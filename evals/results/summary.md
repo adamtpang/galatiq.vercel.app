@@ -1,6 +1,6 @@
 # Eval summary
 
-Offline: generated 2026-10-22 18:35 CDT, base commit 982b14f. Live (grok-4.7): run 2026-10-22 18:34 CDT, base commit 982b14f.
+Offline: generated 2026-10-22 18:57 CDT, base commit 849b0af. Live (grok-4.7): run 2026-10-22 18:34 CDT, base commit 982b14f.
 
 | Eval | Offline | Live |
 |---|---|---|
@@ -22,6 +22,6 @@ Offline: generated 2026-10-22 18:35 CDT, base commit 982b14f. Live (grok-4.7): r
 | (b) Disagreement routing (a metric; sending disagreements to a person is a plan, not policy), eval live run | - | 3 of 20 would go to a person; without that check one side paid 3 of them ($17,580.00) |
 | (d) 20 samples: LLM calls, tokens | 0 | 71 calls; prompt 144,140 (cached 115,584), completion 11,110, reasoning 51,091 |
 | (d) 20 samples: billed cost | $0 | $0.4881 total, $0.0244 per invoice |
-| (d) 20 samples: latency | 8.2 ms mean per invoice, 0.3s batch | 32.08s mean per invoice, 641.81s batch |
+| (d) 20 samples: latency | 6.7 ms mean per invoice, 0.26s batch | 32.08s mean per invoice, 641.81s batch |
 
 Details: `offline.md` and `live.md` next to this file.

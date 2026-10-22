@@ -1,6 +1,6 @@
 # Eval results (offline)
 
-Generated 2026-10-22 18:35 CDT, base commit 982b14f.
+Generated 2026-10-22 18:57 CDT, base commit 849b0af.
 
 ## (a) Extraction accuracy
 
@@ -103,47 +103,47 @@ Rejected 0, held 4, paid 0, read correctly 0 of 4; met the expectation: 4/4.
 
 | Batch | Invoices | LLM calls | Prompt (cached) | Completion | Reasoning | Billed USD | List price USD | Latency mean per invoice | Batch wall s |
 |---|---|---|---|---|---|---|---|---|---|
-| samples | 20 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 8.2 ms | 0.3 |
-| adversarial | 8 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 2.1 ms | 0.05 |
-| extra | 5 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 2.3 ms | 0.03 |
-| unseen | 4 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 1.9 ms | 0.03 |
+| samples | 20 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 6.7 ms | 0.26 |
+| adversarial | 8 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 2.6 ms | 0.05 |
+| extra | 5 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 1.7 ms | 0.03 |
+| unseen | 4 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 2.1 ms | 0.03 |
 
 | File | Decision | Calls | Tools | Prompt | Completion | Reasoning | Billed USD | Latency s |
 |---|---|---|---|---|---|---|---|---|
-| invoice_1001.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.007 |
+| invoice_1001.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.005 |
 | invoice_1002.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_1003.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_1004.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.049 |
+| invoice_1003.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
+| invoice_1004.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_1004_revised.json | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_1005.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
-| invoice_1006.csv | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
+| invoice_1005.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
+| invoice_1006.csv | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
 | invoice_1007.csv | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_1008.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.004 |
+| invoice_1008.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_1009.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
-| invoice_1010.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_1011.pdf | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.011 |
-| invoice_1011.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
-| invoice_1012.pdf | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.051 |
+| invoice_1010.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.004 |
+| invoice_1011.pdf | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.009 |
+| invoice_1011.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
+| invoice_1012.pdf | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.04 |
 | invoice_1012.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_1013.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_1013.pdf | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.017 |
+| invoice_1013.pdf | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.016 |
 | invoice_1014.xml | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.005 |
-| invoice_1015.csv | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
-| invoice_1016.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
-| invoice_3001_injection_note.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
-| invoice_3002_injection_reworded.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
+| invoice_1015.csv | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.03 |
+| invoice_1016.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.004 |
+| invoice_3001_injection_note.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.004 |
+| invoice_3002_injection_reworded.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
 | invoice_3003_lookalike_vendor.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_3004_renamed_vendor.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
+| invoice_3004_renamed_vendor.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_3005_just_under_limit.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
 | invoice_3006_duplicate_new_number.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
 | invoice_3007_watchlist_address.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
-| invoice_3008_bank_details_change.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_2001_email.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
+| invoice_3008_bank_details_change.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
+| invoice_2001_email.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
 | invoice_2002_injection.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
 | invoice_2003_truncated.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
-| invoice_2004_over_limit_clean.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
+| invoice_2004_over_limit_clean.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_2005_over_limit_price.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_4001_supplier_at.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
 | invoice_4002_pipe_table.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_4003_prose_email.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_4004_odd_headers.csv | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
+| invoice_4004_odd_headers.csv | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |

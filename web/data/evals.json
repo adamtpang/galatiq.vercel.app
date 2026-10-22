@@ -1,6 +1,6 @@
 {
  "source": "evals/results (python -m evals)",
- "offline_generated_at": "2026-10-22 18:35 CDT",
+ "offline_generated_at": "2026-10-22 18:57 CDT",
  "live_generated_at": "2026-10-22 18:34 CDT",
  "model": "grok-4.7",
  "extraction": {
@@ -698,19 +698,19 @@
  },
  "offline_latency": {
   "samples": {
-   "latency_mean_ms": 8.2,
-   "wall_s": 0.3
+   "latency_mean_ms": 6.7,
+   "wall_s": 0.26
   },
   "adversarial": {
-   "latency_mean_ms": 2.1,
+   "latency_mean_ms": 2.6,
    "wall_s": 0.05
   },
   "extra": {
-   "latency_mean_ms": 2.3,
+   "latency_mean_ms": 1.7,
    "wall_s": 0.03
   },
   "unseen": {
-   "latency_mean_ms": 1.9,
+   "latency_mean_ms": 2.1,
    "wall_s": 0.03
   }
  }
