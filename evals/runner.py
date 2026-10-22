@@ -16,6 +16,7 @@ committed snapshot instead (evals/results/ and web/data/evals.json).
 from __future__ import annotations
 
 import argparse
+import sys
 import json
 import re
 import subprocess
@@ -522,6 +523,10 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.report_only:
         saved = {m: json.loads((out / f"{m}.json").read_text()) for m in ("offline", "live") if (out / f"{m}.json").exists()}
+        if "offline" not in saved:
+            print(f"No saved results in {rel(out)}: run `python -m evals` first "
+                  "(or add --write-snapshot to re-render the committed snapshot).", file=sys.stderr)
+            return 2
         if not args.no_write:
             for m, r in saved.items():
                 (out / f"{m}.md").write_text(detail_md(r))

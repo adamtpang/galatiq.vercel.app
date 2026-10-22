@@ -117,3 +117,13 @@ def test_review_reject_end_to_end(db):
     assert conn.execute("SELECT status FROM invoices WHERE source_file LIKE '%1004_revised.json'").fetchone()[0] == "REJECTED"
     again = run(db, [INVOICES / "invoice_1004_revised.json"], "rerun")["invoice_1004_revised.json"]
     assert again.decision.status == DecisionStatus.REJECTED and again.payment["status"] == "not_paid"
+
+
+def test_trace_paths_are_repo_relative(tmp_path):
+    """Traces get committed, so absolute machine paths must not leak into them."""
+    ctx = make_context(llm=OfflineClient(), db=str(tmp_path / "inv.db"), runs_dir=tmp_path / "runs", run_id="t",
+                       base_delay=0, sleep=lambda s: None)
+    run_batch([INVOICES / "invoice_1004.json", INVOICES / "invoice_1004_revised.json"], ctx)
+    text = (tmp_path / "runs" / "t" / "trace.jsonl").read_text()
+    assert '"data/invoices/invoice_1004.json"' in text
+    assert str(ROOT) not in text

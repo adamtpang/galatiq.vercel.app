@@ -119,3 +119,9 @@ def test_default_run_modifies_no_tracked_files(tmp_path):
     assert (runner.OUT / "summary.md").exists()
     ignored = subprocess.run(["git", "check-ignore", "-q", str(runner.OUT / "summary.md")], cwd=ROOT)
     assert ignored.returncode == 0
+
+
+def test_report_only_without_saved_results_exits_cleanly(tmp_path, capsys):
+    from evals.runner import main
+    assert main(["--report-only", "--out", str(tmp_path)]) == 2
+    assert "run `python -m evals` first" in capsys.readouterr().err

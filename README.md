@@ -14,7 +14,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt && python main.py --batch data/invoices
 ```
 
-**Results:** offline, 6 of the 20 samples paid ($28,890.00), 12 rejected, 2 held for a person, in under a second. Live with grok-4.7, 3 paid ($13,955.00), 12 rejected, 5 held, every difference a hold where the rules would pay. The adversarial set of 7 traps is caught 7 of 7 in both modes; 192 offline tests, CI on Python 3.11 and 3.12. Details below and in [docs/run_log.md](docs/run_log.md).
+**Results:** offline, 6 of the 20 samples paid ($28,890.00), 12 rejected, 2 held for a person, in under a second. Live with grok-4.7, 3 paid ($13,955.00), 12 rejected, 5 held, every difference a hold where the rules would pay. The adversarial set of 7 traps is caught 7 of 7 in both modes; 194 offline tests, CI on Python 3.11 and 3.12. Details below and in [docs/run_log.md](docs/run_log.md).
 
 **Walkthrough:** [docs/demo_script.md](docs/demo_script.md) (what to run, what to point at) and [docs/presentation.md](docs/presentation.md) (5 to 10 minute talk track).
 
@@ -225,7 +225,7 @@ Not estimated: losses from paying wrong or fraudulent invoices, early-payment di
 
 ## Testing
 
-- `pytest`: 192 offline tests in about 4 seconds, no network. Parsers on all 20 files, every validation check, payment idempotency, retries and chaos, the HITL queue, approval rules, the hard holds and the critic loop, a golden test (`tests/golden.yaml`) that pins the expected offline decision and paid amount for every sample, and `tests/test_agentic.py`, which drives the real `GrokClient` with a scripted OpenAI-compatible client to test the self-correction retry, the tool-call loop (including an unknown tool) and API retries. `tests/test_evals.py` runs the four evals offline and pins their numbers (see "Evals"). `tests/test_history.py` covers duplicates against stored history across separate runs, idempotent re-runs, and the review command approving and rejecting a held invoice end to end.
+- `pytest`: 194 offline tests in about 4 seconds, no network. Parsers on all 20 files, every validation check, payment idempotency, retries and chaos, the HITL queue, approval rules, the hard holds and the critic loop, a golden test (`tests/golden.yaml`) that pins the expected offline decision and paid amount for every sample, and `tests/test_agentic.py`, which drives the real `GrokClient` with a scripted OpenAI-compatible client to test the self-correction retry, the tool-call loop (including an unknown tool) and API retries. `tests/test_evals.py` runs the four evals offline and pins their numbers (see "Evals"). `tests/test_history.py` covers duplicates against stored history across separate runs, idempotent re-runs, and the review command approving and rejecting a held invoice end to end.
 - `pytest -m live`: one real Grok extraction of invoice 1001 (needs `XAI_API_KEY`).
 - CI runs the offline suite on Python 3.11 and 3.12 plus an offline batch run. The workflow source is in `ci/github-actions-ci.yml`; the active copy is `.github/workflows/ci.yml`.
 

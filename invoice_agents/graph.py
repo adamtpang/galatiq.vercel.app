@@ -107,10 +107,11 @@ def build_graph(ctx: RunContext):
         path = ctx.trace_path()
         if path:
             with open(path, "a") as fh:
+                root = str(ROOT) + "/"  # traces are committed; keep paths repo-relative
                 for ev in s.trace:
                     fh.write(json.dumps({"run_id": ctx.run_id, "source": Path(s.source).name,
                                          "invoice": inv.number if inv else None, **ev.model_dump(mode="json")},
-                                        default=str) + "\n")
+                                        default=str).replace(root, "") + "\n")
         return s
 
     g = StateGraph(GraphState)
