@@ -1,0 +1,17 @@
+# Published xAI pricing for grok-4.7, used only to cross-check the billed cost the API returns.
+# Source: https://docs.x.ai/docs/models and https://docs.x.ai/developers/pricing ("Text API
+# Pricing", fetched Oct 22, 2026). Reasoning tokens are billed at the completion (output) rate:
+# https://docs.x.ai/developers/advanced-api-usage/prompt-caching/usage-and-pricing
+# The API also returns the billed cost of every call as usage.cost_in_usd_ticks
+# (1 USD = 10,000,000,000 ticks): https://docs.x.ai/developers/cost-tracking
+model: grok-4.7
+fetched: "2026-10-22"
+usd_per_million_tokens:
+  input: 2.00
+  cached_input: 0.50
+  output: 6.00               # completion and reasoning tokens
+long_context:
+  threshold_prompt_tokens: 200000
+  input: 4.00
+  cached_input: 1.00
+  output: 12.00

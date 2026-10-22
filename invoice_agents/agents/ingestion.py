@@ -70,6 +70,17 @@ def _from_llm(x: ExtractedInvoice, source: str, fmt: str) -> Invoice:
     return finish(inv, number=x.invoice_number, date_raw=x.date, due_raw=x.due_date)
 
 
+def llm_extract(raw: str, source: str, fmt: str, llm: LLMClient, problem: str | None = None):
+    """Grok extraction with schema validation and self-correction. Returns (Invoice, LLMResult).
+    Used by the repair path below and by the extraction eval (evals/), which runs it on every file."""
+    head = f"Deterministic parser problem: {problem}\n\n" if problem else ""
+    res = llm.complete_structured(ExtractedInvoice, [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": f"{head}Invoice text:\n{raw[:20000]}"},
+    ])
+    return _from_llm(res.value, source, fmt), res
+
+
 def resolve_skus(inv: Invoice, inventory: Inventory) -> None:
     catalog = list(inventory.items)
     for li in inv.items:
@@ -106,11 +117,7 @@ def ingest(path: str | Path, inventory: Inventory, llm: LLMClient | None = None)
     elif llm.available:
         problem = parse_error or "parser found no line items or no total"
         try:
-            res = llm.complete_structured(ExtractedInvoice, [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Deterministic parser problem: {problem}\n\nInvoice text:\n{raw[:20000]}"},
-            ])
-            inv = _from_llm(res.value, str(path), fmt)
+            inv, res = llm_extract(raw, str(path), fmt, llm, problem)
             state.extraction_attempts += len(res.attempts)
             state.extraction_mode = "llm_repair"
             state.trace.append(TraceEvent(agent=AGENT, step="llm_repair", detail={

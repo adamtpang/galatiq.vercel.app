@@ -47,9 +47,23 @@ class RunContext:
         return self.run_dir / "trace.jsonl" if self.run_dir else None
 
 
-def _safe(name: str, fn: Callable[[InvoiceState], InvoiceState]):
+def llm_usage(records: list[dict]) -> dict:
+    """Sum of usage records (see llm.usage_record) for one node."""
+    keys = ("prompt_tokens", "cached_prompt_tokens", "completion_tokens", "reasoning_tokens")
+    out: dict[str, Any] = {"calls": len(records), **{k: sum(r[k] for r in records) for k in keys},
+                           "api_latency_s": round(sum(r["latency_s"] for r in records), 3),
+                           "max_prompt_tokens": max((r["prompt_tokens"] for r in records), default=0),
+                           "purposes": [r["purpose"] for r in records]}
+    ticks = [r["cost_in_usd_ticks"] for r in records if r.get("cost_in_usd_ticks") is not None]
+    out["cost_in_usd_ticks"] = sum(ticks) if len(ticks) == len(records) else None
+    return out
+
+
+def _safe(name: str, fn: Callable[[InvoiceState], InvoiceState], llm: Any = None):
     def node(g: GraphState) -> GraphState:
         s = g["s"]
+        log = getattr(llm, "usage_log", None)
+        n0 = len(log) if log is not None else 0
         t0 = time.monotonic()
         try:
             s = fn(s)
@@ -59,7 +73,10 @@ def _safe(name: str, fn: Callable[[InvoiceState], InvoiceState]):
             if name in ("risk", "approval") and s.decision is None:
                 s.decision = Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="error",
                                       reasons=[f"{name} failed: {e}"])
-        s.trace.append(TraceEvent(agent=name, step="node_done", detail={"ms": round((time.monotonic() - t0) * 1000, 1)}))
+        detail: dict[str, Any] = {"ms": round((time.monotonic() - t0) * 1000, 1)}
+        if log is not None and len(log) > n0:
+            detail["llm"] = llm_usage(log[n0:])
+        s.trace.append(TraceEvent(agent=name, step="node_done", detail=detail))
         return {"s": s}
     return node
 
@@ -96,10 +113,10 @@ def build_graph(ctx: RunContext):
         return s
 
     g = StateGraph(GraphState)
-    g.add_node("ingest", _safe("ingestion", do_ingest))
+    g.add_node("ingest", _safe("ingestion", do_ingest, ctx.llm))
     g.add_node("validate", _safe("validation", lambda s: validate(s, ctx.inventory, ctx.policy, ctx.registry)))
-    g.add_node("risk", _safe("risk", lambda s: risk.assess(s, ctx.policy, ctx.llm, risk.risk_tools(ctx.inventory, ctx.conn))))
-    g.add_node("approve", _safe("approval", lambda s: approval.approve(s, ctx.llm, ctx.policy)))
+    g.add_node("risk", _safe("risk", lambda s: risk.assess(s, ctx.policy, ctx.llm, risk.risk_tools(ctx.inventory, ctx.conn)), ctx.llm))
+    g.add_node("approve", _safe("approval", lambda s: approval.approve(s, ctx.llm, ctx.policy), ctx.llm))
     g.add_node("pay", _safe("payment", ctx.payments.pay))
     g.add_node("reject", _safe("payment", lambda s: log_rejection(ctx.conn, s)))
     g.add_node("hold", _safe("hitl", lambda s: enqueue(ctx.conn, s)))

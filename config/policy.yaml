@@ -1,10 +1,10 @@
-# Business rules for validation. Tune here, not in code.
-# Approval rules (who approves what) belong to the approval agent, which Adam owns. See DECISIONS in README.
+# Business rules for validation, risk and approval. Tune here, not in code.
+# Approval rules (who approves what) are Adam's decisions. See docs/DECISIONS.md.
 
 currency: USD
 
-# Approval policy (Adam's decisions, see README "Decisions"). The approval agent that
-# reads these is not built yet; validation only uses approval_threshold_usd for an info flag.
+# Approval policy (Adam's decisions, see docs/DECISIONS.md). Read by the approval agent
+# (invoice_agents/agents/approval.py) and the risk agent; validation adds info flags from the thresholds.
 approval:
   approval_threshold_usd: 10000      # over this: extra scrutiny (critic loop)
   near_limit_usd: 9500               # total >= this counts as "near the limit": critic loop
@@ -51,6 +51,6 @@ fx_to_usd:
   GBP: 1.27
   CAD: 0.73
 
-# Decisions made by Adam (see README "Decisions"). Encoded as flag severities.
+# Decisions made by Adam (see docs/DECISIONS.md). Encoded as flag severities.
 decisions:
   stock_exceeded: reject             # qty > stock after aggregating repeated lines: blocking STOCK_EXCEEDED flag

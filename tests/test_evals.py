@@ -1,0 +1,104 @@
+"""Offline evals run in CI: ground truth coverage, scorer behaviour, and the offline numbers
+pinned so a parser, policy or prompt change that moves them shows up as a test failure."""
+import json
+from types import SimpleNamespace as NS
+
+import pytest
+
+from evals import runner
+from invoice_agents.graph import llm_usage
+from invoice_agents.llm import GrokClient, usage_record
+from invoice_agents.pipeline import collect
+
+from .conftest import ROOT
+
+
+@pytest.fixture(scope="module")
+def offline(tmp_path_factory):
+    return runner.evaluate("offline", workdir=tmp_path_factory.mktemp("evals"))
+
+
+def test_ground_truth_covers_every_sample_and_extra():
+    gt = runner.load_yaml("ground_truth.yaml")
+    files = [runner.rel(p) for d in (runner.SAMPLES, runner.EXTRA) for p in collect(d)]
+    assert sorted(gt) == sorted(files) and len(files) == 23
+    for name, g in gt.items():
+        assert set(runner.FIELDS) <= set(g), name
+
+
+def test_known_sample_math_errors_recorded_as_printed():
+    gt = runner.load_yaml("ground_truth.yaml")
+    assert gt["data/invoices/invoice_1007.csv"]["total"] == 15525.00 and "$110" in gt["data/invoices/invoice_1007.csv"]["math_note"]
+    assert gt["data/invoices/invoice_1013.json"]["total"] == 22562.80 and "$50" in gt["data/invoices/invoice_1013.json"]["math_note"]
+
+
+def test_scorer_rules():
+    from invoice_agents.models import Invoice, LineItem
+    gt = {"vendor": "Widgets Inc.", "invoice_number": "INV-1002", "total": 10.0, "due_date": None,
+          "line_items": [["WidgetA", 1], ["WidgetA", 2]], "ambiguous": {"due_date": "relative"}}
+    inv = Invoice(vendor="widgets inc", number="1002", total=10.0,
+                  items=[LineItem(sku_raw="Widget A", sku="WidgetA", sku_confidence=1.0, qty=2),
+                         LineItem(sku_raw="WidgetA", sku="WidgetA", sku_confidence=1.0, qty=1)])
+    s = runner.score_invoice(inv, gt)
+    assert {f: v["status"] for f, v in s.items()} == {"vendor": "correct", "invoice_number": "correct", "total": "correct",
+                                                       "line_items": "correct", "due_date": "ambiguous"}
+    inv.items[0].qty = 3
+    assert runner.score_invoice(inv, gt)["line_items"]["status"] == "wrong"
+    assert all(v["status"] in ("failed", "ambiguous") for v in runner.score_invoice(None, gt).values())
+
+
+def test_offline_extraction_numbers(offline):
+    ex = offline["extraction"]["pipeline"]
+    assert ex["files"] == 23
+    # The parsers read all 20 samples exactly; the 2 unreadable extra files fail offline by design.
+    sample_misses = [m for m in ex["misses"] if m["file"].startswith("data/invoices/")]
+    assert sample_misses == []
+    assert ex["overall"] == {"correct": 104, "scored": 112, "accuracy": 0.9286}
+    assert {m["file"] for m in ex["misses"]} == {"data/invoices_extra/invoice_2001_email.txt",
+                                                  "data/invoices_extra/invoice_2003_truncated.json"}
+
+
+def test_offline_adversarial_numbers(offline):
+    adv = offline["adversarial"]
+    assert adv["total"] == 7 and adv["caught"] == 3
+    # Honest misses with the current policy (see README "Evals"); pinned so a change is visible.
+    assert sorted(adv["missed"]) == ["invoice_3001_injection_note.json", "invoice_3002_injection_reworded.txt",
+                                     "invoice_3004_renamed_vendor.txt", "invoice_3006_duplicate_new_number.txt"]
+
+
+def test_offline_makes_no_llm_calls(offline):
+    assert all(b["calls"] == 0 for b in offline["cost_latency"]["batches"].values())
+
+
+def test_committed_demo_agreement(offline):
+    demo = offline["agreement"][0]
+    assert demo["invoices"] == 20 and demo["agree"] == 17
+    assert sorted(d["file"] for d in demo["disagreements"]) == ["invoice_1006.csv", "invoice_1010.txt", "invoice_1014.xml"]
+
+
+def test_usage_record_counts_every_call_and_reasoning_tokens():
+    resp = NS(model="grok-4.7", usage=NS(prompt_tokens=1246, completion_tokens=1, cost_in_usd_ticks=22640000,
+                                          completion_tokens_details=NS(reasoning_tokens=249),
+                                          prompt_tokens_details=NS(cached_tokens=1152)))
+    r = usage_record(resp, "VPOpinion", 0.5)
+    assert (r["prompt_tokens"], r["cached_prompt_tokens"], r["completion_tokens"], r["reasoning_tokens"]) == (1246, 1152, 1, 249)
+    pricing = runner.load_yaml("pricing.yaml")
+    agg = llm_usage([r])
+    # list price recomputed from docs.x.ai matches the billed ticks of this real response
+    assert runner.price(agg, pricing) == pytest.approx(22640000 / 1e10)
+
+
+def test_grok_client_logs_usage_for_tool_rounds_and_structured_calls():
+    from .test_agentic import FakeOpenAI, call, reply
+    fake = FakeOpenAI([reply(tool_calls=[call("1", "noop", {})]), reply(), reply(json.dumps({"score": 5}))])
+    g = GrokClient(client=fake, sleep=lambda s: None)
+    from invoice_agents.agents.risk import RiskReview
+    from invoice_agents.llm import Tool
+    msgs, calls = g.run_tools([{"role": "user", "content": "x"}], [Tool("noop", "", {"type": "object"}, lambda: {})])
+    g.complete_structured(RiskReview, msgs)
+    assert [u["purpose"] for u in g.usage_log] == ["tool_round", "tool_round", "RiskReview"]
+    assert sum(u["prompt_tokens"] for u in g.usage_log) == 30
+
+
+def test_report_renders(offline):
+    assert "Extraction" in runner.detail_md(offline) and "| (c) Adversarial catch rate | 3/7" in runner.summary_md(offline, None)

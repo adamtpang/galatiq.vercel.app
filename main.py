@@ -4,6 +4,7 @@
   python main.py --batch data/invoices [--offline] [--chaos 0.3] [--json]
   python main.py review                       # list the human review queue
   python main.py review INV-1012 --approve    # or --reject, optional --note
+  python main.py eval [--live]                # the four evals (same as python -m evals)
 """
 from __future__ import annotations
 
@@ -106,6 +107,13 @@ def review(
     else:
         state = log_rejection(conn, state)
     console.print(f"{state.invoice.number}: {state.decision.status.value} by human. Payment: {state.payment}")
+
+
+@app.command("eval")
+def eval_cmd(live: bool = typer.Option(False, "--live", help="Also run live against the xAI API (needs XAI_API_KEY)")):
+    """Run the evals: extraction accuracy, live vs offline agreement, adversarial set, cost and latency."""
+    from evals.runner import main as run_evals
+    raise typer.Exit(run_evals(["--live"] if live else []))
 
 
 if __name__ == "__main__":

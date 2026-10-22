@@ -73,6 +73,21 @@ class OfflineClient:
         raise LLMUnavailable("Offline mode: no LLM calls. Deterministic parsers and rules only.")
 
 
+def usage_record(resp: Any, purpose: str, latency_s: float) -> dict:
+    """Token usage of one API response. reasoning_tokens are billed at the output rate and are
+    NOT included in completion_tokens on the xAI API; cost_in_usd_ticks is the billed cost
+    the API reports (1 USD = 1e10 ticks), when present."""
+    u = getattr(resp, "usage", None)
+    ctd = getattr(u, "completion_tokens_details", None)
+    ptd = getattr(u, "prompt_tokens_details", None)
+    return {"purpose": purpose, "model": getattr(resp, "model", None), "latency_s": round(latency_s, 3),
+            "prompt_tokens": getattr(u, "prompt_tokens", 0) or 0,
+            "cached_prompt_tokens": getattr(ptd, "cached_tokens", 0) or 0,
+            "completion_tokens": getattr(u, "completion_tokens", 0) or 0,
+            "reasoning_tokens": getattr(ctd, "reasoning_tokens", 0) or 0,
+            "cost_in_usd_ticks": getattr(u, "cost_in_usd_ticks", None)}
+
+
 class GrokClient:
     name = "grok"
     available = True
@@ -82,6 +97,7 @@ class GrokClient:
         self.model = model or os.environ.get("XAI_MODEL") or DEFAULT_MODEL
         self.api_retries = api_retries
         self._sleep = sleep
+        self.usage_log: list[dict] = []   # one record per API call (every agent), see usage_record()
         if client is not None:          # tests inject a fake OpenAI-compatible client
             self._client = client
             return
@@ -92,18 +108,21 @@ class GrokClient:
             raise LLMUnavailable("XAI_API_KEY is not set")
         self._client = OpenAI(api_key=key, base_url=XAI_BASE_URL, timeout=timeout)
 
-    def _create(self, **kw):
+    def _create(self, purpose: str = "chat", **kw):
         last = None
         for i in range(self.api_retries):
+            t0 = time.monotonic()
             try:
-                return self._client.chat.completions.create(model=self.model, temperature=0, **kw)
+                resp = self._client.chat.completions.create(model=self.model, temperature=0, **kw)
+                self.usage_log.append(usage_record(resp, purpose, time.monotonic() - t0))
+                return resp
             except Exception as e:  # network, rate limit, 5xx
                 last = e
                 self._sleep(min(2 ** i, 8))
         raise LLMUnavailable(f"xAI API failed after {self.api_retries} tries: {last}")
 
     def _call(self, schema: type[BaseModel], messages: list[dict]):
-        return self._create(messages=messages, response_format={"type": "json_schema", "json_schema": {
+        return self._create(purpose=schema.__name__, messages=messages, response_format={"type": "json_schema", "json_schema": {
             "name": schema.__name__, "schema": schema.model_json_schema()}})
 
     def run_tools(self, messages: list[dict], tools: list[Tool], max_rounds: int = 4) -> tuple[list[dict], list[dict]]:
@@ -113,7 +132,7 @@ class GrokClient:
         by_name = {t.name: t for t in tools}
         calls: list[dict] = []
         for _ in range(max_rounds):
-            resp = self._create(messages=msgs, tools=[t.spec() for t in tools], tool_choice="auto")
+            resp = self._create(purpose="tool_round", messages=msgs, tools=[t.spec() for t in tools], tool_choice="auto")
             msg = resp.choices[0].message
             tcs = getattr(msg, "tool_calls", None) or []
             if not tcs:

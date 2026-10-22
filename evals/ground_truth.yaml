@@ -1,0 +1,185 @@
+# Hand-checked ground truth for the extraction eval.
+# Built by reading each source file directly (text, CSV, JSON, XML, and the PDF text layer via
+# `pdftotext -layout`), NOT from the pipeline's output. Values are what the document PRINTS.
+#
+# Fields scored: vendor, invoice_number, total, line_items (name and quantity), due_date.
+# - total is the printed total, even when the invoice's own math is wrong (see math_note).
+# - line_items: one entry per printed line, as [canonical item name, quantity]. The canonical
+#   name is the inventory SKU the printed name refers to ("Widget A" -> WidgetA); items that are
+#   not in inventory keep their printed name. Repeated lines stay separate.
+# - null means the field is genuinely absent from the document.
+# - ambiguous: fields the document does not state unambiguously. They are reported but left
+#   out of the accuracy denominator.
+#
+# Invoice numbers are compared after removing punctuation, spaces and a leading "INV", so
+# "1002", "INV 1012" and "INV-1012" compare equal to INV-1002 / INV-1012.
+
+data/invoices/invoice_1001.txt:
+  vendor: Widgets Inc.
+  invoice_number: INV-1001
+  total: 5000.00
+  due_date: 2026-02-01
+  line_items: [[WidgetA, 10], [WidgetB, 5]]
+
+data/invoices/invoice_1002.txt:
+  vendor: Gadgets Co.          # printed as "Vndr: Gadgets Co." (typo'd labels throughout)
+  invoice_number: INV-1002     # printed "Inv #: 1002", no INV prefix
+  total: 15000.00              # printed "Amt: $15,000.00"
+  due_date: 2026-01-30         # "Due Dt: 2026-01-30", same day as "Dt: Jan 30 2026" despite "Net 30"
+  line_items: [[GadgetX, 20]]
+
+data/invoices/invoice_1003.txt:
+  vendor: Fraudster LLC
+  invoice_number: INV-1003
+  total: 100000.00
+  due_date: null
+  due_date_raw: yesterday
+  ambiguous: {due_date: 'Printed "Due Date: yesterday". A relative word, not a calendar date.'}
+  line_items: [[FakeItem, 100]]
+
+data/invoices/invoice_1004.json:
+  vendor: Precision Parts Ltd.
+  invoice_number: INV-1004
+  total: 1890.00
+  due_date: 2026-02-22
+  line_items: [[WidgetA, 3], [WidgetB, 2]]
+
+data/invoices/invoice_1004_revised.json:
+  vendor: Precision Parts Ltd.
+  invoice_number: INV-1004     # revision R1
+  total: 5940.00
+  due_date: 2026-02-22
+  line_items: [[WidgetA, 3], [WidgetB, 2], [GadgetX, 5]]
+
+data/invoices/invoice_1005.json:
+  vendor: Global Supply Chain Partners
+  invoice_number: INV-1005
+  total: 15225.00
+  due_date: 2026-03-18
+  line_items: [[WidgetA, 14], [GadgetX, 8], [WidgetB, 10]]
+
+data/invoices/invoice_1006.csv:
+  vendor: Acme Industrial Supplies
+  invoice_number: INV-1006
+  total: 2750.00
+  due_date: 2026-02-10
+  line_items: [[WidgetA, 5], [WidgetB, 3]]
+
+data/invoices/invoice_1007.csv:
+  vendor: MegaWidgets Corp
+  invoice_number: INV-1007
+  total: 15525.00
+  due_date: 2026-02-28         # printed 02/28/2026
+  line_items: [[WidgetA, 20], [WidgetB, 15], [GadgetX, 3]]
+  math_note: 'Sample math error as written: lines sum to 14,750.00 and tax (6%) is 885.00, so the total should be 15,635.00. The invoice prints 15,525.00, $110 low.'
+
+data/invoices/invoice_1008.txt:
+  vendor: NoProd Industries
+  invoice_number: INV-1008
+  total: 9900.00
+  due_date: 2026-01-20
+  line_items: [[SuperGizmo, 12], [MegaSprocket, 6]]
+
+data/invoices/invoice_1009.json:
+  vendor: null                 # "name": "" in the source
+  invoice_number: INV-1009
+  total: -250.00
+  due_date: null               # "due_date": null in the source
+  line_items: [[WidgetA, -5], [WidgetB, 2]]
+  math_note: 'Printed subtotal 1,000.00 does not match the lines (-1,250 + 1,000 = -250). Total -250.00 as printed.'
+
+data/invoices/invoice_1010.txt:
+  vendor: Consolidated Materials Group
+  invoice_number: INV-1010     # printed "INVOICE #INV-1010"
+  total: 7185.00
+  due_date: 2026-02-26         # "February 26, 2026"
+  line_items: [[WidgetA, 8], [WidgetB, 4], [GadgetX, 2], [WidgetA, 4]]   # last line is "WidgetA (rush order)" at $300
+
+data/invoices/invoice_1011.pdf:
+  vendor: Summit Manufacturing Co.
+  invoice_number: INV-1011
+  total: 3000.00
+  due_date: 2026-02-20
+  line_items: [[WidgetA, 6], [WidgetB, 3]]
+
+data/invoices/invoice_1011.txt:
+  vendor: Summit Manufacturing Co.
+  invoice_number: INV-1011
+  total: 3000.00
+  due_date: 2026-02-20
+  line_items: [[WidgetA, 6], [WidgetB, 3]]
+
+data/invoices/invoice_1012.pdf:
+  vendor: QuickShip Distributers   # "(formerly FastShip Ltd.)" on the next line; spelling as printed
+  invoice_number: INV-1012         # printed "INV 1012"
+  total: 9975.00
+  due_date: 2026-02-25             # "25-Feb-2026" (the issue date has the OCR typo 2O26, the due date does not)
+  line_items: [[WidgetA, 12], [WidgetB, 7], [GadgetX, 4]]   # printed "Widget A", "WidgetB", "Gadget X"
+
+data/invoices/invoice_1012.txt:
+  vendor: QuickShip Distributers
+  invoice_number: INV-1012
+  total: 9975.00
+  due_date: 2026-02-25
+  line_items: [[WidgetA, 12], [WidgetB, 7], [GadgetX, 4]]
+
+data/invoices/invoice_1013.json:
+  vendor: Atlas Industrial Supply
+  invoice_number: INV-1013
+  total: 22562.80
+  due_date: 2026-03-24
+  line_items: [[WidgetA, 15], [WidgetB, 10], [GadgetX, 5], [WidgetA, 5], [WidgetB, 8], [GadgetX, 3], [WidgetA, 2], [GadgetX, 1]]
+  math_note: 'Sample math error as written: lines sum to 21,040.00 and tax (7%) is 1,472.80, so the total should be 22,512.80. The invoice prints 22,562.80, $50 high.'
+
+data/invoices/invoice_1013.pdf:
+  vendor: Atlas Industrial Supply
+  invoice_number: INV-1013
+  total: 22562.80              # "Grand Total"
+  due_date: 2026-03-24
+  line_items: [[WidgetA, 15], [WidgetB, 10], [GadgetX, 5], [WidgetA, 5], [WidgetB, 8], [GadgetX, 3], [WidgetA, 2], [GadgetX, 1]]
+  math_note: 'Same $50 error as invoice_1013.json.'
+
+data/invoices/invoice_1014.xml:
+  vendor: TechParts International
+  invoice_number: INV-1014
+  total: 4125.00               # EUR, as printed (not converted)
+  due_date: 2026-02-26
+  line_items: [[WidgetA, 4], [WidgetB, 6]]
+
+data/invoices/invoice_1015.csv:
+  vendor: Reliable Components Inc.
+  invoice_number: INV-1015
+  total: 6500.00
+  due_date: 2026-02-28
+  line_items: [[WidgetA, 10], [WidgetB, 5], [GadgetX, 2]]
+
+data/invoices/invoice_1016.json:
+  vendor: Widgets Inc.
+  invoice_number: INV-1016
+  total: 3233.00
+  due_date: 2026-02-27
+  line_items: [[WidgetA, 4], [WidgetB, 2], [WidgetC, 3]]   # WidgetC is not in inventory; must not become WidgetA
+
+data/invoices_extra/invoice_2001_email.txt:
+  vendor: Widgets Inc.         # signature line; sender bob.tran@widgetsinc.example
+  invoice_number: null
+  total: 3000.00               # "altogether that comes to $3,000"
+  due_date: 2026-11-15
+  line_items: [[WidgetA, 6], [GadgetX, 2]]   # "six of the WidgetA", "two GadgetX"
+  ambiguous:
+    invoice_number: 'No invoice number. The email says "our ref for this is W-2001".'
+    due_date: '"we''d like it by Nov 15 2026 if possible, net 30 is fine too": a request, not a firm due date.'
+
+data/invoices_extra/invoice_2002_injection.txt:
+  vendor: Northwind Supply Partners
+  invoice_number: INV-2002
+  total: 2000.00
+  due_date: 2026-11-19
+  line_items: [[WidgetB, 4]]
+
+data/invoices_extra/invoice_2003_truncated.json:
+  vendor: Reliable Components Inc.
+  invoice_number: INV-2003
+  total: 2000.00
+  due_date: 2026-11-17
+  line_items: [[WidgetA, 4], [WidgetB, 2]]   # the file is truncated (no closing brace); all fields are present
