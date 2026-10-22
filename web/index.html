@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acme AP Agents | Galatiq case by Adam Pang</title>
+<meta name="description" content="A multi-agent system, powered by Grok, that ingests, validates, approves and pays Acme Corp invoices. Work in progress for the Galatiq FDE case.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top"><span class="logo"></span>Acme AP Agents</a>
+    <nav>
+      <a href="#problem">Problem</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#bench">Test bench</a>
+    </nav>
+    <span class="badge soon"><span class="dot"></span>Live demo coming soon</span>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero wrap">
+    <div class="hero-copy">
+      <p class="eyebrow">Galatiq FDE case · Work in progress</p>
+      <h1>Four AI agents that read, check, approve and pay Acme's invoices.</h1>
+      <p class="lede">A multi-agent pipeline with Grok as the reasoning engine. Messy invoices go in. A clear decision with reasons comes out: pay it, reject it, or send it to a human.</p>
+      <div class="cta">
+        <a class="btn primary" href="#pipeline">See the pipeline</a>
+        <a class="btn ghost" href="#bench">Browse the test bench</a>
+      </div>
+      <p class="fine">The system is being built now. Nothing on this page is a measured result.</p>
+    </div>
+
+    <aside class="card preview" aria-label="Design preview of a decision card">
+      <div class="preview-top">
+        <span class="label">Design preview</span>
+        <span class="label muted">Not live output</span>
+      </div>
+      <div class="inv-head">
+        <div>
+          <div class="mono small muted">invoice_1003.txt</div>
+          <div class="inv-id">INV-1003</div>
+        </div>
+        <span class="pill reject">Rejected</span>
+      </div>
+      <div class="amount">$100,000.00</div>
+      <div class="meter">
+        <div class="meter-row"><span>Risk</span><span class="mono">expected: high</span></div>
+        <div class="meter-bar"><span></span></div>
+      </div>
+      <ul class="flags">
+        <li><span class="sev block">block</span>FakeItem has zero stock</li>
+        <li><span class="sev block">block</span>Due date reads "yesterday"</li>
+        <li><span class="sev warn">warn</span>Urgent wire transfer pressure</li>
+        <li><span class="sev warn">warn</span>Over $10K: VP plus critic review</li>
+      </ul>
+      <div class="steps">
+        <span class="s done">Ingest</span><span class="s done">Validate</span><span class="s done">Approve ⇄ Critic</span><span class="s stop">Reject + log</span>
+      </div>
+    </aside>
+  </section>
+
+  <section id="problem" class="wrap section">
+    <p class="eyebrow">The problem</p>
+    <h2>Acme pays people to retype invoices. It costs them.</h2>
+    <p class="sub">Invoices arrive by email in every format. Staff copy the data by hand, check it against a shaky inventory database, chase a VP over email, then pay.</p>
+    <div class="stats">
+      <div class="stat"><div class="big">$2M</div><div class="cap">lost per year to manual processing</div></div>
+      <div class="stat"><div class="big">30%</div><div class="cap">of invoices carry an error</div></div>
+      <div class="stat"><div class="big">5 days</div><div class="cap">from inbox to payment</div></div>
+    </div>
+    <p class="fine">Figures from the Galatiq case brief describing Acme today.</p>
+  </section>
+
+  <section id="pipeline" class="wrap section">
+    <p class="eyebrow">The pipeline</p>
+    <h2>One invoice, four agents, one auditable decision.</h2>
+    <p class="sub">Each agent has one job and its own tools. Deterministic code owns the math. Grok extracts, reasons and critiques.</p>
+
+    <ol class="flow">
+      <li class="stage">
+        <div class="num">1</div>
+        <h3>Ingest</h3>
+        <p>Reads PDF, TXT, CSV, JSON and XML. Grok extracts vendor, items, quantities, total and due date into a strict schema.</p>
+        <div class="loop">↺ Self-corrects when the schema or math fails</div>
+      </li>
+      <li class="arrow" aria-hidden="true"></li>
+      <li class="stage">
+        <div class="num">2</div>
+        <h3>Validate</h3>
+        <p>Checks every line against the SQLite inventory. Flags stock overruns, unknown items, bad dates, negative quantities and totals that do not add up.</p>
+        <div class="loop">Tools: query_inventory, check_math</div>
+      </li>
+      <li class="arrow" aria-hidden="true"></li>
+      <li class="stage accent">
+        <div class="num">3</div>
+        <h3>Approve</h3>
+        <p>A VP agent proposes a decision. A critic agent challenges it. They revise until they agree or escalate. Anything over $10K gets extra scrutiny.</p>
+        <div class="critic"><span>VP proposes</span><span class="swap">⇄</span><span>Critic pushes back</span></div>
+      </li>
+      <li class="arrow" aria-hidden="true"></li>
+      <li class="stage">
+        <div class="num">4</div>
+        <h3>Pay or reject</h3>
+        <p>Approved invoices call the mock payment function once. Rejections are logged with the reasons, so a human can see exactly why.</p>
+        <div class="outcomes"><span class="pill approve">Approved</span><span class="pill reject">Rejected</span><span class="pill review">Needs review</span></div>
+      </li>
+    </ol>
+    <p class="fine">Runs locally per the brief, with Grok via the xAI API. This page will later replay real run traces.</p>
+  </section>
+
+  <section id="bench" class="wrap section">
+    <p class="eyebrow">Test bench</p>
+    <h2>20 sample files, and the trap hidden in each.</h2>
+    <p class="sub">Every file in the case repo's <span class="mono">data/invoices</span>. The right column is the <strong>expected handling</strong> the system is being built to reach. These are targets, not results.</p>
+
+    <div class="filters" role="tablist">
+      <button class="chip on" data-f="all">All</button>
+      <button class="chip" data-f="approve">Expect approve</button>
+      <button class="chip" data-f="reject">Expect reject</button>
+      <button class="chip" data-f="review">Expect review</button>
+    </div>
+
+    <div class="table" id="bench-table">
+      <div class="row head">
+        <div>Invoice</div><div>The trap</div><div>Expected handling</div>
+      </div>
+      <div class="row" data-k="approve">
+        <div><b>INV-1001</b><span class="fmt">TXT</span><div class="money">$5,000.00</div></div>
+        <div>The clean baseline. Net 15 terms do not quite match the due date, worth a note, not a block.</div>
+        <div><span class="pill approve">Approve</span><span class="why">Pay Widgets Inc.</span></div>
+      </div>
+      <div class="row" data-k="reject">
+        <div><b>INV-1002</b><span class="fmt">TXT</span></div>
+        <div>Typos in the field labels. Asks for 20 GadgetX with 5 in stock. Over $10K. Due the day it was issued.</div>
+        <div><span class="pill reject">Reject</span><span class="why">Stock exceeded</span></div>
+      </div>
+      <div class="row" data-k="reject">
+        <div><b>INV-1003</b><span class="fmt">TXT</span><div class="money">$100,000.00</div></div>
+        <div>Bills for FakeItem, which has zero stock. Due "yesterday". Pushes for an urgent wire transfer.</div>
+        <div><span class="pill reject">Reject</span><span class="why">Fraud alert, high risk</span></div>
+      </div>
+      <div class="row" data-k="approve">
+        <div><b>INV-1004</b><span class="fmt">JSON</span><div class="money">$1,890.00</div></div>
+        <div>Clean on its own. A revised version with the same number follows.</div>
+        <div><span class="pill approve">Approve</span><span class="why">Unless superseded</span></div>
+      </div>
+      <div class="row" data-k="approve">
+        <div><b>INV-1004 rev</b><span class="fmt">JSON</span><div class="money">$5,940.00</div></div>
+        <div>Same invoice number as 1004. Revision R1 should replace the original, never stack on top of it.</div>
+        <div><span class="pill approve">Approve</span><span class="why">Revision wins, original voided</span></div>
+      </div>
+      <div class="row" data-k="reject">
+        <div><b>INV-1005</b><span class="fmt">JSON</span></div>
+        <div>8 GadgetX against 5 in stock. Over $10K. The vendor address is 1600 Pennsylvania Ave.</div>
+        <div><span class="pill reject">Reject</span><span class="why">Critic loop on display</span></div>
+      </div>
+      <div class="row" data-k="approve">
+        <div><b>INV-1006</b><span class="fmt">CSV</span><div class="money">$2,750.00</div></div>
+        <div>Key-value CSV instead of a table. The vendor name looks a lot like "Acme".</div>
+        <div><span class="pill approve">Approve</span><span class="why">Lookalike noted</span></div>
+      </div>
+      <div class="row" data-k="reject">
+        <div><b>INV-1007</b><span class="fmt">CSV</span></div>
+        <div>WidgetA 20 vs 15 and WidgetB 15 vs 10 in stock. Over $10K. US style MM/DD dates.</div>
+        <div><span class="pill reject">Reject</span><span class="why">Stock exceeded</span></div>
+      </div>
+      <div class="row" data-k="reject">
+        <div><b>INV-1008</b><span class="fmt">TXT</span><div class="money">$9,900.00</div></div>
+        <div>An email body, not a form. SuperGizmo and MegaSprocket do not exist. Unknown vendor. Sits just under $10K.</div>
+        <div><span class="pill reject">Reject</span><span class="why">Unknown items, threshold gaming</span></div>
+      </div>
+      <div class="row" data-k="reject">
+        <div><b>INV-1009</b><span class="fmt">JSON</span></div>
+        <div>No vendor, no due date, a negative quantity, and a total of -$250 against a $1,000 subtotal.</div>
+        <div><span class="pill reject">Reject</span><span class="why">Data integrity</span></div>
+      </div>
+      <div class="row" data-k="approve">
+        <div><b>INV-1010</b><span class="fmt">TXT</span><div class="money">$7,185.00</div></div>
+        <div>WidgetA appears twice (12 total, within stock). A rush price of $300 vs $250. Tax and shipping to reconcile.</div>
+        <div><span class="pill approve">Approve</span><span class="why">With price note</span></div>
+      </div>
+      <div class="row" data-k="approve">
+        <div><b>INV-1011</b><span class="fmt">TXT + PDF</span><div class="money">$3,000.00</div></div>
+        <div>The same invoice sent twice in two formats.</div>
+        <div><span class="pill approve">Approve once</span><span class="why">Second copy skipped, no double pay</span></div>
+      </div>
+      <div class="row" data-k="review">
+        <div><b>INV-1012</b><span class="fmt">TXT + PDF</span><div class="money">$9,975.00</div></div>
+        <div>OCR noise (letter O for zero), fuzzy SKU names, a vendor "formerly FastShip", and a total just under $10K.</div>
+        <div><span class="pill review">Needs review</span><span class="why">Vendor change, near threshold</span></div>
+      </div>
+      <div class="row" data-k="reject">
+        <div><b>INV-1013</b><span class="fmt">JSON + PDF</span></div>
+        <div>Repeated lines add up past stock on WidgetA, WidgetB and GadgetX. Over $10K. A "Sample" line that still costs money.</div>
+        <div><span class="pill reject">Reject</span><span class="why">Stock exceeded after aggregation</span></div>
+      </div>
+      <div class="row" data-k="review">
+        <div><b>INV-1014</b><span class="fmt">XML</span></div>
+        <div>Billed in EUR. Needs conversion with a fixed FX table. Prices come in below catalog.</div>
+        <div><span class="pill review">Needs review</span><span class="why">Or approve with FX note</span></div>
+      </div>
+      <div class="row" data-k="approve">
+        <div><b>INV-1015</b><span class="fmt">CSV</span><div class="money">$6,500.00</div></div>
+        <div>Clean. The control case for the CSV parser.</div>
+        <div><span class="pill approve">Approve</span><span class="why">Pay in full</span></div>
+      </div>
+      <div class="row" data-k="reject">
+        <div><b>INV-1016</b><span class="fmt">JSON</span></div>
+        <div>Bills for WidgetC, which is not in inventory.</div>
+        <div><span class="pill reject">Reject</span><span class="why">Unknown item</span></div>
+      </div>
+    </div>
+    <p class="fine">17 documents across 20 files (1011, 1012 and 1013 ship in two formats each). Source: <a href="https://github.com/galatiq-ai/galatiq-case-invoices">galatiq-ai/galatiq-case-invoices</a>.</p>
+  </section>
+
+  <section class="wrap section next">
+    <div class="card next-card">
+      <div>
+        <h2>What is next</h2>
+        <p class="sub">The Python CLI lands in this repo first. Then this page becomes a control tower that replays real runs: an invoice inbox, a step by step agent timeline, flags with evidence, and decision cards.</p>
+      </div>
+      <span class="badge soon big"><span class="dot"></span>Live demo coming soon</span>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap foot-inner">
+    <span>Built by <a href="https://adampang.com">Adam Pang</a></span>
+    <span class="links"><a href="https://github.com/adamtpang">github.com/adamtpang</a><a href="https://adampang.com">adampang.com</a></span>
+  </div>
+</footer>
+
+<script>
+  document.querySelectorAll('.chip').forEach(function (c) {
+    c.addEventListener('click', function () {
+      document.querySelectorAll('.chip').forEach(function (x) { x.classList.remove('on'); });
+      c.classList.add('on');
+      var f = c.dataset.f;
+      document.querySelectorAll('#bench-table .row[data-k]').forEach(function (r) {
+        r.style.display = (f === 'all' || r.dataset.k === f) ? '' : 'none';
+      });
+    });
+  });
+</script>
+</body>
+</html>

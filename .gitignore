@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+.venv/
+venv/
+inventory.db
+runs/
+node_modules/
+.vercel/
+.DS_Store
