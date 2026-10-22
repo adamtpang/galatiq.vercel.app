@@ -1,4 +1,4 @@
-"""Temporary pipeline: ingest + validate. Approval and payment agents are not built yet.
+"""Ingest + validate only (used by validation tests). The full pipeline is invoice_agents/graph.py.
 LangGraph wiring comes with the approval agent."""
 from __future__ import annotations
 

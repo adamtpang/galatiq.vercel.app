@@ -26,6 +26,22 @@ payment_terms:
 sku_matching:
   min_confidence: 0.85               # below this an item is treated as unknown
 
+# Risk agent: deterministic signals, each adds its weight once. Score is capped at 100.
+risk:
+  weights:
+    urgency_language: 20       # "URGENT", "pay immediately", "avoid penalties"
+    wire_transfer: 20          # pressure to pay by wire, or to new bank details
+    unknown_vendor: 20         # not in the vendor master
+    suspicious_address: 30     # address on the watch list below
+    threshold_gaming: 25       # total in [near_limit_usd, approval_threshold_usd]
+    vendor_rename: 20          # "formerly X"
+    math_mismatch: 25          # totals do not add up
+    price_variance: 10         # unit price more than warn_above_pct over catalog
+  urgency_patterns: ['\burgent\b', 'pay immediately', '\basap\b', 'avoid penalt', 'final notice', 'immediately']
+  wire_patterns: ['wire transfer', '\bwire\b', 'new bank', 'change of bank', 'gift card', 'crypto', 'bitcoin']
+  suspicious_addresses: ['1600 pennsylvania ave']
+  llm_review: true             # live mode: Grok may add reasons and raise the score, never lower it
+
 # Mock FX table (units of USD per 1 unit of currency). Fixed so runs are deterministic.
 fx_to_usd:
   USD: 1.0

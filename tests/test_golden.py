@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 import yaml
 
-from invoice_agents.agents import approval
 from invoice_agents.graph import make_context, run_batch
 from invoice_agents.llm import OfflineClient
 from invoice_agents.pipeline import collect
@@ -12,7 +11,6 @@ from invoice_agents.pipeline import collect
 from .conftest import INVOICES
 
 GOLDEN = yaml.safe_load((Path(__file__).parent / "golden.yaml").read_text())
-APPROVAL_BUILT = not getattr(approval, "IS_STUB", False)
 
 
 @pytest.fixture(scope="module")
@@ -30,8 +28,6 @@ def test_golden_covers_all_files():
 @pytest.mark.parametrize("name", sorted(GOLDEN))
 def test_golden_decision(results, name):
     exp = GOLDEN[name]
-    if exp.get("needs") == "approval_agent" and not APPROVAL_BUILT:
-        pytest.xfail("approval agent pending")
     s = results[0][name]
     assert s.decision.status.value == exp["decision"], s.decision.reasons
     codes = {f.code for f in s.flags}

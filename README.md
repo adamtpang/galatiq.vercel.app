@@ -12,12 +12,13 @@ This repo is building a four-stage agent pipeline: **Ingest -> Validate -> Appro
 |---|---|
 | Ingestion agent (PDF, TXT/email, CSV, JSON, XML) | Built. Deterministic parsers read all 20 sample files. Grok repair runs only when the parser fails. |
 | Validation agent (inventory, math, dates, FX, prices, vendors, duplicates) | Built. Emits typed flags (info, warn, block) with evidence. |
-| Risk agent | **Stub.** Returns score 0. Adam is designing it. |
-| Approval agent | **Stub.** Applies only the hard rule: any blocking flag means REJECTED. Everything else goes to PENDING_HUMAN with "approval agent not built". VP and critic loop are Adam's to design. |
+| Risk agent | Built. Deterministic signals (urgency wording, wire pressure, unknown vendor, watch-listed address, total just under the limit, vendor rename, math mismatch, price variance) with weights in `config/policy.yaml`, score 0 to 100. In live mode Grok may add reasons and raise the score, never lower it. |
+| Approval agent | Built to Adam's policy (see Decisions). Hard rules first, then a VP agent, then a critic loop when triggered, max 2 rounds, deadlock goes to a human. Grok in live mode; fixed offline rules otherwise. |
 | Payment agent | Built. Wraps the case's `mock_payment` unchanged, checks an idempotency key in SQLite before paying, retries 3 times with exponential backoff, `--chaos` fault injection, rejection log. |
 | Human review queue | Built. PENDING_HUMAN invoices go to a SQLite queue; `python main.py review INV-1012 --approve`. |
 | Orchestration | Built with LangGraph: ingest, validate, risk, approval, then pay, reject or hold, then report. JSONL trace per run in `runs/<run_id>/trace.jsonl`. |
-| Golden tests | `tests/golden.yaml` lists the expected decision for all 20 files. Cases that need the real approval agent are marked xfail ("approval agent pending"). |
+| Golden tests | `tests/golden.yaml` lists the expected offline decision and payment for all 20 files. All pass. |
+| Demo runs | `runs/demo/offline` and `runs/demo/live` (Grok) with full traces; compared in [docs/run_log.md](docs/run_log.md). |
 
 ## CI
 
@@ -36,7 +37,7 @@ python main.py review INV-1012 --approve --note "called vendor"
 pytest                                                  # offline suite, a few seconds
 ```
 
-Without `XAI_API_KEY` everything runs offline. With a key, `--mode auto` (the default) lets Grok repair invoices the parser cannot read. `pytest -m live` runs one real call.
+Without `XAI_API_KEY` everything runs offline. With a key, `--mode auto` (the default) uses Grok for the risk review, VP and critic, and to repair invoices the parser cannot read. Use `--offline` for the deterministic rules. `pytest -m live` runs one real call.
 The database (`inventory.db`) is created on first run. Payments are idempotent across runs, so a second batch run pays nothing new.
 
 ## How it works
@@ -85,7 +86,18 @@ Source of truth for `config/policy.yaml`:
 3. The critic loop runs only for invoices over $10K, near the limit, or high risk. Other invoices are decided by the VP agent alone, after the hard rules.
 4. Thresholds: approval $10,000; near the limit means total >= $9,500; high risk means risk_score >= 50 out of 100.
 
-Items 2 to 4 are recorded in `config/policy.yaml` (`approval:`) and will be used by the approval agent once it is built.
+5. The VP and critic prompts are Adam's exact text (`invoice_agents/agents/approval.py`). The LLM never computes or changes amounts; code computes every number and the payment amount. Invoice text is passed inside `<invoice_document>` tags as data, not instructions.
+
+All values are in `config/policy.yaml` (`approval:` and `risk:`).
+
+### How a decision is made
+
+1. **Hard rules**: any blocking flag means REJECTED, with the flag messages as reasons. No LLM call.
+2. **VP agent**: approve, reject or hold (hold means PENDING_HUMAN), 1 to 3 reasons, optional payment conditions.
+3. **Critic**, only if the total is over $10,000, at least $9,500, or risk is at least 50, and only if the VP approves. Each round the critic objects or signs off; after an objection the VP may revise. If the VP still approves after 2 objections, the invoice goes to PENDING_HUMAN with both arguments attached.
+4. Approved invoices are paid; rejections are logged; holds go to the review queue.
+
+Offline, the VP approves only a known vendor with clean math, turning explainable warnings (price variance, FX, rename) into payment conditions, and holds anything else. The offline critic objects to a rename, a total just under the limit, a price more than 25% off catalog, or pushy wording. Conditions do not change those facts, so on 1012 the two disagree for 2 rounds and it goes to a human.
 
 ## Assumptions
 
@@ -109,15 +121,17 @@ invoice_agents/
   normalize.py              OCR, money, dates, invoice numbers, SKUs
   parsers/                  text/email, csv (key-value and table), json, xml, pdf
   agents/ingestion.py       parse + optional Grok repair loop
-  agents/risk.py            stub (score 0)
-  agents/approval.py        stub: hard rule only
+  agents/risk.py            risk signals and score
+  agents/approval.py        hard rules, VP agent, critic loop (Adam's prompts)
   agents/payment.py         mock_payment wrapper, idempotency, retries, chaos, rejection log
   graph.py                  LangGraph StateGraph
   hitl.py                   human review queue
   reporter.py               summary table, summary.json, report.md
   validation.py             validation tools and flags
   llm.py                    GrokClient, OfflineClient
-tests/                      parsers, validation, llm, payment, golden (golden.yaml)
+tests/                      parsers, validation, llm, payment, approval, golden (golden.yaml)
+runs/demo/                  committed offline and live runs
+docs/run_log.md             offline vs live comparison
 web/                        landing page (Vercel)
 ```
 

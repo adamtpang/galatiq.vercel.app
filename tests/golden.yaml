@@ -2,25 +2,27 @@
 # Based on spec section 4, adjusted for Adam's decisions (DECISIONS.md) and validation findings:
 #   - over-stock is a REJECT (decision 1), so 1002, 1005, 1007, 1013 reject rather than partial-approve
 #   - 1007 and 1013 also have real arithmetic errors (total off by $110 and $50)
-#   - 1012 is near the limit, so the critic runs; a renamed vendor near the limit is a VP/critic deadlock (decision 2)
-# needs: approval_agent  => depends on VP/critic logic, not only on the hard rule.
-invoice_1001.txt:          {decision: APPROVED, paid: 5000.00, needs: approval_agent}
+#   - 1012 is near the limit, so the critic runs (decision 3); it objects to the rename and the near-limit total,
+#     the VP keeps approving with conditions, so after 2 rounds it is a deadlock => PENDING_HUMAN (decision 2)
+#   - approved amounts are paid in USD (1014 converted with the mock FX table)
+#   - offline VP/critic are deterministic; a live Grok run may differ (see docs/run_log.md)
+invoice_1001.txt:          {decision: APPROVED, paid: 5000.00}
 invoice_1002.txt:          {decision: REJECTED, must_flag: [STOCK_EXCEEDED]}
 invoice_1003.txt:          {decision: REJECTED, must_flag: [ZERO_STOCK, INVALID_DUE_DATE]}
 invoice_1004.json:         {decision: REJECTED, must_flag: [SUPERSEDED_BY_REVISION]}
-invoice_1004_revised.json: {decision: APPROVED, paid: 5940.00, needs: approval_agent}
+invoice_1004_revised.json: {decision: APPROVED, paid: 5940.00}
 invoice_1005.json:         {decision: REJECTED, must_flag: [STOCK_EXCEEDED]}
-invoice_1006.csv:          {decision: APPROVED, paid: 2750.00, needs: approval_agent}
+invoice_1006.csv:          {decision: APPROVED, paid: 2750.00}
 invoice_1007.csv:          {decision: REJECTED, must_flag: [STOCK_EXCEEDED, TOTAL_MISMATCH]}
 invoice_1008.txt:          {decision: REJECTED, must_flag: [UNKNOWN_ITEM]}
 invoice_1009.json:         {decision: REJECTED, must_flag: [NEGATIVE_QTY, MISSING_VENDOR, TOTAL_MISMATCH]}
-invoice_1010.txt:          {decision: APPROVED, paid: 7185.00, needs: approval_agent}
-invoice_1011.pdf:          {decision: APPROVED, paid: 3000.00, needs: approval_agent}
+invoice_1010.txt:          {decision: APPROVED, paid: 7185.00}
+invoice_1011.pdf:          {decision: APPROVED, paid: 3000.00}
 invoice_1011.txt:          {decision: REJECTED, must_flag: [DUPLICATE_INVOICE]}
-invoice_1012.pdf:          {decision: PENDING_HUMAN, needs: approval_agent}
+invoice_1012.pdf:          {decision: PENDING_HUMAN}
 invoice_1012.txt:          {decision: REJECTED, must_flag: [DUPLICATE_INVOICE]}
 invoice_1013.json:         {decision: REJECTED, must_flag: [STOCK_EXCEEDED, TOTAL_MISMATCH]}
 invoice_1013.pdf:          {decision: REJECTED, must_flag: [DUPLICATE_INVOICE]}
-invoice_1014.xml:          {decision: APPROVED, paid: 4455.00, needs: approval_agent}
-invoice_1015.csv:          {decision: APPROVED, paid: 6500.00, needs: approval_agent}
+invoice_1014.xml:          {decision: APPROVED, paid: 4455.00}
+invoice_1015.csv:          {decision: APPROVED, paid: 6500.00}
 invoice_1016.json:         {decision: REJECTED, must_flag: [UNKNOWN_ITEM]}

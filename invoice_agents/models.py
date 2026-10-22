@@ -69,7 +69,7 @@ class Decision(BaseModel):
     conditions: list[str] = Field(default_factory=list)
     risk_score: int | None = Field(default=None, ge=0, le=100)
     critique_rounds: int = 0
-    decided_by: str = "unknown"   # hard_rules | vp | vp+critic | human | stub | error
+    decided_by: str = "unknown"   # hard_rules | vp | vp+critic | deadlock | human | error
     arguments: dict[str, Any] = Field(default_factory=dict)  # e.g. VP and critic positions on deadlock
 
 
@@ -88,9 +88,9 @@ class InvoiceState(BaseModel):
     extraction_mode: Literal["deterministic", "llm_repair", "failed"] | None = None
     flags: list[Flag] = Field(default_factory=list)
     total_usd: float | None = None
-    risk: dict[str, Any] | None = None       # filled by the risk agent (not built yet)
-    decision: Decision | None = None         # filled by the approval agent (not built yet)
-    payment: dict[str, Any] | None = None    # filled by the payment agent (not built yet)
+    risk: dict[str, Any] | None = None       # filled by the risk agent
+    decision: Decision | None = None         # filled by the approval agent
+    payment: dict[str, Any] | None = None    # filled by the payment agent
     errors: list[str] = Field(default_factory=list)
     trace: list[TraceEvent] = Field(default_factory=list)
 
