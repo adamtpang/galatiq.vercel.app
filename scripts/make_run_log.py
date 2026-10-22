@@ -36,13 +36,16 @@ def dec(r: dict) -> str:
 DIFFS = """\
 ## Where live and offline disagree
 
-Both runs use the same policy, including the address watch list (`742 evergreen terrace` was added after an earlier live run flagged it). In live mode the risk agent also calls three read-only tools (`lookup_vendor`, `query_inventory`, `vendor_history`) before it scores; the calls are in the trace as `tool_call` events. Every difference goes the cautious way: Grok sent an invoice to a human where the offline rules paid it. Neither run paid anything the other refused.
+Both runs use the same policy, including the address watch list and the hard hold rules for prompt injection and renamed or lookalike vendors (decisions 8 and 9 in `docs/DECISIONS.md`). In live mode the risk agent also calls three read-only tools (`lookup_vendor`, `query_inventory`, `vendor_history`) before it scores; the calls are in the trace as `tool_call` events. Every difference goes the cautious way: Grok sent an invoice to a human where the offline rules paid it. Neither run paid anything the other refused.
 
-- **invoice_1006.csv**: the live VP held it to confirm a remit address and to pay only to the bank on file. Offline sees a known vendor with clean math and pays.
-- **invoice_1010.txt**: the live VP held it until a PO or written rush authorization backs the $300 WidgetA rate ($250 catalog). Offline approves with that check as a payment condition.
-- **invoice_1014.xml**: the live VP held it as the vendor's first observed invoice, billed in EUR below catalog price. Offline pays the USD amount at the mock FX rate with a treasury condition. In an earlier live run, before the risk agent had tools, Grok paid it; live results vary between runs.
-- **invoice_1012.pdf**: both runs end PENDING_HUMAN, by different paths. Offline: the VP approves with conditions, the critic objects twice (the rename, then the total just under $10K) and the loop deadlocks after 2 rounds. Live: the risk agent looked up both vendor names, found that QuickShip Distributers is not a recorded alias of FastShip Ltd. and raised the risk to 74, and the VP held it straight away. The critic only reviews approvals, so it never ran.
-- **invoice_1004_revised.json**: PENDING_HUMAN in both runs. Offline holds it on the watch-list hit; live holds it on the watch-list address and a risk score of 60, above the high-risk threshold of 50.
+- **invoice_1006.csv**: the live VP held it to confirm the remit-to address and bank details against the vendor master. Offline sees a known vendor with clean math and pays.
+- **invoice_1010.txt**: the live VP held it until a PO or written authorization covers the $300 WidgetA rush rate ($250 catalog). Offline approves with that check as a payment condition.
+- **invoice_1014.xml**: the live VP held it as the vendor's first observed invoice, billed in EUR. Offline pays the USD amount at the mock FX rate with a treasury condition. Live results are not perfectly repeatable: in the eval run of the same commit (`evals/results/live.md`), Grok approved 1014 and 1006.
+
+Same outcome, by a different path:
+
+- **invoice_1012.pdf**: PENDING_HUMAN in both runs, decided by the vendor-rename hard hold (decision 9) before the VP and critic. Live, the risk agent still ran its tools and raised the risk to 70, but no VP or critic call was made.
+- **invoice_1004_revised.json**: PENDING_HUMAN in both runs. Offline holds it on the watch-list hit; live holds it on the watch-list address and a risk score of 62, above the high-risk threshold of 50.
 
 Risk scores differ on most clean invoices because the live risk agent can add points on top of the rule score (it can never lower it). None of those increases crossed a threshold except where noted above.
 """
@@ -60,7 +63,7 @@ def main() -> None:
         f"- **Live** (`--mode live`, {live.get('model')} via the xAI API for risk review, VP and critic): `runs/demo/live/`",
         "",
         "Each folder has `trace.jsonl` (every agent step), `summary.json` and `report.md`. "
-        "Hard rules (any blocking flag) decide 12 of 20 without any LLM call, so both runs agree on those by construction. "
+        "Hard rules (any blocking flag) decide 12 of 20 without any LLM call, so both runs agree on those by construction; a hard hold rule holds 1012.pdf (renamed vendor) before the VP. "
         "Regenerate this file with `python scripts/make_run_log.py`.",
         "",
         "## Side by side",
@@ -81,7 +84,7 @@ def main() -> None:
     out += ["", DIFFS, "## Live reasons (first reason per invoice the VP decided)", "",
             "| File | Decision | Reason | Conditions |", "|---|---|---|---|"]
     for l in live["rows"]:
-        if l["decided_by"] == "hard_rules":
+        if l["decided_by"] in ("hard_rules", "hard_hold"):
             continue
         cond = "; ".join(l["conditions"]) or "none"
         out.append(f"| {l['file']} | {l['decision']} | {l['reason']} | {cond} |")

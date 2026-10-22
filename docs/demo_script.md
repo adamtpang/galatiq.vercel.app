@@ -35,9 +35,10 @@ Expected: 6 paid ($28,890.00), 12 rejected, 2 held for a human. Same result ever
 | 1009 | Missing vendor, negative quantity, negative total, subtotal that does not add up. | five blocking flags |
 | 1010 | WidgetA on two lines (8 + 4 = 12, within stock of 15); the rush line is 20% over catalog. | `LINES_AGGREGATED`, `PRICE_VARIANCE` |
 | 1011, 1012, 1013 | Same invoice in two formats. The second copy is rejected as a duplicate. | `DUPLICATE_INVOICE` |
-| 1012.pdf | OCR noise fixed (`2O26`, `$3,500.O0`), vendor renamed, $25 under the limit. VP approves with conditions, the critic objects twice, deadlock goes to a human. | `critic_review`, `vp_revise` |
+| 1012.pdf | OCR noise fixed (`2O26`, `$3,500.O0`), vendor renamed ("formerly FastShip Ltd."), $25 under the limit. The rename hard hold sends it to a human before the VP (decision 9). | `VENDOR_RENAMED`, decided_by `hard_hold` |
 | 1013 | WidgetA, WidgetB and GadgetX each over stock only after summing repeated lines; a "Sample" line is charged; total off by $50. | `STOCK_EXCEEDED` evidence lists the lines |
 | 1014 | Billed in EUR, paid in USD at the fixed mock rate. | `CURRENCY_CONVERTED` |
+| 3005 (adversarial) | $9,990 from a known vendor. The VP approves, the critic objects twice (just under the limit), and the deadlock goes to a human. Run it with `python main.py --invoice_path data/invoices_adversarial/invoice_3005_just_under_limit.txt --offline`. | `critic_review`, `vp_revise` |
 
 ## 4. Payments are safe to retry
 
@@ -62,7 +63,7 @@ python main.py --invoice_path=data/invoices/invoice_1012.pdf --mode live
 python main.py --batch data/invoices_extra --mode live
 ```
 
-Point at: `tool_call` events (the risk agent looks up the vendor master, inventory and vendor history before scoring), the `llm_repair` event on the free-form email and the truncated JSON, and the prompt-injection invoice (2002), which is not approved.
+Point at: `tool_call` events (the risk agent looks up the vendor master, inventory and vendor history before scoring), the `llm_repair` event on the free-form email and the truncated JSON, and the prompt-injection invoice (2002), which the injection hard hold sends to a human (decision 8).
 
 ## 7. The web replay
 

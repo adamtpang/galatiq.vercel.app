@@ -2,7 +2,7 @@
   "use strict";
   var DATA = null, SRC = {}, MODE = "live", SET = "case", FILTER = "all", SELECTED = null, REPORT = "live", P = null;
   var PILL = { APPROVED: ["approve", "Approved"], REJECTED: ["reject", "Rejected"], PENDING_HUMAN: ["review", "Held for a human"] };
-  var BY = { hard_rules: "hard rules", vp: "the VP agent", "vp+critic": "the VP after critic review", deadlock: "deadlock, VP and critic disagree", error: "error fallback" };
+  var BY = { hard_rules: "hard rules", hard_hold: "a hard hold rule", vp: "the VP agent", "vp+critic": "the VP after critic review", deadlock: "deadlock, VP and critic disagree", error: "error fallback" };
   var TRIG = { over_threshold: "over the limit", near_limit: "near the limit", high_risk: "high risk" };
   var SEV = { block: "Blocking: rules out payment", warn: "Warning: does not block on its own", info: "Info: noted for the record" };
   var AGENT = { ingestion: "Ingest", validation: "Validate", risk: "Risk", approval: "Approval", payment: "Payment", hitl: "Review" };
@@ -180,6 +180,7 @@
         o.what = list(d.reasons);
         var notes = [];
         if (d.decided_by === "hard_rules") notes.push("Blocking flags decide on their own.");
+        else if (d.decided_by === "hard_hold") notes.push("Held for a person before the VP: prompt injection, or a renamed or lookalike vendor.");
         else if (trig.length && !d.critique_rounds) notes.push("Critic not run (" + trig.map(function (t) { return TRIG[t] || t; }).join(", ") + "): it only reviews approvals.");
         o.body = (notes.length ? '<p class="small muted">' + notes.join(" ") + "</p>" : "") + (d.conditions && d.conditions.length ? more("Next steps (" + d.conditions.length + ")", list(d.conditions), true) : "");
         o.cls = "decide " + (d.status === "APPROVED" ? "good" : d.status === "REJECTED" ? "bad" : "warn"); break;
@@ -238,7 +239,7 @@
     $("summary").innerHTML = card(money(paid), "paid · " + nPaid) + card(String(rej), "rejected") + card(String(held), "held") + card(money(fraud), "high-risk blocked · " + fraudN, "Rejected with risk score " + hr() + " or more");
     var o = DATA.runs[key(MODE === "offline" ? "live" : "offline", SET)], diff = [];
     if (o) r.invoices.forEach(function (i) { var j = o.invoices.find(function (x) { return x.file === i.file; }); if (j && j.decision.status !== i.decision.status) diff.push(invNumber(i.number)); });
-    $("run-note").textContent = (MODE === "offline" ? "Offline: VP and critic are fixed rules, no API calls." : "Live: Grok does the risk review, the VP and the critic. The critic only reviews approvals.") +
+    $("run-note").textContent = (MODE === "offline" ? "Offline: VP and critic are fixed rules, no API calls." : "Live: Grok does the risk review, the VP and the critic. The critic only reviews approvals. Live decisions can differ run to run even at temperature 0; hard rules run first, and Grok can only raise risk or hold, never pay what the rules block.") +
       (diff.length ? " Differs from the other run on " + diff.join(", ") + "." : o ? " Same outcomes as the other run." : "");
   }
   function card(big, cap, title) { return '<div class="sum"' + (title ? ' title="' + esc(title) + '"' : "") + '><div class="sum-big">' + esc(big) + '</div><div class="small muted">' + esc(cap) + "</div></div>"; }
@@ -352,7 +353,7 @@
     P.stage[st] = "on";
     if (ev.step === "decide") {
       if (!inv.timeline.some(function (x) { return x.step === "critic_review"; })) P.stage.critic = "skipped";
-      if (ev.detail.decided_by === "hard_rules") { P.stage.vp = "skipped"; P.stage.critic = "skipped"; }
+      if (ev.detail.decided_by === "hard_rules" || ev.detail.decided_by === "hard_hold") { P.stage.vp = "skipped"; P.stage.critic = "skipped"; }
       var s = ev.detail.status;
       if (s === "REJECTED") { P.tot.rej++; if (isFraudBlocked(inv)) { P.tot.fraud += inv.total_usd || 0; P.tot.nFraud++; } }
       if (s === "PENDING_HUMAN") P.tot.held++;
@@ -474,12 +475,13 @@
     var paid = invs.filter(function (i) { return i.payment && i.payment.status === "paid"; }), rej = by("REJECTED"), held = by("PENDING_HUMAN"), appr = by("APPROVED");
     var paidSum = paid.reduce(function (a, i) { return a + i.payment.amount; }, 0);
     var hard = invs.filter(function (i) { return i.decision.decided_by === "hard_rules"; }).length;
+    var hh = invs.filter(function (i) { return i.decision.decided_by === "hard_hold"; }).length;
     var reviewed = invs.filter(function (i) { return i.risk.llm && !i.risk.llm.error; }).length, tools = 0;
     invs.forEach(function (i) { i.timeline.forEach(function (e) { if (e.step === "tool_call") tools++; }); });
     var h = [];
     h.push('<p class="memo-note small muted">' + esc(runName(REPORT)) + " · recorded " + esc(w.full) + " · assembled from the trace; only the linking words are a template.</p>");
     h.push('<div class="st-cards"><div class="st approve"><b>' + appr.length + '</b><span>paid</span></div><div class="st reject"><b>' + rej.length + '</b><span>rejected</span></div><div class="st review"><b>' + held.length + '</b><span>need you</span></div><div class="st"><b>' + whole(paidSum) + "</b><span>paid out</span></div></div>");
-    h.push('<section class="m-sec"><h3>What I did</h3><p>Read all ' + n + " files in " + fmtDur(r.duration_ms) + ". " + hard + " were settled by hard rules. " + (isLive(r) ? (n - hard) + " got a Grok risk review (" + plural(tools, "tool call") + ") and a VP decision." : (n - hard) + " went through the rules VP" + (invs.some(function (i) { return i.decision.critique_rounds; }) ? " and critic" : "") + ".") + "</p></section>");
+    h.push('<section class="m-sec"><h3>What I did</h3><p>Read all ' + n + " files in " + fmtDur(r.duration_ms) + ". " + hard + " were settled by hard rules. " + (hh ? hh + " held by a hard hold rule, before the VP. " : "") + (isLive(r) ? (n - hard) + " got a Grok risk review (" + plural(tools, "tool call") + ") and " + (n - hard - hh) + " a VP decision." : (n - hard - hh) + " went through the rules VP" + (invs.some(function (i) { return i.decision.critique_rounds; }) ? " and critic" : "") + ".") + "</p></section>");
 
     var groups = {}, order = [];
     rej.forEach(function (i) { var c = catOf(i); if (!groups[c[0]]) { groups[c[0]] = { c: c, items: [] }; order.push(c[0]); } groups[c[0]].items.push(i); });

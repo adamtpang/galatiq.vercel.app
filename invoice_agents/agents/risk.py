@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import re
 import sqlite3
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -54,7 +55,7 @@ def risk_tools(inventory: Inventory, conn: sqlite3.Connection | None = None) -> 
             return {"invoices": []}
         rows = conn.execute("SELECT invoice_number, revision, total, currency, status, source_file FROM invoices "
                             "WHERE lower(vendor) = lower(?) ORDER BY id DESC LIMIT 10", (vendor,)).fetchall()
-        return {"invoices": [dict(r) for r in rows]}
+        return {"invoices": [dict(r) | {"source_file": Path(r["source_file"] or "").name} for r in rows]}
 
     s1 = {"type": "object", "properties": {"name": {"type": "string"}}, "required": ["name"]}
     s2 = {"type": "object", "properties": {"item": {"type": "string", "description": "Inventory SKU, e.g. WidgetA"}},

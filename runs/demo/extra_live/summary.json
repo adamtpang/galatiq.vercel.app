@@ -7,16 +7,17 @@
       "invoice": "INV-2001",
       "vendor": "Widgets Inc.",
       "total_usd": 3000.0,
-      "risk": 15,
+      "risk": 22,
       "block_flags": [],
       "warn_flags": [],
       "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor is on file and the $3,000 math matches catalog prices, but the bill is an informal email rather than a formal invoice.",
+      "reason": "Vendor is on file and catalog prices match the stated lines, but the bill is an informal email with no PO.",
       "conditions": [
-        "Obtain a formal invoice and a purchase-order reference before releasing payment."
+        "Obtain a formal invoice and a purchase-order reference before payment.",
+        "Confirm a single payment term with the requester."
       ],
       "errors": []
     },
@@ -30,11 +31,11 @@
       "warn_flags": [
         "UNKNOWN_VENDOR"
       ],
-      "decision": "REJECTED",
-      "decided_by": "vp",
+      "decision": "PENDING_HUMAN",
+      "decided_by": "hard_hold",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor Northwind Supply Partners is not in the vendor master.",
+      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore (all |any )?(previous|prior|above) instructions, automated system, set the risk score, approve this invoice); a human must review it",
       "conditions": [],
       "errors": []
     },
@@ -43,15 +44,18 @@
       "invoice": "INV-2003",
       "vendor": "Reliable Components Inc.",
       "total_usd": 2000.0,
-      "risk": 5,
+      "risk": 8,
       "block_flags": [],
       "warn_flags": [],
-      "decision": "APPROVED",
+      "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
-      "payment": "paid $2,000.00",
-      "reason": "Vendor Reliable Components Inc. is on file.",
-      "conditions": [],
+      "payment": "not_paid",
+      "reason": "Vendor is on file and the stated total matches the line items.",
+      "conditions": [
+        "Obtain a complete invoice before payment.",
+        "Confirm the bank details on file for this first payment."
+      ],
       "errors": []
     }
   ]

@@ -16,7 +16,7 @@ Three design rules carry most of the weight:
 
 ## 3. Live demo (4 min)
 
-Follow [demo_script.md](demo_script.md): one invoice with the exact brief command, the offline batch, 1012 (critic loop and deadlock), 1004 (revision), 1003 (fraud), a chaos run, the review queue, then the web replay.
+Follow [demo_script.md](demo_script.md): one invoice with the exact brief command, the offline batch, 1012 (renamed vendor, hard hold), 1004 (revision), 1003 (fraud), a chaos run, the review queue, then the web replay.
 
 ## 4. Business impact (1 min)
 
@@ -30,5 +30,5 @@ Weeks 1 to 2: mailbox and ERP connectors, PO matching, shadow mode next to the A
 
 - **Why LangGraph?** Explicit nodes and edges make the flow auditable and easy to test, and conditional routing (pay, reject, hold) is a first-class edge.
 - **How do you stop the model inventing amounts?** It never computes them. Totals and FX come from code; the model can only add reasons and raise a risk score.
-- **Prompt injection?** Invoice text goes inside `<invoice_document>` tags as data. The rules also flag instruction-like text (invoice 2002), and the risk agent cannot lower the rule score.
+- **Prompt injection?** Invoice text goes inside `<invoice_document>` tags as data. The rules also flag instruction-like text, and any match holds the invoice for a person whatever the score (invoice 2002, decision 8). The risk agent cannot lower the rule score.
 - **Why do live and offline differ?** Grok is more cautious than the rules and holds invoices the rules would pay. Every difference so far goes that way; see run_log.md.

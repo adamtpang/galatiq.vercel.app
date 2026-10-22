@@ -257,15 +257,11 @@
         "VENDOR_RENAMED"
       ],
       "decision": "PENDING_HUMAN",
-      "decided_by": "deadlock",
-      "critique_rounds": 2,
+      "decided_by": "hard_hold",
+      "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "VP and critic still disagree after 2 rounds",
-      "conditions": [
-        "Verify the rename and bank details with the contact on file for the former name.",
-        "Resolve auditor concern before paying: Vendor was renamed (formerly FastShip Ltd.); paying a new name before verifying bank details is a classic fraud pattern.",
-        "Resolve auditor concern before paying: Total $9,975.00 sits just under the $10,000 limit, which avoids the extra scrutiny above the limit."
-      ],
+      "reason": "VENDOR_RENAMED: Vendor says it was formerly 'FastShip Ltd.' (on file); new name is not, so verify bank details; hold for human verification of the vendor and bank details",
+      "conditions": [],
       "errors": []
     },
     {

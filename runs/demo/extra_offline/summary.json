@@ -36,10 +36,10 @@
         "UNKNOWN_VENDOR"
       ],
       "decision": "PENDING_HUMAN",
-      "decided_by": "vp",
+      "decided_by": "hard_hold",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor is not on file",
+      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore (all |any )?(previous|prior|above) instructions, automated system, set the risk score, approve this invoice); a human must review it",
       "conditions": [],
       "errors": []
     },
