@@ -141,3 +141,9 @@ def test_report_only_without_saved_results_exits_cleanly(tmp_path, capsys):
     from evals.runner import main
     assert main(["--report-only", "--out", str(tmp_path)]) == 2
     assert "run `python -m evals` first" in capsys.readouterr().err
+
+
+def test_rel_never_writes_a_machine_path(tmp_path):
+    from evals.runner import rel
+    out = rel(tmp_path / "runs" / "main" / "trace.jsonl")
+    assert str(tmp_path) not in out and not out.startswith("/") and out.endswith("main/trace.jsonl")

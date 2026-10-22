@@ -576,6 +576,33 @@
   });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("inspector").hidden) $("insp-close").click(); });
 
+  function frac(a, b) { return a + " of " + b; }
+  function evCard(big, cap, detail) { return '<div class="sum"><div class="sum-big">' + esc(big) + '</div><div class="small muted">' + esc(cap) + "</div>" + (detail ? '<div class="small">' + esc(detail) + "</div>" : "") + "</div>"; }
+  function renderEvals(E) {
+    var cards = [], x = E.extraction || {}, ad = E.adversarial || {}, sr = E.separate_run, sl = E.separate_run_live, cr = E.cache_repeatability;
+    var ag = (E.agreement || []).find(function (a) { return /eval run, samples/.test(a.label); });
+    var cl = E.cost_latency && E.cost_latency.batches && E.cost_latency.batches.samples;
+    if (x.offline) cards.push(evCard(frac(x.offline.overall.correct, x.offline.overall.scored), "fields extracted correctly, offline parsers",
+      x.live_pipeline ? "Live pipeline: " + frac(x.live_pipeline.overall.correct, x.live_pipeline.overall.scored) + "." : ""));
+    if (ad.offline) cards.push(evCard(frac(ad.offline.caught, ad.offline.total), "adversarial invoices caught, offline",
+      ad.live ? "Live " + E.model + ": " + frac(ad.live.caught, ad.live.total) + ". Caught = not approved and not paid." : ""));
+    if (sr || sl) cards.push(evCard(frac((sl || sr).caught, (sl || sr).total), "caught as a separate later run" + (sl ? ", live" : ""),
+      (sr ? "Offline: " + frac(sr.caught, sr.total) + ". " : "") + (sl ? "Live once: " + sl.calls + " Grok calls, $" + sl.billed_usd + ", " + Math.round(sl.wall_s) + " s. " : "") +
+      (sr && sr.duplicate_3006 ? "3006, a copy of INV-1001 under a new number, is " + sr.duplicate_3006.decision.toLowerCase() + " by the hard rules." : "")));
+    if (cr) cards.push(evCard(frac(cr.identical, cr.invoices), "identical on a live re-run with the decision cache",
+      "First run " + cr.first.api_calls + " API calls ($" + cr.first.billed_usd + ", " + Math.round(cr.first.span_s) + " s); re-run " + cr.second.api_calls + " calls, " + cr.second.span_s + " s."));
+    if (ag) cards.push(evCard(frac(ag.agree, ag.invoices), "live decisions that match the offline rules",
+      ag.disagreement_routing ? (function (d) { var n = ag.invoices - ag.agree, lv = (d.paid_on_one_side || []).filter(function (p) { return p.paid_by === "live"; }).length;
+        return n + (n === 1 ? " differs" : " differ") + "; disagreement routing sends " + (d.to_human === 1 ? "it" : "them") + " to a person. Live paid " + (lv ? lv + " invoice(s)" : "nothing") + " the rules would not."; })(ag.disagreement_routing) : ""));
+    if (cl) cards.push(evCard("$" + cl.billed_usd, "Grok cost for the 20 samples, live",
+      cl.calls + " calls, " + cl.latency_mean_s + " s per invoice on average over all 20. Offline costs $0."));
+    $("ev-cards").innerHTML = cards.join("");
+    $("ev-note").textContent = "From evals/results, exported to /data/evals.json. Offline " + (E.offline_generated_at || "") + (E.live_generated_at ? "; live " + E.live_generated_at : "") + ".";
+    $("ev-foot").innerHTML = 'Details, traces and the live/offline disagreements: <a href="https://github.com/adamtpang/galatiq.vercel.app/tree/main/evals/results">evals/results on GitHub</a>.';
+  }
+  fetch("/data/evals.json").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(renderEvals).catch(function () { $("ev-note").textContent = "Could not load eval results."; });
+
   Promise.all([
     fetch("/data/demo.json").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }),
     fetch("/data/sources.json").then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; })

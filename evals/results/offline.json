@@ -4,8 +4,8 @@
  "generated_at": "2026-10-22 15:14 CDT",
  "commit": "47ba5b7",
  "traces": [
-  "/tmp/evals-fvjn0bk8/runs/main/trace.jsonl",
-  "/tmp/evals-fvjn0bk8/runs/extra/trace.jsonl"
+  "(temporary, not kept)/main/trace.jsonl",
+  "(temporary, not kept)/extra/trace.jsonl"
  ],
  "extraction": {
   "pipeline": {

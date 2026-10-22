@@ -1,6 +1,7 @@
 """Compare two runs folder by folder: per-invoice decision, reason and risk, Grok calls and cost.
 
   python scripts/compare_runs.py runs/cache-1 runs/cache-2 > evals/results/cache_repeatability.md
+  python scripts/compare_runs.py runs/cache-1 runs/cache-2 --json evals/results/cache_repeatability.json
 """
 from __future__ import annotations
 
@@ -29,7 +30,7 @@ def stats(run: Path) -> dict:
             "cache_hits": hits, "cache_misses": misses, "models": sorted(models)}
 
 
-def main(a: str, b: str) -> int:
+def main(a: str, b: str, json_out: str | None = None) -> int:
     ra, rb = json.loads((Path(a) / "summary.json").read_text()), json.loads((Path(b) / "summary.json").read_text())
     sa, sb = stats(Path(a)), stats(Path(b))
     rows = []
@@ -54,9 +55,17 @@ def main(a: str, b: str) -> int:
            f"| Model ids recorded (a cached answer keeps the id of its original call) | {', '.join(sa['models']) or 'none'} | {', '.join(sb['models']) or "none"} |", "",
            "| file | decision 1 | decision 2 | risk 1 | risk 2 | payment 1 | payment 2 | identical |",
            "|---|---|---|---|---|---|---|---|", *rows, ""]
-    print("\n".join(out))
+    if json_out:
+        Path(json_out).write_text(json.dumps({
+            "model": ra["model"], "runs": [Path(a).name, Path(b).name], "invoices": len(ra["rows"]), "identical": same,
+            "compared": list(SAME_KEYS), "first": sa | {"approved_usd": round(paid, 2)}, "second": sb,
+            "decisions": {k: [count(r["rows"], k) for r in (ra, rb)] for k in ("APPROVED", "REJECTED", "PENDING_HUMAN")},
+            "recorded_at": "2026-10-22"}, indent=1))
+    else:
+        print("\n".join(out))
     return 0 if same == len(ra["rows"]) else 1
 
 
 if __name__ == "__main__":
-    sys.exit(main(*sys.argv[1:3]))
+    args = sys.argv[1:]
+    sys.exit(main(args[0], args[1], args[args.index("--json") + 1] if "--json" in args else None))

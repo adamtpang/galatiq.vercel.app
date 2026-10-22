@@ -315,3 +315,8 @@ dialog::backdrop{background:rgba(0,0,0,.6);backdrop-filter:blur(6px)}
   .go{position:sticky;bottom:0;z-index:15;margin:24px -18px 0;padding:14px 18px calc(14px + env(safe-area-inset-bottom));background:linear-gradient(to top,#000 70%,rgba(0,0,0,0));gap:6px}
 }
 .insp-bar .ctl{white-space:nowrap;flex:none}
+
+.ev-grid{grid-template-columns:repeat(3,1fr)}
+.ev-grid .sum .small+.small{margin-top:6px}
+@media (max-width:900px){.ev-grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:520px){.ev-grid{grid-template-columns:1fr}}

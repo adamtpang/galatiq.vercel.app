@@ -55,8 +55,8 @@ def rel(p: str | Path) -> str:
     p = Path(p)
     try:
         return p.resolve().relative_to(ROOT).as_posix()
-    except ValueError:
-        return p.as_posix()
+    except ValueError:   # outside the repo (a temp dir): never write a machine path into committed results
+        return f"(temporary, not kept)/{p.parent.name}/{p.name}"
 
 
 # --- (a) extraction ------------------------------------------------------------------
@@ -518,6 +518,12 @@ def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Pa
     return res
 
 
+def _saved(name: str, pick):
+    """A committed one-off result in evals/results (separate_run_live.json, cache_repeatability.json), or None."""
+    p = RESULTS / name
+    return pick(json.loads(p.read_text())) if p.exists() else None
+
+
 def web_summary(off: dict, live: dict | None) -> dict:
     """Compact eval summary for the web replay (web/data/evals.json). Written only with --web."""
     def ext(e):
@@ -539,6 +545,11 @@ def web_summary(off: dict, live: dict | None) -> dict:
                       for a in (live or off)["agreement"]],
         "separate_run": off.get("adversarial_separate_run") and {
             k: off["adversarial_separate_run"][k] for k in ("caught", "total", "catch_rate", "missed", "duplicate_3006")},
+        "separate_run_live": _saved("separate_run_live.json", lambda r: {
+            k: r[k] for k in ("caught", "total", "missed", "generated_at", "model", "commit", "wall_s", "billed_usd")}
+            | {"calls": r["usage"]["calls"], "cases": [{k: c[k] for k in ("file", "decision", "decided_by", "caught")}
+                                                       for c in r["cases"]]}),
+        "cache_repeatability": _saved("cache_repeatability.json", lambda r: r),
         "adversarial": {"offline": {k: off["adversarial"][k] for k in ("caught", "total", "catch_rate")},
                         "live": live and {k: live["adversarial"][k] for k in ("caught", "total", "catch_rate")},
                         "cases": [{"file": f, "trap": c["trap"], "offline": c["decision"], "offline_caught": c["caught"],
