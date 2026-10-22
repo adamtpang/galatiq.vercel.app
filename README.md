@@ -194,6 +194,7 @@ Other assumptions:
 - **INV-1004** passes inventory validation, as the brief expects, but it is not paid: revision R1 (`invoice_1004_revised.json`) replaces it.
 - **Terms mismatch** ("Net 15" with a 16 or 17 day due date) is info only offline. Grok sometimes holds on it.
 - Validation does not decrement stock across invoices in a batch.
+- The content duplicate check (decision 7) compares invoices within one batch run. A copy submitted in a later, separate run is not caught: running `--batch data/invoices_adversarial` on its own after the sample batch pays 3006. The eval runs both sets in one batch, which is why it catches 3006. A production version would check the stored invoice history.
 
 ## What was cut, and a production plan
 
