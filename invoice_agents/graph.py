@@ -98,7 +98,7 @@ def build_graph(ctx: RunContext):
     g = StateGraph(GraphState)
     g.add_node("ingest", _safe("ingestion", do_ingest))
     g.add_node("validate", _safe("validation", lambda s: validate(s, ctx.inventory, ctx.policy, ctx.registry)))
-    g.add_node("risk", _safe("risk", lambda s: risk.assess(s, ctx.policy, ctx.llm)))
+    g.add_node("risk", _safe("risk", lambda s: risk.assess(s, ctx.policy, ctx.llm, risk.risk_tools(ctx.inventory, ctx.conn))))
     g.add_node("approve", _safe("approval", lambda s: approval.approve(s, ctx.llm, ctx.policy)))
     g.add_node("pay", _safe("payment", ctx.payments.pay))
     g.add_node("reject", _safe("payment", lambda s: log_rejection(ctx.conn, s)))

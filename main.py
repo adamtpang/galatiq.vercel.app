@@ -39,6 +39,8 @@ def run(
     seed: Optional[int] = typer.Option(None, "--seed", help="Seed for --chaos"),
     as_json: bool = typer.Option(False, "--json", help="Print full JSON states"),
     run_id: Optional[str] = typer.Option(None, "--run-id", help="Name of the runs/<run_id> folder"),
+    log: Optional[bool] = typer.Option(None, "--log/--no-log",
+                                       help="Print each agent step as a JSON line (default: on for one file, off for --batch)"),
 ):
     load_dotenv()
     if ctx.invoked_subcommand:
@@ -47,6 +49,9 @@ def run(
     if target is None:
         console.print(ctx.get_help())
         raise typer.Exit(1)
+    if not target.exists():
+        console.print(f"[red]No such file or directory:[/] {target}")
+        raise typer.Exit(2)
     llm = get_client("offline" if offline else mode)
     rc = make_context(llm=llm, chaos=chaos, seed=seed, run_id=run_id)
     model = getattr(llm, "model", None)
@@ -58,6 +63,17 @@ def run(
     if as_json:
         print(json.dumps([s.model_dump(mode="json", exclude={"raw_text"}) for s in states], indent=2, default=str))
     else:
+        if log if log is not None else invoice_path is not None:
+            for st in states:
+                for ev in st.trace:
+                    if ev.step == "node_done":
+                        continue
+                    line = json.dumps({"agent": ev.agent, "step": ev.step, "detail": ev.detail}, default=str)
+                    print(line if len(line) <= 220 else line[:217] + "...")
+        for st in states:
+            msg = (st.payment or {}).get("bank_message") if isinstance(st.payment, dict) else None
+            if msg:
+                print(f"mock_payment: {msg}")
         print_summary(states, console, llm.name, rc.run_dir)
 
 

@@ -21,7 +21,7 @@
       <a href="#demo">Demo</a>
       <a href="https://github.com/adamtpang/galatiq.vercel.app">Code</a>
     </nav>
-    <span class="badge real"><span class="dot"></span>Replay of real runs</span>
+    <span class="badge real" title="Every number on this page comes from committed traces of real pipeline runs: one offline with fixed rules, one live with Grok."><span class="dot"></span>Replays of real pipeline runs<span class="badge-more">, offline and live Grok</span></span>
   </div>
 </header>
 
@@ -99,8 +99,13 @@
         <button class="seg-btn on" data-run="offline">Offline rules</button>
         <button class="seg-btn" data-run="live">Live Grok</button>
       </div>
+      <div class="seg" role="tablist" aria-label="Invoice set">
+        <button class="set-btn seg-btn on" data-set="case">Case samples</button>
+        <button class="set-btn seg-btn" data-set="extra">Extra tests</button>
+      </div>
       <span class="small muted" id="run-meta"></span>
     </div>
+    <p class="run-note small" id="run-note"></p>
 
     <div class="summary" id="summary"></div>
 

@@ -37,8 +37,10 @@ risk:
     vendor_rename: 20          # "formerly X"
     math_mismatch: 25          # totals do not add up
     price_variance: 10         # unit price more than warn_above_pct over catalog
+    prompt_injection: 40       # text that tries to instruct the system ("ignore previous instructions")
   urgency_patterns: ['\burgent\b', 'pay immediately', '\basap\b', 'avoid penalt', 'final notice', 'immediately']
   wire_patterns: ['wire transfer', '\bwire\b', 'new bank', 'change of bank', 'gift card', 'crypto', 'bitcoin']
+  injection_patterns: ['ignore (all |any )?(previous|prior|above) instructions', 'automated system', 'set the risk score', 'approve this invoice']
   suspicious_addresses: ['1600 pennsylvania ave', '742 evergreen terrace']   # White House; the Simpsons' fictional address (found by Grok on 1004_revised)
   llm_review: true             # live mode: Grok may add reasons and raise the score, never lower it
 

@@ -4,7 +4,9 @@
 
 Four agents that read, check, approve and pay Acme Corp's invoices, with Grok (xAI) as the reasoning engine. Every decision comes with reasons and a full trace. Code does all the math; the model only extracts and argues.
 
-**Live demo:** https://galatiq.vercel.app replays the two committed runs below, invoice by invoice, with every agent step, flag and VP/critic argument.
+**Live demo:** https://galatiq.vercel.app replays the committed runs below, invoice by invoice, with every agent step, tool call, flag and VP/critic argument. It is a static page over exported traces; the system itself runs locally, as the brief asks.
+
+**Walkthrough:** [docs/demo_script.md](docs/demo_script.md) (what to run, what to point at) and [docs/presentation.md](docs/presentation.md) (5 to 10 minute talk track).
 
 ## The problem
 
@@ -20,12 +22,21 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt && python main.py --batch data/invoices
 ```
 
-That processes all 20 samples and prints a summary table plus the paths to `runs/<run_id>/trace.jsonl`, `summary.json` and `report.md`. Verified on a fresh clone and a new venv (see Testing for timing).
+That processes all 20 samples and prints a summary table plus the paths to `runs/<run_id>/trace.jsonl`, `summary.json` and `report.md`. Verified on a fresh clone and a new venv.
+
+The command from the brief works as written:
+
+```bash
+python main.py --invoice_path=data/invoices/invoice_1001.txt
+```
+
+For a single file it prints one JSON line per agent step (structured log), the `mock_payment` output, the result table and the trace path. `--log/--no-log` turns the step log on or off. A path that does not exist exits with code 2 and a clear message.
 
 More commands:
 
 ```bash
 python main.py --invoice_path=data/invoices/invoice_1012.pdf   # one invoice
+python main.py --batch data/invoices_extra --mode live         # 3 extra test invoices (messy email, injection, broken JSON)
 python main.py --batch data/invoices --chaos 0.3               # bank fails 30% of calls; watch the retries
 python main.py review                                          # human review queue
 python main.py review INV-1012 --approve --note "called vendor"
@@ -33,7 +44,7 @@ python main.py --batch data/invoices --mode live               # Grok for risk r
 pytest                                                         # offline suite, about 2 seconds
 ```
 
-Without `XAI_API_KEY` everything runs offline on deterministic rules. With a key, the default `--mode auto` uses Grok (`grok-4.7`, override with `XAI_MODEL`). `--offline` forces the rules. The SQLite database (`inventory.db`) is created on first run. Payments are idempotent, so a second batch run pays nothing new.
+Without `XAI_API_KEY` everything runs offline on deterministic rules, which matches the brief's "assume no internet" runtime. With a key, the default `--mode auto` uses Grok (`grok-4.7`, the current flagship on docs.x.ai; override with `XAI_MODEL`). The brief's snippet (`from xai import Grok`, `grok-3`) is not a real SDK import, so the client uses the OpenAI SDK against `https://api.x.ai/v1`, which the xAI docs support. `--offline` forces the rules. The SQLite database (`inventory.db`) is created on first run. Payments are idempotent, so a second batch run pays nothing new.
 
 ## Results on the 20 samples
 
@@ -73,15 +84,17 @@ A LangGraph `StateGraph` (`invoice_agents/graph.py`) passes one typed `InvoiceSt
 
 - **Ingest** (`agents/ingestion.py`): pdfplumber layout text with a PyMuPDF fallback, then format parsers for text/email, CSV, JSON, XML and PDF. Fixes OCR look-alikes inside numbers (`2O26`, `$3,500.O0`), normalizes dates, maps item names to SKUs with a confidence score. Grok repair runs only when the parser cannot produce a valid invoice.
 - **Validate** (`validation.py`): small pure functions for inventory, arithmetic, dates, currency, prices, vendor and duplicates. Each returns flags with a code, a severity (info, warn, block) and evidence. A batch prescan finds revisions and duplicates before any decision.
-- **Risk** (`agents/risk.py`): weighted signals from `config/policy.yaml` (urgency wording, wire pressure, unknown vendor, watch-listed address, total just under the limit, vendor rename, math mismatch, price variance), score 0 to 100. In live mode Grok adds reasons and can raise the score, never lower it.
-- **Approve** (`agents/approval.py`): hard rules, then a VP agent, then a critic loop when triggered.
+- **Risk** (`agents/risk.py`): weighted signals from `config/policy.yaml` (urgency wording, wire pressure, unknown vendor, watch-listed address, total just under the limit, vendor rename, math mismatch, price variance, instruction-like text), score 0 to 100. In live mode Grok gets three read-only tools through function calling (`lookup_vendor`, `query_inventory`, `vendor_history`), checks the invoice's claims against them, then adds reasons and can raise the score, never lower it. Every tool call and result is in the trace.
+- **Approve** (`agents/approval.py`): hard rules, then a VP agent, then a critic loop when triggered. Every model answer is a Pydantic schema (`VPOpinion`, `CriticOpinion`, `RiskReview`, `ExtractedInvoice`) requested as JSON schema output and validated before use.
 - **Pay** (`agents/payment.py`): wraps the case's `mock_payment` unchanged. An idempotency key in SQLite stops double payment, 3 retries with exponential backoff, `--chaos` fault injection. Rejections go to an audit log; holds go to the `review_queue` table.
 
 Design rules: the LLM never computes or changes an amount. Invoice text is passed inside `<invoice_document>` tags and treated as data, not instructions. Any blocking flag means REJECTED, whatever the model says.
 
 ## The two loops
 
-**Self-correction (extraction).** When the deterministic parser fails, `GrokClient` asks for JSON matching the invoice schema. If Pydantic rejects the answer, the validation errors go back to the model, up to 3 attempts, and every attempt is traced. On the 20 samples the parsers read every file, so this loop did not fire in either committed run.
+**Self-correction (extraction).** When the deterministic parser fails, `GrokClient` asks for JSON matching the invoice schema. If Pydantic rejects the answer, the validation errors go back to the model, up to 3 attempts, and every attempt is traced. The same loop wraps every structured call (risk, VP, critic).
+
+The 20 samples never need it, because the parsers read every file. So there are three extra invoices in `data/invoices_extra/`: a free-form email with quantities in words, a truncated JSON file and a prompt-injection invoice. EXTRA_LIVE_SENTENCE The retry itself is proven by `tests/test_agentic.py`: a scripted client returns `"qty": "six"` first, and the test checks that the exact Pydantic error went back to the model and the second answer was used.
 
 **Critique (approval).** The critic runs only when the VP approves an invoice that is over $10,000, at least $9,500, or has a risk score of 50 or more. It objects with a specific reason or signs off; after an objection the VP may revise. If the VP still approves after 2 objections, the invoice goes to a human with both arguments attached. Real excerpt from `runs/demo/offline/trace.jsonl`, invoice_1012.pdf:
 
@@ -118,6 +131,8 @@ Other assumptions:
 - **Address watch list**: `1600 pennsylvania ave` and `742 evergreen terrace`. The second was added after the first live run, where Grok pointed out it is a fictional address.
 - **FX** is a fixed mock table (EUR 1.08) so runs are reproducible. The bank is paid in USD.
 - **Batch order** is filename order, so `invoice_1011.pdf` is the original and `invoice_1011.txt` the duplicate.
+- **Payment conditions** (for example "confirm the rush price against the PO") are recorded with the decision for AP to follow up. In this prototype they do not block the payment; anything that should block is a hold.
+- **INV-1004** passes inventory validation, as the brief expects, but it is not paid: revision R1 (`invoice_1004_revised.json`) replaces it.
 - **Terms mismatch** ("Net 15" with a 16 or 17 day due date) is info only offline. Grok sometimes holds on it.
 - Validation does not decrement stock across invoices in a batch.
 
@@ -145,7 +160,7 @@ Not estimated: losses from paying wrong or fraudulent invoices, early-payment di
 
 ## Testing
 
-- `pytest`: 140 offline tests in about 2 seconds, no network. Parsers on all 20 files, every validation check, payment idempotency, retries and chaos, the HITL queue, approval rules and the critic loop, and a golden test (`tests/golden.yaml`) that pins the expected offline decision and paid amount for every sample.
+- `pytest`: 146 offline tests in about 2 seconds, no network. Parsers on all 20 files, every validation check, payment idempotency, retries and chaos, the HITL queue, approval rules and the critic loop, a golden test (`tests/golden.yaml`) that pins the expected offline decision and paid amount for every sample, and `tests/test_agentic.py`, which drives the real `GrokClient` with a scripted OpenAI-compatible client to test the self-correction retry, the tool-call loop (including an unknown tool) and API retries.
 - `pytest -m live`: one real Grok extraction of invoice 1001 (needs `XAI_API_KEY`).
 - CI runs the offline suite on Python 3.11 and 3.12 plus an offline batch run. The workflow source is in `ci/github-actions-ci.yml`; the active copy is `.github/workflows/ci.yml`.
 
@@ -166,7 +181,8 @@ invoice_agents/
 tests/                      unit and golden tests
 runs/demo/                  committed offline and live runs
 scripts/                    DB setup, run_log and web data exporters
-docs/                       run_log.md, DECISIONS.md
+data/invoices_extra/        3 extra test invoices (not from the case)
+docs/                       run_log.md, DECISIONS.md, demo_script.md, presentation.md
 web/                        static trace-replay demo (Vercel), data in web/data/demo.json
 ```
 

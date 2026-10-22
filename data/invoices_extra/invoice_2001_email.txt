@@ -1,0 +1,14 @@
+From: bob.tran@widgetsinc.example
+To: ap@acmecorp.example
+Subject: our bill for the october order
+
+hey AP team,
+
+hope all is well! as discussed on the phone we shipped six of the WidgetA
+(two hundred fifty dollars each) plus two GadgetX at 750 ea. our ref for this
+is W-2001. altogether that comes to $3,000 and we'd like it by Nov 15 2026 if
+possible, net 30 is fine too.
+
+cheers,
+Bob
+Widgets Inc.
