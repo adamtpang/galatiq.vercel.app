@@ -233,6 +233,8 @@
       '<div class="amount">' + money(inv.total_usd) + (inv.currency && inv.currency !== "USD" ? ' <span class="small muted">' + esc(inv.currency) + " " + esc(inv.total) + "</span>" : "") + "</div>" +
       riskMeter(inv.risk.score) +
       '<div class="why"><div class="sub-h">Why</div>' + list(d.reasons) + (d.conditions && d.conditions.length ? "<div class='sub-h'>Conditions</div>" + list(d.conditions) : "") +
+      (function () { var cr = (inv.timeline || []).filter(function (e) { return e.step === "critic_review"; });
+        return cr.length ? "<div class='sub-h'>Critic</div>" + list(cr.map(function (e) { return "Round " + e.detail.round + ", " + (e.detail.verdict === "sign_off" ? "signed off" : "objected") + ": " + e.detail.reason; })) : ""; })() +
       (inv.memo ? "<div class='sub-h'>Memo" + (inv.memo.by === "grok" ? " by Grok" : " (template)") + "</div><p class='small'>" + esc(inv.memo.text) + "</p>" : "") + "</div>" +
       compareHtml(inv) +
       more("Agent steps (" + inv.timeline.length + ")", "<ol class='timeline'>" + inv.timeline.map(function (ev) { return stepHtml(ev, inv, r); }).join("") + "</ol>") +
@@ -498,7 +500,8 @@
     var h = [];
     h.push('<p class="memo-note small muted">' + esc(runName(REPORT)) + " · recorded " + esc(w.full) + " · assembled from the trace; only the linking words are a template.</p>");
     h.push('<div class="st-cards"><div class="st approve"><b>' + appr.length + '</b><span>paid</span></div><div class="st reject"><b>' + rej.length + '</b><span>rejected</span></div><div class="st review"><b>' + held.length + '</b><span>need you</span></div><div class="st"><b>' + whole(paidSum) + "</b><span>paid out</span></div></div>");
-    h.push('<section class="m-sec"><h3>What I did</h3><p>Read all ' + n + " files in " + fmtDur(r.duration_ms) + ". " + hard + " were settled by hard rules. " + (hh ? hh + " held by a hard hold rule, before the VP. " : "") + (isLive(r) ? (n - hard) + " got a Grok risk review (" + plural(tools, "tool call") + ") and " + (n - hard - hh) + " a VP decision." : (n - hard - hh) + " went through the rules VP" + (invs.some(function (i) { return i.decision.critique_rounds; }) ? " and critic" : "") + ".") + "</p></section>");
+    h.push('<section class="m-sec"><h3>What I did</h3><p>Read all ' + n + " files in " + fmtDur(r.duration_ms) + ". " + (isLive(r) ? (function () { var cc = r.invoices.filter(function (i) { return i.cross_check && i.cross_check.ok; }), ag = cc.filter(function (i) { return i.cross_check.agree; }).length, rb = r.invoices.filter(function (i) { return i.timeline.some(function (e) { return e.step === "llm_repair"; }); }).length;
+        return "Grok checked the parser's reading of " + cc.length + " (" + (ag === cc.length ? "all agreed" : ag + " agreed") + ")" + (rb ? ", rebuilt " + rb + " the parser could not read," : "") + " and wrote all " + n + " memos. "; })() : "") + hard + " were settled by hard rules. " + (hh ? hh + " held by a hard hold rule, before the VP. " : "") + (isLive(r) ? (n - hard) + " got a Grok risk review (" + plural(tools, "tool call") + ") and " + (n - hard - hh) + " a VP decision." : (n - hard - hh) + " went through the rules VP" + (invs.some(function (i) { return i.decision.critique_rounds; }) ? " and critic" : "") + ".") + "</p></section>");
 
     var groups = {}, order = [];
     rej.forEach(function (i) { var c = catOf(i); if (!groups[c[0]]) { groups[c[0]] = { c: c, items: [] }; order.push(c[0]); } groups[c[0]].items.push(i); });
