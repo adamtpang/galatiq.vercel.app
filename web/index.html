@@ -2,90 +2,85 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Acme AP Agents | Galatiq case by Adam Pang</title>
-<meta name="description" content="Watch a replay of a real grok-4.7 run that ingests, validates, approves and pays Acme Corp's 20 sample invoices, then hands off a report.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Acme AP Agents · Galatiq FDE case by Adam Pang</title>
+<meta name="description" content="A replay of a real grok-4.7 run that reads, checks, approves and pays Acme Corp's 20 sample invoices, with the original files and a handoff report.">
+<meta name="theme-color" content="#000000">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <a class="skip" href="#overview">Skip to content</a>
 <header class="nav">
   <div class="wrap nav-inner">
-    <a class="brand" href="#top"><span class="logo" aria-hidden="true"></span>Acme AP Agents</a>
+    <a class="brand" href="#top">Acme AP Agents</a>
     <nav aria-label="Sections">
-      <a href="#overview">Overview</a>
       <a href="#run">Run</a>
       <a href="#report">Report</a>
       <a href="#demo">Explore</a>
       <a href="https://github.com/adamtpang/galatiq.vercel.app">Code</a>
     </nav>
-    <span class="badge real" title="Every number on this page comes from committed traces of real pipeline runs."><span class="dot"></span><span>Replay of a real run<span class="badge-more">, not a live call</span></span></span>
+    <span class="badge" title="Played back from committed traces of a real run">Replay</span>
   </div>
 </header>
 
 <main id="top">
-  <!-- Stage 1: initial state and overview -->
   <section id="overview" class="wrap section first" aria-labelledby="ov-h">
-    <p class="eyebrow">Galatiq FDE case · Acme Corp accounts payable</p>
-    <h1 id="ov-h">Acme has an inbox full of invoices. Watch Grok work through it.</h1>
-    <p class="lede">Four agents read every invoice, check it, argue about it and then pay it, reject it or hold it for a person. Press the button to watch the recorded run, step by step, with every tool call and argument.</p>
-    <div class="honesty" id="honesty" role="note">Loading run data...</div>
-    <div class="top-go"><button class="btn ghost" id="go-top" type="button">Skip the overview and run Grok</button><span class="small muted">or read on for the full picture first</span></div>
-
-    <h2 class="h2s">The situation</h2>
-    <div class="sit">
-      <div class="sit-card"><span class="sit-k">Messy formats</span><p>Invoices arrive as text emails, PDFs, CSV, JSON and XML. Some have OCR slips, typos or repeated lines. Today staff retype them by hand.</p></div>
-      <div class="sit-card"><span class="sit-k" id="sit-limit">Approval limit</span><p id="sit-limit-p">Large invoices need extra scrutiny before anyone pays them.</p></div>
-      <div class="sit-card"><span class="sit-k">Fraud risk</span><p>Some invoices push urgency, ask for a wire to a new account, come from vendors not on file or sit just under the limit.</p></div>
-      <div class="sit-card"><span class="sit-k">Inventory to check</span><p>Every line has to match the inventory database: the item must exist and there must be enough stock.</p></div>
+    <div class="hero">
+      <p class="eyebrow">Galatiq FDE case</p>
+      <h1 id="ov-h">Grok works Acme's invoice inbox.</h1>
+      <p class="lede">20 invoices in five formats. Four agents read, check and pay them, or hold them for a person.</p>
+      <p class="replay" id="honesty" role="note">Loading run data...</p>
     </div>
-    <p class="fine">From the Galatiq case brief: manual processing costs Acme about $2M a year, 30% of invoices carry an error and payment takes 5 days.</p>
 
     <div class="ov-grid">
-      <div class="card pad-l">
-        <h2 class="h2s">What is in the inbox</h2>
-        <p class="muted small" id="inbox-sum"></p>
-        <div class="fmt-row" id="fmt-row"></div>
-        <ul class="tiles" id="tiles" aria-label="Unprocessed invoices"></ul>
+      <div class="card">
+        <h2 class="card-h">The job</h2>
+        <ul class="job">
+          <li><b>Messy files</b><span>TXT, PDF, CSV, JSON, XML</span></li>
+          <li><b id="job-limit">Approval limit</b><span>Big bills get a second opinion</span></li>
+          <li><b>Fraud</b><span>Urgency, new bank details, unknown vendors</span></li>
+          <li><b>Stock</b><span>Every line must exist and be in stock</span></li>
+        </ul>
       </div>
-      <div class="card pad-l">
-        <h2 class="h2s">How Grok will handle each one</h2>
-        <ol class="pipe" id="pipe">
-          <li><b>1. Ingest</b><span>Read the file and pull out vendor, items, amounts and dates. A format parser runs first; Grok extracts only what the parser cannot read, and its answer is checked against a schema.</span></li>
-          <li><b>2. Validate</b><span>Code checks each line against inventory, redoes the math, checks dates, currency, prices, vendor and duplicates. Any blocking flag means the invoice cannot be paid.</span></li>
-          <li><b>3. Risk</b><span>Weighted fraud signals give a score from 0 to 100. On invoices with no blocking flag, Grok calls read-only tools (vendor master, inventory, vendor history) and can raise the score with reasons, never lower it.</span></li>
-          <li><b>4. VP approval</b><span>A VP agent reads the flags and the risk review and proposes approve, hold or reject, with reasons and conditions.</span></li>
-          <li><b>5. Critic</b><span id="pipe-critic">A critic challenges VP approvals that are large, near the limit or high risk.</span></li>
-          <li><b>6. Outcome</b><span>Pay through the mock bank (once, with an idempotency key), reject with reasons logged, or hold in a review queue for a human.</span></li>
+      <div class="card">
+        <h2 class="card-h">Inbox <span class="muted" id="inbox-count"></span><span class="muted small hint">Select a file to open it</span></h2>
+        <div class="fmt-row" id="fmt-row"></div>
+        <ul class="tiles" id="tiles" aria-label="Invoice files. Select one to see the original."></ul>
+      </div>
+      <div class="card">
+        <h2 class="card-h">Pipeline</h2>
+        <ol class="pipe">
+          <li><b>Ingest</b><span>Read the file</span></li>
+          <li><b>Validate</b><span>Stock, math, duplicates</span></li>
+          <li><b>Risk</b><span>Fraud score, tool checks</span></li>
+          <li><b>VP</b><span>Approve, hold or reject</span></li>
+          <li><b>Critic</b><span>Challenges risky approvals</span></li>
+          <li><b>Outcome</b><span>Pay, reject or hold</span></li>
         </ol>
-        <h3 class="h3s">What each status means</h3>
-        <dl class="statuses">
-          <div><dt><span class="pill approve">Approved</span></dt><dd>Checks passed and the VP approved, so it was paid.</dd></div>
-          <div><dt><span class="pill reject">Rejected</span></dt><dd>A hard rule failed (stock, math, duplicate, missing data) or the VP rejected it. Not paid; reasons logged.</dd></div>
-          <div><dt><span class="pill review">Held for a human</span></dt><dd>Something needs a person to confirm before money moves. It waits in the review queue with the reasons attached.</dd></div>
-        </dl>
+        <div class="statuses">
+          <span class="pill approve" title="Checks passed and the VP approved, so it was paid">Approved</span>
+          <span class="pill reject" title="A hard rule failed or the VP rejected it. Not paid">Rejected</span>
+          <span class="pill review" title="Waits in the review queue for a person">Held for a human</span>
+        </div>
       </div>
     </div>
 
     <div class="go">
       <button class="btn primary xl" id="go" type="button" disabled>Run Grok on the inbox</button>
-      <div class="go-side">
-        <p class="small muted" id="go-note"></p>
-        <button class="linkish small" id="go-offline" type="button">Replay the offline rules run instead</button>
-      </div>
+      <p class="small muted" id="go-note"></p>
+      <button class="linkish small" id="go-offline" type="button">Replay the offline rules instead</button>
     </div>
   </section>
 
-  <!-- Stage 2: working -->
   <section id="run" class="wrap section" aria-labelledby="run-h" hidden>
     <div class="run-head">
       <div>
         <p class="eyebrow" id="run-eyebrow">Working</p>
-        <h2 id="run-h">Grok is working through the inbox</h2>
+        <h2 id="run-h">Working through the inbox</h2>
       </div>
       <div class="controls" role="group" aria-label="Playback">
         <button class="ctl" id="pause" type="button" aria-pressed="false">Pause</button>
@@ -96,23 +91,21 @@
         <button class="ctl" id="skip" type="button">Skip to end</button>
       </div>
     </div>
-    <p class="small muted speed-note" id="speed-note"></p>
     <div class="runbar card">
-      <div class="prog-top"><b id="prog-label">0 of 20 invoices done</b><span class="small muted" id="prog-eta"></span></div>
+      <div class="prog-top"><b id="prog-label">0 of 20 done</b><span class="small muted" id="prog-eta"></span></div>
       <div class="prog" role="progressbar" aria-label="Invoices processed" aria-valuemin="0" aria-valuemax="20" aria-valuenow="0" id="prog"><span id="prog-fill"></span></div>
-      <div class="small muted" id="prog-real"></div>
+      <div class="prog-sub small muted"><span id="speed-note"></span><span id="prog-real"></span></div>
       <div class="totals" id="totals"></div>
     </div>
     <p class="sr-only" aria-live="polite" id="live-status"></p>
     <div class="work-grid">
       <div class="card queue">
-        <div class="q-head small muted">Inbox queue · click any invoice to pause and inspect it</div>
+        <div class="q-head small muted">Queue · select to inspect</div>
         <ul class="q-list" id="queue"></ul>
       </div>
       <div class="card feed-card">
         <div id="cur-head" class="cur-head"></div>
         <ol class="stepper" id="stepper" aria-label="Pipeline stage"></ol>
-        <p class="gloss small"><span><b>Flag</b> a finding from the checks</span><span><b>Blocking</b> a flag that rules out payment</span><span><b>Critic</b> a second agent that challenges VP approvals</span><span><b>Hold</b> wait for a person to decide</span></p>
         <ol class="feed" id="feed" aria-label="Agent activity"></ol>
         <div class="waiting" id="waiting" hidden></div>
         <div class="inspector" role="region" id="inspector" hidden tabindex="-1" aria-label="Invoice detail">
@@ -123,12 +116,11 @@
     </div>
   </section>
 
-  <!-- Stage 3: report -->
   <section id="report" class="wrap section" aria-labelledby="rep-h" hidden>
     <div class="run-head">
       <div>
-        <p class="eyebrow">Handoff report</p>
-        <h2 id="rep-h">Done. Here is what I did and what needs you.</h2>
+        <p class="eyebrow">Handoff</p>
+        <h2 id="rep-h">Report</h2>
       </div>
       <div class="controls">
         <div class="seg" role="group" aria-label="Report for run">
@@ -141,47 +133,46 @@
     <article class="memo card" id="memo"></article>
   </section>
 
-  <!-- Explorer: per-invoice detail view -->
   <section id="demo" class="wrap section" aria-labelledby="demo-h">
     <p class="eyebrow">Explore</p>
-    <h2 id="demo-h">Every invoice, every step.</h2>
-    <p class="sub">Pick a run, then an invoice, to see each agent step with its actual output. Everything shown comes from the traces; the browser only adds up the summary cards and compares the two runs.</p>
-
+    <h2 id="demo-h">Every invoice, every step</h2>
     <div class="toolbar">
       <div class="seg" role="group" aria-label="Run">
         <button class="seg-btn on" data-run="live" type="button">Live grok-4.7</button>
         <button class="seg-btn" data-run="offline" type="button">Offline rules</button>
       </div>
       <div class="seg" role="group" aria-label="Invoice set">
-        <button class="set-btn seg-btn on" data-set="case" type="button">Case samples</button>
-        <button class="set-btn seg-btn" data-set="extra" type="button">Extra tests</button>
+        <button class="seg-btn on" data-set="case" type="button">Case samples</button>
+        <button class="seg-btn" data-set="extra" type="button">Extra tests</button>
       </div>
-      <span class="small muted" id="run-meta"></span>
     </div>
-    <p class="showing" id="showing"></p>
-    <p class="run-note small" id="run-note"></p>
-
+    <p class="showing small" id="showing"></p>
     <div class="summary" id="summary"></div>
-
     <div class="demo-grid">
       <div class="inbox card">
         <div class="filters" id="filters">
-          <button class="chip on" data-f="all" type="button">All</button>
-          <button class="chip" data-f="APPROVED" type="button">Approved</button>
-          <button class="chip" data-f="REJECTED" type="button">Rejected</button>
-          <button class="chip" data-f="PENDING_HUMAN" type="button">Needs review</button>
+          <button class="chip on" data-f="all" type="button" aria-pressed="true">All</button>
+          <button class="chip" data-f="APPROVED" type="button" aria-pressed="false">Approved</button>
+          <button class="chip" data-f="REJECTED" type="button" aria-pressed="false">Rejected</button>
+          <button class="chip" data-f="PENDING_HUMAN" type="button" aria-pressed="false">Held</button>
         </div>
         <ul id="inbox" class="inbox-list"></ul>
       </div>
       <div class="detail card" id="detail"></div>
     </div>
+    <p class="small muted run-note" id="run-note"></p>
   </section>
 </main>
 
+<dialog id="src-dialog" aria-labelledby="src-title">
+  <div class="dlg-bar"><b id="src-title">Original file</b><button class="ctl" id="src-close" type="button">Close</button></div>
+  <div class="dlg-body" id="src-body"></div>
+</dialog>
+
 <footer class="footer">
   <div class="wrap foot-inner">
-    <span>Built by <a href="https://adampang.com">Adam Pang</a> · <a href="https://github.com/adamtpang/galatiq.vercel.app#quickstart-offline-about-a-minute">Run it locally</a></span>
-    <span class="links"><a href="https://github.com/adamtpang">github.com/adamtpang</a><a href="https://adampang.com">adampang.com</a></span>
+    <span>Built by Adam Pang for the Galatiq FDE case · <a href="https://github.com/adamtpang/galatiq.vercel.app">Code on GitHub</a></span>
+    <span class="muted">Not an official Galatiq product.</span>
   </div>
 </footer>
 <script src="/app.js"></script>

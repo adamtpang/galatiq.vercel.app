@@ -1,0 +1,10 @@
+{
+  "invoice_number": "INV-2003",
+  "vendor": {"name": "Reliable Components Inc."},
+  "date": "2026-10-18",
+  "due_date": "2026-11-17",
+  "line_items": [
+    {"item": "WidgetA", "quantity": 4, "unit_price": 250.00},
+    {"item": "WidgetB", "quantity": 2, "unit_price": 500.00}
+  ],
+  "total": 2000.00

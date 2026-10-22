@@ -17,6 +17,9 @@ from invoice_agents.config import load_policy  # noqa: E402
 
 RUNS = ROOT / "runs" / "demo"
 OUT = ROOT / "web" / "data" / "demo.json"
+SRC_OUT = ROOT / "web" / "data" / "sources.json"
+INV_DIR = ROOT / "web" / "invoices"
+SOURCE_DIRS = [ROOT / "data" / "invoices", ROOT / "data" / "invoices_extra"]
 
 
 def export_run(name: str) -> dict:
@@ -72,10 +75,46 @@ def export_run(name: str) -> dict:
             "vendor_address": inv.get("vendor_address") if inv else None,
             "date": inv.get("date") if inv else None,
             "due_date_raw": inv.get("due_date_raw") if inv else None,
+            "extracted": {k: inv.get(k) for k in ("number", "revision", "vendor", "vendor_address", "vendor_former_name", "date_raw",
+                                                  "due_date_raw", "currency", "subtotal", "tax", "tax_rate", "shipping", "total", "terms")} if inv else None,
         })
     return {"name": name, "mode": summary["mode"], "model": summary.get("model"),
             "recorded_at": datetime.fromtimestamp(run_t0, timezone.utc).isoformat(timespec="seconds"),
             "duration_ms": round((run_t1 - run_t0) * 1000), "invoices": invoices}
+
+
+def export_sources(files: set[str]) -> dict:
+    """Copy the original invoice files into web/invoices and record their text for the page.
+
+    Text files are stored as written. PDFs keep the original file, plus the text layer pdfplumber reads
+    (what the ingest agent starts from) and a PNG render of each page so phones can see it too.
+    """
+    import shutil
+    INV_DIR.mkdir(parents=True, exist_ok=True)
+    out = {}
+    for name in sorted(files):
+        src = next((d / name for d in SOURCE_DIRS if (d / name).exists()), None)
+        if src is None:
+            continue
+        shutil.copyfile(src, INV_DIR / name)
+        rec = {"url": f"/invoices/{name}", "format": src.suffix.lstrip(".").lower(), "bytes": src.stat().st_size,
+               "folder": str(src.parent.relative_to(ROOT))}
+        if rec["format"] == "pdf":
+            import pdfplumber
+            import pypdfium2 as pdfium
+            with pdfplumber.open(src) as pdf:
+                rec["text"] = "\n\n".join((pg.extract_text() or "") for pg in pdf.pages)
+            doc = pdfium.PdfDocument(str(src))
+            rec["pages"] = []
+            for i in range(len(doc)):
+                png = f"{src.stem}.p{i + 1}.png"
+                doc[i].render(scale=2).to_pil().save(INV_DIR / png, optimize=True)
+                rec["pages"].append(f"/invoices/{png}")
+            doc.close()
+        else:
+            rec["text"] = src.read_text(encoding="utf-8", errors="replace")
+        out[name] = rec
+    return out
 
 
 if __name__ == "__main__":
@@ -87,4 +126,7 @@ if __name__ == "__main__":
             "runs": {n: export_run(n) for n in ("offline", "live", "extra_offline", "extra_live") if (RUNS / n / "summary.json").exists()}}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, separators=(",", ":"), default=str))
+    srcs = export_sources({i["file"] for r in data["runs"].values() for i in r["invoices"]})
+    SRC_OUT.write_text(json.dumps(srcs, separators=(",", ":")))
+    print(f"wrote {SRC_OUT} and {len(srcs)} original files to {INV_DIR}")
     print(f"wrote {OUT} ({OUT.stat().st_size // 1024} KB): " + ", ".join(f"{k}={len(v['invoices'])}" for k, v in data["runs"].items()))
