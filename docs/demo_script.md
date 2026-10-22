@@ -53,6 +53,7 @@ Point at: `bank_error` events and retries with backoff, then `idempotency_skip` 
 
 ```bash
 python main.py review
+python main.py review INV-1012                 # what a reviewer sees for one held invoice
 python main.py review INV-1012 --approve --note "called FastShip, rename confirmed"
 ```
 
@@ -63,7 +64,7 @@ python main.py --invoice_path=data/invoices/invoice_1012.pdf --mode live
 python main.py --batch data/invoices_extra --mode live
 ```
 
-Point at: `tool_call` events (the risk agent looks up the vendor master, inventory and vendor history before scoring), the `llm_repair` event on the free-form email and the truncated JSON, and the prompt-injection invoice (2002), which the injection hard hold sends to a human (decision 8).
+Point at: `tool_call` events (the risk agent looks up the vendor master, inventory and vendor history before scoring), the `llm_repair` event on the free-form email and the truncated JSON, which the decision 10 hard hold then sends to a person (`python main.py review INV-2003` shows the original next to Grok's reading), and the prompt-injection invoice (2002), which the injection hard hold sends to a human (decision 8).
 
 ## 7. The web replay
 

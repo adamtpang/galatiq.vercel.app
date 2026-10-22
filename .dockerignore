@@ -1,0 +1,14 @@
+.git
+.github
+.venv
+venv
+.env
+.env.*
+**/__pycache__
+.pytest_cache
+inventory.db
+runs/*
+!runs/demo
+evals/out
+web
+node_modules

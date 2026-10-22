@@ -68,6 +68,10 @@ def print_summary(states: list[InvoiceState], console: Console, mode: str, run_d
     paid = sum((s.payment or {}).get("amount", 0) for s in states if (s.payment or {}).get("status") == "paid")
     console.print(f"{len(states)} invoice{'' if len(states) == 1 else 's'}: {counts['APPROVED']} approved, {counts['REJECTED']} rejected, "
                   f"{counts['PENDING_HUMAN']} pending human review. Paid this run: {money(paid)}.")
+    late = [Path(s.source).name.removeprefix("invoice_") for s in states if any(f.code == "PAST_DUE" for f in s.flags)]
+    if late:
+        console.print(f"[yellow]Past due[/] when processed (warning only, changes no decision): {len(late)} of "
+                      f"{len(states)}: {', '.join(late[:8])}{', ...' if len(late) > 8 else ''}")
     if run_dir:
         console.print(f"Trace: {run_dir / 'trace.jsonl'}")
 

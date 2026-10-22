@@ -59,6 +59,11 @@
   function isFraudBlocked(inv) { return inv.decision.status === "REJECTED" && (inv.risk.score || 0) >= hr(); }
   function grokReasons(inv) { return (inv.risk.llm && inv.risk.llm.extra_reasons) || []; }
   function ruleReasons(inv) { return (inv.risk.reasons || []).filter(function (r) { return !/^\(Grok\) /.test(r); }); }
+  function reviewCmd(i) {
+    var repaired = i.decision && (i.decision.reasons || []).some(function (r) { return /^LLM_REPAIRED/.test(r); });
+    return (repaired ? '<p class="small">Grok rebuilt this invoice from the raw text (decision 10). This shows the original next to Grok\'s reading:</p><code class="block">python main.py review ' + esc(i.number) + "</code>" : "") +
+      '<code class="block">python main.py review ' + esc(i.number) + ' --approve --note "..."</code>';
+  }
   function blocks(i) { return i.flags.filter(function (f) { return f.severity === "block"; }).map(function (f) { return f.code; }); }
   function hasBlock(i) { return blocks(i).length > 0; }
 
@@ -191,7 +196,7 @@
       case "payment.idempotency_skip": o.title = "Already paid, skipped"; break;
       case "payment.rejection_logged": o.title = "Not paid"; o.what = "Logged with reasons"; o.cls = "bad"; break;
       case "hitl.queued": o.title = "Queued for a person"; o.what = "No money moves until someone decides";
-        o.body = more("Review command", '<code class="block">python main.py review ' + esc(inv.number) + ' --approve --note "..."</code>'); o.cls = "warn"; break;
+        o.body = more("Review command", reviewCmd(inv)); o.cls = "warn"; break;
       default: o.title = esc(ev.agent + " " + ev.step);
     }
     return o;
@@ -506,17 +511,18 @@
         '<div class="r-sub small muted">' + esc(riskText(i.risk)) + " · " + (ow.length ? esc(ow.join(" and ")) + " named by the VP" : "Owner: AP reviewer") + ' · <button type="button" class="linkish" data-open-file="' + esc(i.file) + '">' + esc(i.file) + "</button></div>" +
         '<div class="sub-h">Next steps</div>' + ((i.decision.conditions || []).length ? list(i.decision.conditions) : '<p class="small muted">None recorded.</p>') +
         more("Why I held it", list(i.decision.reasons) + (crit.length ? "<div class='sub-h'>Critic</div>" + list(crit.map(function (c) { return "Round " + c.detail.round + ": " + c.detail.reason; })) : "")) +
-        more("Review command", '<code class="block">python main.py review ' + esc(i.number) + ' --approve --note "..."</code>') + "</div>";
+        more("Review command", reviewCmd(i)) + "</div>";
     }).join("") : "<p>Nothing is waiting.</p>") + "</section>");
 
     var codes = {};
-    invs.forEach(function (i) { i.flags.forEach(function (f) { if (f.severity === "info") return; var c = codes[f.code] || (codes[f.code] = { sev: f.severity, files: [], msg: f.message }); if (c.files.indexOf(i.file) < 0) c.files.push(i.file); if (f.severity === "block") c.sev = "block"; }); });
+    var pastDue = invs.filter(function (i) { return flag(i, "PAST_DUE"); });
+    invs.forEach(function (i) { i.flags.forEach(function (f) { if (f.severity === "info" || f.code === "PAST_DUE") return; var c = codes[f.code] || (codes[f.code] = { sev: f.severity, files: [], msg: f.message }); if (c.files.indexOf(i.file) < 0) c.files.push(i.file); if (f.severity === "block") c.sev = "block"; }); });
     var ck = Object.keys(codes).sort(function (a, b) { return (codes[a].sev === "block" ? 0 : 1) - (codes[b].sev === "block" ? 0 : 1) || codes[b].files.length - codes[a].files.length; });
     var fixes = {};
     invs.forEach(function (i) { i.flags.forEach(function (f) { if (/OCR_CORRECTED|SKU_NORMALIZED|LINES_AGGREGATED/.test(f.code)) { fixes[f.code] = fixes[f.code] || []; if (fixes[f.code].indexOf(i.file) < 0) fixes[f.code].push(i.file); } }); });
     h.push('<section class="m-sec"><h3>Data errors found</h3><p>' + plural(ck.length, "kind") + " of error or warning. Most common: " + ck.slice(0, 3).map(function (c) { return "<code>" + esc(c) + "</code> (" + codes[c].files.length + ")"; }).join(", ") + ".</p>" + more("Show all", '<ul class="fl">' + ck.map(function (c) {
       var x = codes[c]; return '<li><span class="sev ' + x.sev + '" title="' + esc(SEV[x.sev]) + '">' + x.sev + '</span><span><code>' + esc(c) + "</code> · " + plural(x.files.length, "file") + '<div class="small muted">' + esc(x.msg) + "</div></span></li>";
-    }).join("") + "</ul>" + (Object.keys(fixes).length ? '<p class="small muted">Fixed automatically: ' + Object.keys(fixes).map(function (c) { return "<code>" + esc(c) + "</code> (" + fixes[c].length + ")"; }).join(", ") + ".</p>" : "")) + "</section>");
+    }).join("") + "</ul>" + (pastDue.length ? '<p class="small muted"><code>PAST_DUE</code>: ' + pastDue.length + " of " + invs.length + " were already past their due date when this run processed them. That warning is for people only; the agents do not see it, so it changes no decision.</p>" : "") + (Object.keys(fixes).length ? '<p class="small muted">Fixed automatically: ' + Object.keys(fixes).map(function (c) { return "<code>" + esc(c) + "</code> (" + fixes[c].length + ")"; }).join(", ") + ".</p>" : "")) + "</section>");
 
     var rec = [];
     invs.filter(function (i) { return flag(i, "VENDOR_RENAMED") && i.decision.status !== "REJECTED"; }).forEach(function (i) { var f = flag(i, "VENDOR_RENAMED"); rec.push("Call " + f.evidence.former + " on its contact on file to confirm the rename to " + f.evidence.vendor + ", then record the alias or reject " + invNumber(i.number) + "."); });

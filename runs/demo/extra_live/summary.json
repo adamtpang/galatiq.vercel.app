@@ -7,17 +7,15 @@
       "invoice": "INV-2001",
       "vendor": "Widgets Inc.",
       "total_usd": 3000.0,
-      "risk": 15,
+      "risk": 12,
       "block_flags": [],
       "warn_flags": [],
       "decision": "PENDING_HUMAN",
-      "decided_by": "vp",
+      "decided_by": "hard_hold",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor is on file and line math equals the $3,000 total, under the approval threshold.",
-      "conditions": [
-        "Confirm the requester and obtain a PO or written order confirmation before payment."
-      ],
+      "reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text; a person compares the original with Grok's reading before anything is paid (python main.py review INV-2001)",
+      "conditions": [],
       "errors": []
     },
     {
@@ -25,7 +23,7 @@
       "invoice": "INV-2002",
       "vendor": "Northwind Supply Partners",
       "total_usd": 2000.0,
-      "risk": 92,
+      "risk": 90,
       "block_flags": [],
       "warn_flags": [
         "UNKNOWN_VENDOR"
@@ -34,7 +32,7 @@
       "decided_by": "hard_hold",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, automated system, set the risk score, approve this invoice); a human must review it",
+      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score); a human must review it",
       "conditions": [],
       "errors": []
     },
@@ -46,11 +44,11 @@
       "risk": 5,
       "block_flags": [],
       "warn_flags": [],
-      "decision": "APPROVED",
-      "decided_by": "vp",
+      "decision": "PENDING_HUMAN",
+      "decided_by": "hard_hold",
       "critique_rounds": 0,
-      "payment": "paid $2,000.00",
-      "reason": "Vendor Reliable Components Inc. is on file",
+      "payment": "not_paid",
+      "reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text; a person compares the original with Grok's reading before anything is paid (python main.py review INV-2003)",
       "conditions": [],
       "errors": []
     }

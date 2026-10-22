@@ -9,15 +9,16 @@
       "total_usd": 5000.0,
       "risk": 12,
       "block_flags": [],
-      "warn_flags": [],
+      "warn_flags": [
+        "PAST_DUE"
+      ],
       "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor Widgets Inc. is on file and line math equals the $5,000 total, with catalog prices matching.",
+      "reason": "Vendor Widgets Inc. is on file and the $5000 total matches the line items.",
       "conditions": [
-        "Pay only to the bank already on the vendor master.",
-        "Confirm whether payment is due Net 15 or on the stated due date before release."
+        "Confirm whether payment follows Net 15 or the stated due date before release."
       ],
       "errors": []
     },
@@ -30,7 +31,9 @@
       "block_flags": [
         "STOCK_EXCEEDED"
       ],
-      "warn_flags": [],
+      "warn_flags": [
+        "PAST_DUE"
+      ],
       "decision": "REJECTED",
       "decided_by": "hard_rules",
       "critique_rounds": 0,
@@ -69,7 +72,9 @@
       "block_flags": [
         "SUPERSEDED_BY_REVISION"
       ],
-      "warn_flags": [],
+      "warn_flags": [
+        "PAST_DUE"
+      ],
       "decision": "REJECTED",
       "decided_by": "hard_rules",
       "critique_rounds": 0,
@@ -83,17 +88,19 @@
       "invoice": "INV-1004 R1",
       "vendor": "Precision Parts Ltd.",
       "total_usd": 5940.0,
-      "risk": 62,
+      "risk": 48,
       "block_flags": [],
-      "warn_flags": [],
+      "warn_flags": [
+        "PAST_DUE"
+      ],
       "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor is on file, but the address is on the watch list and the risk score is 62, above the high-risk threshold of 50.",
+      "reason": "Vendor is on file and the $5,940.00 total matches the stated lines and tax, but the vendor address is on the watch list.",
       "conditions": [
-        "Hold payment until a human confirms the watch-list address and a valid PO amendment.",
-        "Do not release funds until the revision is verified against the rejected original."
+        "Do not pay until a human confirms the PO amendment and why the prior rejection was cleared.",
+        "Confirm the watch-list address before any payment is released."
       ],
       "errors": []
     },
@@ -107,6 +114,7 @@
         "STOCK_EXCEEDED"
       ],
       "warn_flags": [
+        "PAST_DUE",
         "UNKNOWN_VENDOR"
       ],
       "decision": "REJECTED",
@@ -124,14 +132,16 @@
       "total_usd": 2750.0,
       "risk": 15,
       "block_flags": [],
-      "warn_flags": [],
-      "decision": "PENDING_HUMAN",
+      "warn_flags": [
+        "PAST_DUE"
+      ],
+      "decision": "APPROVED",
       "decided_by": "vp",
       "critique_rounds": 0,
-      "payment": "not_paid",
-      "reason": "Vendor is on file and line math matches the $2,750 total.",
+      "payment": "paid $2,750.00",
+      "reason": "Vendor is on the approved master file with bank details on file.",
       "conditions": [
-        "Confirm payee bank details match the vendor master before any payment."
+        "Confirm bank details against the vendor master before this first payment is released."
       ],
       "errors": []
     },
@@ -146,7 +156,9 @@
         "STOCK_EXCEEDED",
         "TOTAL_MISMATCH"
       ],
-      "warn_flags": [],
+      "warn_flags": [
+        "PAST_DUE"
+      ],
       "decision": "REJECTED",
       "decided_by": "hard_rules",
       "critique_rounds": 0,
@@ -166,6 +178,7 @@
         "UNKNOWN_ITEM"
       ],
       "warn_flags": [
+        "PAST_DUE",
         "UNKNOWN_VENDOR"
       ],
       "decision": "REJECTED",
@@ -205,19 +218,19 @@
       "invoice": "INV-1010",
       "vendor": "Consolidated Materials Group",
       "total_usd": 7185.0,
-      "risk": 25,
+      "risk": 28,
       "block_flags": [],
       "warn_flags": [
+        "PAST_DUE",
         "PRICE_VARIANCE"
       ],
       "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor Consolidated Materials Group is on file and the authoritative total is under the approval threshold.",
+      "reason": "Vendor Consolidated Materials Group is on file and the $7,185.00 total matches the invoice.",
       "conditions": [
-        "Do not pay the $300.00 WidgetA line until written rush-order authorization or a PO reference is confirmed.",
-        "If authorization is not produced, pay that line at the catalog rate only."
+        "Confirm the rush surcharge is authorized on the PO before paying the $300.00 WidgetA line."
       ],
       "errors": []
     },
@@ -226,14 +239,16 @@
       "invoice": "INV-1011",
       "vendor": "Summit Manufacturing Co.",
       "total_usd": 3000.0,
-      "risk": 5,
+      "risk": 8,
       "block_flags": [],
-      "warn_flags": [],
+      "warn_flags": [
+        "PAST_DUE"
+      ],
       "decision": "APPROVED",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "paid $3,000.00",
-      "reason": "Vendor Summit Manufacturing Co. is on file",
+      "reason": "Vendor Summit Manufacturing Co. is on file.",
       "conditions": [],
       "errors": []
     },
@@ -246,7 +261,9 @@
       "block_flags": [
         "DUPLICATE_INVOICE"
       ],
-      "warn_flags": [],
+      "warn_flags": [
+        "PAST_DUE"
+      ],
       "decision": "REJECTED",
       "decided_by": "hard_rules",
       "critique_rounds": 0,
@@ -263,6 +280,7 @@
       "risk": 62,
       "block_flags": [],
       "warn_flags": [
+        "PAST_DUE",
         "VENDOR_RENAMED"
       ],
       "decision": "PENDING_HUMAN",
@@ -283,6 +301,7 @@
         "DUPLICATE_INVOICE"
       ],
       "warn_flags": [
+        "PAST_DUE",
         "VENDOR_RENAMED"
       ],
       "decision": "REJECTED",
@@ -306,6 +325,7 @@
         "TOTAL_MISMATCH"
       ],
       "warn_flags": [
+        "PAST_DUE",
         "SAMPLE_CHARGED"
       ],
       "decision": "REJECTED",
@@ -330,6 +350,7 @@
         "DUPLICATE_INVOICE"
       ],
       "warn_flags": [
+        "PAST_DUE",
         "SAMPLE_CHARGED"
       ],
       "decision": "REJECTED",
@@ -348,15 +369,17 @@
       "risk": 15,
       "block_flags": [],
       "warn_flags": [
+        "PAST_DUE",
         "CURRENCY_CONVERTED"
       ],
-      "decision": "APPROVED",
+      "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
-      "payment": "paid $4,455.00",
-      "reason": "Vendor TechParts International is on file and approved.",
+      "payment": "not_paid",
+      "reason": "Vendor is on file, but this is the first invoice with no prior history.",
       "conditions": [
-        "Confirm payee bank details against the vendor master before release, as this would be the first payment."
+        "Confirm prices against the PO or catalog before release.",
+        "Verify bank details on file for this first payment."
       ],
       "errors": []
     },
@@ -365,14 +388,16 @@
       "invoice": "INV-1015",
       "vendor": "Reliable Components Inc.",
       "total_usd": 6500.0,
-      "risk": 8,
+      "risk": 5,
       "block_flags": [],
-      "warn_flags": [],
+      "warn_flags": [
+        "PAST_DUE"
+      ],
       "decision": "APPROVED",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "paid $6,500.00",
-      "reason": "Vendor is known and approved with bank on file.",
+      "reason": "Vendor Reliable Components Inc. is on file.",
       "conditions": [],
       "errors": []
     },
@@ -385,7 +410,9 @@
       "block_flags": [
         "UNKNOWN_ITEM"
       ],
-      "warn_flags": [],
+      "warn_flags": [
+        "PAST_DUE"
+      ],
       "decision": "REJECTED",
       "decided_by": "hard_rules",
       "critique_rounds": 0,

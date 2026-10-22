@@ -36,18 +36,18 @@ def dec(r: dict) -> str:
 DIFFS = """\
 ## Where live and offline disagree
 
-Both runs use the same policy, including the address watch list and the hard hold rules for prompt injection and renamed or lookalike vendors (decisions 8 and 9 in `docs/DECISIONS.md`). In live mode the risk agent also calls three read-only tools (`lookup_vendor`, `query_inventory`, `vendor_history`) before it scores; the calls are in the trace as `tool_call` events. Every difference goes the cautious way: Grok sent an invoice to a human where the offline rules paid it. Neither run paid anything the other refused.
+Both runs use the same policy, including the address watch list and the hard hold rules for prompt injection, renamed or lookalike vendors and Grok-rebuilt invoices (decisions 8, 9 and 10 in `docs/DECISIONS.md`). In live mode the risk agent also calls three read-only tools (`lookup_vendor`, `query_inventory`, `vendor_history`) before it scores; the calls are in the trace as `tool_call` events. Every difference goes the cautious way: Grok sent an invoice to a human where the offline rules paid it. Neither run paid anything the other refused.
 
 - **invoice_1001.txt**: the live VP held it on the terms mismatch (Net 15 printed, due date 17 days after issue) and because it is the first invoice on file from the vendor. Offline treats the terms gap as info and pays.
-- **invoice_1006.csv**: the live VP held it as a first payment to a vendor whose name resembles the buyer (Acme) and asked for the payee bank details to be confirmed against the vendor master. Offline sees a known vendor with clean math and pays.
-- **invoice_1010.txt**: the live VP held it until a PO or written authorization covers the $300 WidgetA rush rate ($250 catalog). Offline approves with that check as a payment condition.
+- **invoice_1010.txt**: the live VP held it until a PO covers the $300 WidgetA rush rate (20% over the $250 catalog price). Offline approves with that check as a payment condition.
+- **invoice_1014.xml**: the live VP held it as the first invoice from the vendor, billed in EUR, and asked for the prices to be confirmed after the conversion to USD. Offline pays it with the conversion as a payment condition.
 
-Live results are not perfectly repeatable. In the eval run of the same code (`evals/results/live.md`), Grok approved 1001 and 1006 and held 1014 (first EUR invoice from the vendor), which this demo run approved. 1010 was held in both live runs.
+Live results are not perfectly repeatable. In the eval run of the same code (`evals/results/live.md`), Grok paid 1001 and 1014, which this demo run held; 1010 was held in both live runs. 1006 was paid in this demo run and in the eval run (the previous demo run held it).
 
 Same outcome, by a different path:
 
 - **invoice_1012.pdf**: PENDING_HUMAN in both runs, decided by the vendor-rename hard hold (decision 9) before the VP and critic. Live, the risk agent still ran its tools and raised the risk to 62, but no VP or critic call was made.
-- **invoice_1004_revised.json**: PENDING_HUMAN in both runs. Offline holds it on the watch-list hit; live holds it on the watch-list address and a risk score of 62, above the high-risk threshold of 50.
+- **invoice_1004_revised.json**: PENDING_HUMAN in both runs. Offline holds it on the watch-list address; live, the VP holds it on the watch-list address and on the earlier rejected INV-1004 (risk 48).
 
 Risk scores differ on most clean invoices because the live risk agent can add points on top of the rule score (it can never lower it). None of those increases crossed a threshold except where noted above.
 """

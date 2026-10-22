@@ -75,7 +75,7 @@ def test_offline_makes_no_llm_calls(offline):
 def test_committed_demo_agreement(offline):
     demo = offline["agreement"][0]
     assert demo["invoices"] == 20 and demo["agree"] == 17
-    assert sorted(d["file"] for d in demo["disagreements"]) == ["invoice_1001.txt", "invoice_1006.csv", "invoice_1010.txt"]
+    assert sorted(d["file"] for d in demo["disagreements"]) == ["invoice_1001.txt", "invoice_1010.txt", "invoice_1014.xml"]
 
 
 def test_adversarial_as_a_separate_later_run(offline):
