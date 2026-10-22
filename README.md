@@ -276,7 +276,7 @@ Not estimated: losses from paying wrong or fraudulent invoices, early-payment di
 
 ## Testing
 
-- `pytest`: 218 offline tests in about 4 seconds, no network. Parsers on all 20 files, every validation check, payment idempotency, retries and chaos, the HITL queue, approval rules, the hard holds and the critic loop, a golden test (`tests/golden.yaml`) that pins the expected offline decision and paid amount for every sample, and `tests/test_agentic.py`, which drives the real `GrokClient` with a scripted OpenAI-compatible client to test the self-correction retry, the tool-call loop (including an unknown tool) and API retries. `tests/test_evals.py` runs the four evals offline and pins their numbers (see "Evals"). `tests/test_history.py` covers duplicates against stored history across separate runs, idempotent re-runs, and the review command approving and rejecting a held invoice end to end, plus decision 10 (a Grok-rebuilt invoice held, shown next to its original, then approved). `tests/test_cache.py` covers the decision cache (a re-run reuses every answer and is identical; with `--no-cache` a drifting scripted model differs; the key ignores line endings but not content or model) and the model pin (a different reported model holds; the configured one is quiet). `tests/test_history.py` also checks the backfill: an old row with empty history keys is filled in on connect and then catches 3006. `tests/test_validation.py` covers PAST_DUE and UNSUPPORTED_CURRENCY, and `tests/test_approval.py` checks the injection patterns on held-out injections and on harmless notes. `parse_text` was split into small helpers; its output on 341 inputs (every sample, extra, adversarial and edge file plus 300 shuffled line sets) was compared before and after and is identical.
+- `pytest`: 262 offline tests in about 10 seconds, no network. Parsers on all 20 files, every validation check, payment idempotency, retries and chaos, the HITL queue, approval rules, the hard holds and the critic loop, a golden test (`tests/golden.yaml`) that pins the expected offline decision and paid amount for every sample, and `tests/test_agentic.py`, which drives the real `GrokClient` with a scripted OpenAI-compatible client to test the self-correction retry, the tool-call loop (including an unknown tool) and API retries. `tests/test_evals.py` runs the five evals offline and pins their numbers (see "Evals"). `tests/test_history.py` covers duplicates against stored history across separate runs, idempotent re-runs, and the review command approving and rejecting a held invoice end to end, plus decision 10 (a Grok-rebuilt invoice held, shown next to its original, then approved). `tests/test_cache.py` covers the decision cache (a re-run reuses every answer and is identical; with `--no-cache` a drifting scripted model differs; the key ignores line endings but not content or model) and the model pin (a different reported model holds; the configured one is quiet). `tests/test_history.py` also checks the backfill: an old row with empty history keys is filled in on connect and then catches 3006. `tests/test_validation.py` covers PAST_DUE and UNSUPPORTED_CURRENCY, and `tests/test_approval.py` checks the injection patterns on held-out injections and on harmless notes. `tests/test_review_fixes.py` covers the outside-review fixes: NaN, infinity, zero, negative and fractional amounts rejected and the payment guard, currency codes normalized, the bank-details hold and harmless notes that must not trigger it (adversarial 3008 is pinned in the adversarial eval), the Grok cross-check (agreement, and a disagreement as a hard hold), the memo (written on every invoice, cannot change a hard-rule rejection), the unreadable-layout hold (and a non-invoice still rejected), the grounded-repair rule, and the 80-column table wrapping on word boundaries. `tests/test_ui.py` drives the review UI over HTTP (queue page, approve pays and writes the audit log, reject logs without paying, an unreadable file cannot be approved, bad token and foreign Host refused). `tests/test_cli.py` runs the brief's literal `invoice1.txt` command. `parse_text` was split into small helpers; its output on 341 inputs (every sample, extra, adversarial and edge file plus 300 shuffled line sets) was compared before and after and is identical.
 - `pytest -m live`: one real Grok extraction of invoice 1001 (needs `XAI_API_KEY`).
 - Container: `docker build -t galatiq-invoices .` then `docker run --rm galatiq-invoices` (the offline batch) or `docker run --rm galatiq-invoices pytest -q`. Mount `-v galatiq-state:/app/state` to keep the database, and with it the review queue, between runs. Built and run on Python 3.12 with podman 5.4 for this submission; docker was not available on the build machine, but the file is a standard Dockerfile.
 - CI runs the offline suite on Python 3.11 and 3.12 plus an offline batch run. The workflow source is in `ci/github-actions-ci.yml`; the active copy is `.github/workflows/ci.yml`.
@@ -284,22 +284,24 @@ Not estimated: losses from paying wrong or fraudulent invoices, early-payment di
 ## Project layout
 
 ```
-main.py                     CLI: single file, --batch, review, --offline, --mode, --chaos
+main.py                     CLI: single file, --batch, review, ui, eval, --offline, --mode, --chaos
 config/policy.yaml          thresholds, risk weights, watch list, FX table
 config/seed.sql             schema and seed data
 invoice_agents/
   models.py                 Invoice, Flag, Decision, InvoiceState (Pydantic v2)
   normalize.py, parsers/    OCR fixes, money, dates, SKUs; one parser per format
   validation.py             validation checks and flags
-  agents/                   ingestion, risk, approval (VP and critic), payment
+  agents/                   ingestion (parser, Grok cross-check and repair), risk, approval (VP and critic), memo, payment
   graph.py                  LangGraph StateGraph
   llm.py                    GrokClient, OfflineClient
   hitl.py, reporter.py      review queue; summary table, review view, summary.json, report.md
+  ui.py                     local review UI (python main.py ui, stdlib HTTP server on 127.0.0.1)
 tests/                      unit and golden tests
-runs/demo/                  committed offline and live runs
+runs/demo/                  committed offline and live runs (samples, extras, and 2004 alone for the critic)
 scripts/                    DB setup, run_log and web data exporters
-data/invoices_extra/        3 extra test invoices (not from the case)
-data/invoices_adversarial/  7 adversarial invoices for the eval (not from the case)
+data/invoices_extra/        5 extra test invoices (added, not from the case)
+data/invoices_adversarial/  8 adversarial invoices for the eval (added, not from the case)
+data/invoices_unseen/       4 invoices in layouts the parsers were never tuned on (added, for the eval)
 evals/                      python -m evals: ground truth, expected outcomes, pricing, results
 docs/                       run_log.md, DECISIONS.md, demo_script.md, presentation.md
 web/                        static trace-replay demo (Vercel); data in web/data/ (scripts/export_web_data.py, python -m evals --write-snapshot)
