@@ -1,0 +1,11 @@
+# Python 3.11+
+pydantic==2.14.1
+pdfplumber==0.11.10
+pymupdf==2.0          # optional PDF fallback
+PyYAML==6.0.3
+rich==15.0.0
+typer==0.27.3
+openai==3.36.1        # OpenAI-compatible client for the xAI API
+langgraph==1.2.16     # orchestration (wired up in a later step)
+python-dotenv==1.2.4
+pytest==9.1.1

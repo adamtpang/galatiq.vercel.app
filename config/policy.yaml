@@ -1,0 +1,38 @@
+# Business rules for validation. Tune here, not in code.
+# Approval rules (who approves what) belong to the approval agent, which Adam owns. See DECISIONS in README.
+
+currency: USD
+
+# Approval policy (Adam's decisions, see README "Decisions"). The approval agent that
+# reads these is not built yet; validation only uses approval_threshold_usd for an info flag.
+approval:
+  approval_threshold_usd: 10000      # over this: extra scrutiny (critic loop)
+  near_limit_usd: 9500               # total >= this counts as "near the limit": critic loop
+  high_risk_score: 50                # risk_score >= this (0 to 100): critic loop
+  critic_max_rounds: 2               # VP proposes, critic objects, at most 2 rounds
+  on_deadlock: PENDING_HUMAN         # VP approves but critic still objects after max rounds
+  critic_loop_only_when: [over_threshold, near_limit, high_risk]   # otherwise VP decides alone, after hard rules
+
+arithmetic:
+  tolerance: 0.01                    # dollars
+
+price_variance:
+  warn_above_pct: 10                 # unit price more than 10% above catalog -> warn
+  info_below_pct: 10                 # more than 10% below catalog -> info
+
+payment_terms:
+  tolerance_days: 1                  # "Net 30" vs actual due-date gap (31-day months pass)
+
+sku_matching:
+  min_confidence: 0.85               # below this an item is treated as unknown
+
+# Mock FX table (units of USD per 1 unit of currency). Fixed so runs are deterministic.
+fx_to_usd:
+  USD: 1.0
+  EUR: 1.08
+  GBP: 1.27
+  CAD: 0.73
+
+# Decisions made by Adam (see README "Decisions"). Encoded as flag severities.
+decisions:
+  stock_exceeded: reject             # qty > stock after aggregating repeated lines: blocking STOCK_EXCEEDED flag

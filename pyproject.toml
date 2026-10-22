@@ -1,0 +1,13 @@
+[project]
+name = "invoice-agents"
+version = "0.1.0"
+description = "Multi-agent invoice processing for the Galatiq case (work in progress)"
+requires-python = ">=3.11"
+
+[tool.setuptools]
+packages = ["invoice_agents", "invoice_agents.parsers", "invoice_agents.agents"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: calls the real xAI API (skipped without XAI_API_KEY)"]
+addopts = "-m 'not live'"

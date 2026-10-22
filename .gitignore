@@ -10,3 +10,5 @@ runs/
 node_modules/
 .vercel/
 .DS_Store
+.pytest_cache/
+*.egg-info/
