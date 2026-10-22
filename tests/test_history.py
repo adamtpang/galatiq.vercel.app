@@ -129,10 +129,10 @@ def test_review_approve_end_to_end_then_rerun(db):
 
 def test_review_reject_end_to_end(db):
     conn = connect(db)
-    st = hitl.resolve(conn, hitl.find(conn, "INV-1004"), approve=False, note="watch-list address")
+    st = hitl.resolve(conn, hitl.find(conn, "INV-1012"), approve=False, note="rename not confirmed")
     assert st.decision.status == DecisionStatus.REJECTED
-    assert conn.execute("SELECT status FROM invoices WHERE source_file LIKE '%1004_revised.json'").fetchone()[0] == "REJECTED"
-    again = run(db, [INVOICES / "invoice_1004_revised.json"], "rerun")["invoice_1004_revised.json"]
+    assert conn.execute("SELECT status FROM invoices WHERE source_file LIKE '%1012.pdf'").fetchone()[0] == "REJECTED"
+    again = run(db, [INVOICES / "invoice_1012.pdf"], "rerun")["invoice_1012.pdf"]
     assert again.decision.status == DecisionStatus.REJECTED and again.payment["status"] == "not_paid"
 
 

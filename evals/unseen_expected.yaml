@@ -1,0 +1,27 @@
+# Unseen-layout invoices (data/invoices_unseen/). Written before running the pipeline on them; not tuned to results.
+# offline: acceptable decisions with no LLM. A legitimate invoice must not be REJECTED; PENDING_HUMAN or APPROVED is fine.
+# live: the invoice should be read correctly (vendor, total, items) and paid; that is the goal, not a guarantee.
+invoice_4001_supplier_at.txt:
+  vendor: Widgets Inc.
+  total: 1000.00
+  line_items: [[WidgetA, 2], [WidgetB, 1]]
+  offline: [PENDING_HUMAN, APPROVED]
+  live: [APPROVED]
+invoice_4002_pipe_table.txt:
+  vendor: Reliable Components Inc.
+  total: 2250.00
+  line_items: [[GadgetX, 2], [WidgetA, 3]]
+  offline: [PENDING_HUMAN, APPROVED]
+  live: [APPROVED]
+invoice_4003_prose_email.txt:
+  vendor: Atlas Industrial Supply
+  total: 2000.00
+  line_items: [[WidgetB, 4]]
+  offline: [PENDING_HUMAN, APPROVED]
+  live: [APPROVED]
+invoice_4004_odd_headers.csv:
+  vendor: Summit Manufacturing Co.
+  total: 1250.00
+  line_items: [[WidgetA, 1], [WidgetB, 2]]
+  offline: [PENDING_HUMAN, APPROVED]
+  live: [APPROVED]

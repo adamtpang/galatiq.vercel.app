@@ -29,3 +29,10 @@ invoice_3006_duplicate_new_number.txt:
 invoice_3007_watchlist_address.json:
   trap: known vendor with the 742 Evergreen Terrace watch-list address
   expected: [PENDING_HUMAN, REJECTED]
+invoice_3008_bank_details_change.txt:
+  trap: known vendor, clean math, small total, but asks to pay a changed bank account (IBAN and SWIFT)
+  expected: [PENDING_HUMAN, REJECTED]
+  history: >-
+    Added Oct 22, 2026 after the independent review, together with decision 11 (bank-detail changes are a
+    hard hold). The expectation was written before the first run. The patterns were written for this gap, so
+    this catch is not a held-out result; tests/test_review_fixes.py checks other wordings and harmless notes.

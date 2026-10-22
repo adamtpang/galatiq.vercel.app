@@ -1,0 +1,11 @@
+From: billing@atlas-industrial.example
+To: ap@acmecorp.example
+Subject: Invoice INV-4003 for October
+
+Hi Acme team,
+
+Atlas Industrial Supply is billing you for 4 WidgetB at $500.00 each, $2,000.00 in total,
+shipped on 2026-10-07. Payment is due by 2026-11-06 (net 30).
+
+Thanks,
+Atlas Industrial Supply

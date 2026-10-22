@@ -1,0 +1,12 @@
+INVOICE
+
+Supplier: Widgets Inc.
+Ref: INV-4001
+Issued: 2026-10-05
+Payment due: 2026-11-04
+
+2 x WidgetA @ 250.00 = 500.00
+1 x WidgetB @ 500.00 = 500.00
+
+Amount due: 1,000.00
+Terms: Net 30

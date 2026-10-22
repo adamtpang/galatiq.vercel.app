@@ -111,8 +111,10 @@ class CachedLLM:
                               (self.key, slot, json.dumps(output, default=str), model))
             self.conn.commit()
 
-    def complete_structured(self, schema, messages, max_attempts=3):
-        slot = self._slot(schema.__name__)
+    def complete_structured(self, schema, messages, max_attempts=3, slot_tag: str | None = None):
+        """slot_tag: stored answers are reused only for the same tag (the memo passes a digest of the decision,
+        so a memo is never reused for a different outcome)."""
+        slot = self._slot(schema.__name__ + (f":{slot_tag}" if slot_tag else ""))
         row = self._get(slot)
         if row is not None:
             self.hits += 1

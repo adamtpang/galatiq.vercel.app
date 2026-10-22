@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sqlite3
 
+from .agents.payment import PaymentAgent, log_rejection
 from .db import log_audit
 from .models import Decision, DecisionStatus, InvoiceState, TraceEvent
 from .normalize import normalize_invoice_number
@@ -39,7 +40,8 @@ def enqueue(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState:
         (inv.number if inv else None, inv.vendor if inv else None, state.source, fp,
          "; ".join(d.reasons) if d else None,
          # decision 10: a rebuilt invoice keeps its raw text so the reviewer sees the original next to Grok's reading
-         state.model_dump_json(exclude=None if state.extraction_mode == "llm_repair" else {"raw_text"})))
+         state.model_dump_json(exclude=None if (state.extraction_mode == "llm_repair" or any(
+             f.code == "UNREADABLE_LAYOUT" for f in state.flags)) else {"raw_text"})))
     conn.commit()
     state.payment = {"status": "not_paid", "reason": "pending human review"}
     state.trace.append(TraceEvent(agent="hitl", step="queued", detail={"fingerprint": fp}))
@@ -52,6 +54,10 @@ def pending(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 
 def queued_state(row: sqlite3.Row) -> InvoiceState:
     return InvoiceState.model_validate_json(row["state_json"])
+
+
+def find_id(conn: sqlite3.Connection, row_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM review_queue WHERE id=? AND status='pending'", (row_id,)).fetchone()
 
 
 def find(conn: sqlite3.Connection, invoice_number: str) -> sqlite3.Row | None:
@@ -83,3 +89,19 @@ def resolve(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str
               {"source": state.source, "note": note, "queued_reason": row["reason"]})
     state.trace.append(TraceEvent(agent="hitl", step="resolved", detail={"approve": approve, "note": note}))
     return state
+
+
+def decide(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str | None,
+           chaos: float = 0.0, payments: PaymentAgent | None = None) -> InvoiceState:
+    """A person's decision, end to end: record it, then pay (approve) or log the rejection. Used by the
+    `review` command and the local review UI (`python main.py ui`), so both write the same tables."""
+    if approve:
+        st = InvoiceState.model_validate_json(row["state_json"])
+        amt = st.total_usd if st.total_usd is not None else (st.invoice.total if st.invoice else None)
+        if st.invoice is None or not st.invoice.items or not amt or amt <= 0:
+            raise ValueError("No payable amount was read from this file, so it cannot be approved and paid as read; "
+                             "reject it, or enter the invoice by hand")
+    state = resolve(conn, row, approve, note)
+    if state.decision.status == DecisionStatus.APPROVED:
+        return (payments or PaymentAgent(conn, chaos=chaos)).pay(state)
+    return log_rejection(conn, state)

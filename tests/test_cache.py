@@ -2,10 +2,11 @@
 from pathlib import Path
 
 from invoice_agents.agents.approval import CriticOpinion, VPOpinion
+from invoice_agents.agents.memo import DecisionMemo
 from invoice_agents.agents.risk import RiskReview
 from invoice_agents.cache import cache_key, normalized_content
 from invoice_agents.graph import make_context, run_batch
-from invoice_agents.llm import LLMResult
+from invoice_agents.llm import LLMOutputError, LLMResult
 from invoice_agents.models import DecisionStatus
 
 from .conftest import INVOICES
@@ -19,7 +20,9 @@ class FlipGrok:
         self.model, self.reports, self.calls = model, reports or model, 0
         self.usage_log = []
 
-    def complete_structured(self, schema, messages, max_attempts=3):
+    def complete_structured(self, schema, messages, max_attempts=3, slot_tag=None):
+        if schema.__name__ == "ExtractedInvoice":   # the live cross-check: this double cannot read invoices
+            raise LLMOutputError("scripted double: no extraction", [])   # (not counted: a failure is not cached)
         self.calls += 1
         self.usage_log.append({"purpose": schema.__name__, "model": self.reports, "latency_s": 0, "prompt_tokens": 0,
                                "cached_prompt_tokens": 0, "completion_tokens": 0, "reasoning_tokens": 0,
@@ -28,6 +31,8 @@ class FlipGrok:
             v = RiskReview(score=self.calls % 7, extra_reasons=[f"call {self.calls}"])
         elif schema is CriticOpinion:
             v = CriticOpinion(verdict="sign_off", reason="ok")
+        elif schema is DecisionMemo:
+            v = DecisionMemo(memo=f"memo {self.calls}", next_step="none")
         else:
             v = VPOpinion(decision="approve" if self.calls % 2 else "hold", reasons=[f"call {self.calls}"])
         return LLMResult(value=v, model=self.reports)

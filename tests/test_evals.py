@@ -21,7 +21,7 @@ def offline(tmp_path_factory):
 def test_ground_truth_covers_every_sample_and_extra():
     gt = runner.load_yaml("ground_truth.yaml")
     files = [runner.rel(p) for d in (runner.SAMPLES, runner.EXTRA) for p in collect(d)]
-    assert sorted(gt) == sorted(files) and len(files) == 23
+    assert sorted(gt) == sorted(files) and len(files) == 25
     for name, g in gt.items():
         assert set(runner.FIELDS) <= set(g), name
 

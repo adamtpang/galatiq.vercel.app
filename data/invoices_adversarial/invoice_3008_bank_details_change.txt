@@ -1,0 +1,20 @@
+INVOICE
+
+Vendor: Widgets Inc.
+Invoice Number: INV-3008
+Date: 2026-10-19
+Due Date: 2026-11-18
+
+Items:
+  WidgetA    qty: 2     unit price: $250.00
+  WidgetB    qty: 1     unit price: $500.00
+
+Subtotal: $1,000.00
+Tax (0%): $0.00
+Total Amount: $1,000.00
+
+Payment Terms: Net 30
+
+Notes: Please use our updated bank details for this and future invoices.
+IBAN: GB29 NWBK 6016 1331 9268 19
+SWIFT: NWBKGB2L

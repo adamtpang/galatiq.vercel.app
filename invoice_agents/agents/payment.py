@@ -12,6 +12,7 @@ import contextlib
 import hashlib
 import io
 import json
+import math
 import random
 import re
 import sqlite3
@@ -55,11 +56,21 @@ class PaymentAgent:
             raise BankError(f"bank returned {res!r}")
         return res, buf.getvalue().strip()
 
+    def _refuse(self, state: InvoiceState, amount) -> InvoiceState:
+        d = state.decision
+        d.status, d.decided_by = DecisionStatus.REJECTED, "payment_guard"
+        d.reasons = [f"PAYMENT_GUARD: amount {amount!r} is not a finite number above zero; nothing was paid"] + d.reasons
+        state.trace.append(TraceEvent(agent=AGENT, step="guard_refused", detail={"amount": repr(amount)}))
+        return log_rejection(self.conn, state)
+
     def pay(self, state: InvoiceState) -> InvoiceState:
         d, inv = state.decision, state.invoice
         if d is None or d.status != DecisionStatus.APPROVED or inv is None:
             raise ValueError("pay() called for an invoice that is not APPROVED")
-        amount = round(state.total_usd if state.total_usd is not None else inv.total, 2)
+        raw_amount = state.total_usd if state.total_usd is not None else inv.total
+        if not isinstance(raw_amount, (int, float)) or not math.isfinite(raw_amount) or raw_amount <= 0:
+            return self._refuse(state, raw_amount)   # last guard: validation should have stopped this already
+        amount = round(raw_amount, 2)
         key = idempotency_key(inv.number, inv.vendor, amount, inv.revision)
         row = self.conn.execute("SELECT status FROM payments WHERE idempotency_key=?", (key,)).fetchone()
         if row and row[0] == "paid":
@@ -99,7 +110,8 @@ def log_rejection(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState
     d = state.decision
     inv = state.invoice
     detail = {"source": state.source, "reasons": d.reasons if d else [], "decided_by": d.decided_by if d else None,
-              "blocking_flags": [f.model_dump(mode="json") for f in state.flags if f.severity.value == "block"]}
+              "blocking_flags": [f.model_dump(mode="json") for f in state.flags if f.severity.value == "block"],
+              "memo": (state.memo or {}).get("text")}
     conn.execute("INSERT INTO audit_log (invoice_number, agent, event, detail) VALUES (?,?,?,?)",
                  (inv.number if inv else None, AGENT, "rejected", json.dumps(detail, default=str)))
     conn.commit()
