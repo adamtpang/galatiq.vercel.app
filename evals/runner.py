@@ -339,7 +339,7 @@ def summary_md(off: dict, live: dict | None) -> str:
     lv = (f"{frac(lx['pipeline']['overall'])} pipeline; {frac(lx['grok_only']['overall'])} Grok-only" if lx else "-")
     L.append(f"| (a) Extraction: all fields | {frac(o)} | {lv} |")
     for a in (live or off)["agreement"]:
-        L.append(f"| (b) Decision agreement, {a['label']} | - | {a['agree']}/{a['invoices']} ({pct(a['rate'])}) |")
+        L.append(f"| (b) Decision agreement, {a['label'].replace('this eval run', 'eval live run')} | - | {a['agree']}/{a['invoices']} ({pct(a['rate'])}) |")
     oa = off["adversarial"]
     la = live["adversarial"] if live else None
     L.append(f"| (c) Adversarial catch rate | {oa['caught']}/{oa['total']} ({pct(oa['catch_rate'])}) | "
@@ -477,6 +477,10 @@ def main(argv: list[str] | None = None) -> int:
     load_dotenv()
     RESULTS.mkdir(parents=True, exist_ok=True)
     if args.live:
+        import os
+        if not os.environ.get("XAI_API_KEY"):
+            print("XAI_API_KEY is not set. Set it (see .env.example) or run `python -m evals` offline.")
+            return 2
         print("Live eval: pipeline on samples, adversarial and extra invoices, then Grok-only extraction ...")
         traces = RESULTS / "runs" / "live"
         res = evaluate("live", keep_traces=traces)

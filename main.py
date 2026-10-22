@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+from difflib import get_close_matches
 from pathlib import Path
 from typing import Optional
 
@@ -20,7 +21,7 @@ from invoice_agents import hitl
 from invoice_agents.agents.payment import PaymentAgent, log_rejection
 from invoice_agents.db import connect, db_path
 from invoice_agents.graph import make_context, run_batch
-from invoice_agents.llm import get_client
+from invoice_agents.llm import LLMUnavailable, get_client
 from invoice_agents.models import DecisionStatus
 from invoice_agents.pipeline import collect
 from invoice_agents.reporter import print_summary, write_artifacts
@@ -52,8 +53,16 @@ def run(
         raise typer.Exit(1)
     if not target.exists():
         console.print(f"[red]No such file or directory:[/] {target}")
+        if target.parent.is_dir():   # e.g. the brief's data/invoices/invoice1.txt: the samples are invoice_1001.txt ...
+            near = sorted(get_close_matches(target.name, [f.name for f in target.parent.iterdir()], n=50, cutoff=0.6))[:3]
+            if near:
+                console.print("Did you mean: " + ", ".join(str(target.parent / n) for n in near) + "?")
         raise typer.Exit(2)
-    llm = get_client("offline" if offline else mode)
+    try:
+        llm = get_client("offline" if offline else mode)
+    except LLMUnavailable as e:
+        console.print(f"[red]{e}.[/] Set it (see .env.example) or run offline with --offline.")
+        raise typer.Exit(2)
     rc = make_context(llm=llm, chaos=chaos, seed=seed, run_id=run_id)
     model = getattr(llm, "model", None)
     if not as_json:

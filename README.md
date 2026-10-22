@@ -30,7 +30,7 @@ The command from the brief works as written:
 python main.py --invoice_path=data/invoices/invoice_1001.txt
 ```
 
-For a single file it prints one JSON line per agent step (structured log), the `mock_payment` output, the result table and the trace path. `--log/--no-log` turns the step log on or off. A path that does not exist exits with code 2 and a clear message.
+For a single file it prints one JSON line per agent step (structured log), the `mock_payment` output, the result table and the trace path. `--log/--no-log` turns the step log on or off. A path that does not exist exits with code 2, a clear message and the nearest file names: the brief's literal `data/invoices/invoice1.txt` is not in the case data, so it suggests `invoice_1001.txt`. `--mode live` without `XAI_API_KEY` also exits with code 2 and says so.
 
 More commands:
 
@@ -200,7 +200,7 @@ A 3 to 6 week plan:
 
 ## Business impact
 
-The case gives the inputs: about $2M a year in manual processing, a 30% error rate and 5-day delays. What the samples show directly: offline the system decided 18 of 20 invoices without a person (live, 15 of 20). The offline batch takes seconds; the live batch took about 6 minutes, and every rejection names the failing check.
+The case gives the inputs: about $2M a year in manual processing, a 30% error rate and 5-day delays. What the samples show directly: offline the system decided 18 of 20 invoices without a person (live, 15 of 20). The offline batch takes seconds; the live batch took about 6 minutes, and every rejection names the failing check. Model cost in the live eval run was $0.2902 for the 20 samples, $0.0363 for each of the 8 invoices that reached Grok (see "Evals").
 
 A rough estimate, with assumptions stated so they can be replaced with Acme's real numbers:
 
@@ -212,7 +212,7 @@ Not estimated: losses from paying wrong or fraudulent invoices, early-payment di
 
 ## Testing
 
-- `pytest`: 156 offline tests in about 2 seconds, no network. Parsers on all 20 files, every validation check, payment idempotency, retries and chaos, the HITL queue, approval rules and the critic loop, a golden test (`tests/golden.yaml`) that pins the expected offline decision and paid amount for every sample, and `tests/test_agentic.py`, which drives the real `GrokClient` with a scripted OpenAI-compatible client to test the self-correction retry, the tool-call loop (including an unknown tool) and API retries. `tests/test_evals.py` runs the four evals offline and pins their numbers (see "Evals").
+- `pytest`: 159 offline tests in about 2 seconds, no network. Parsers on all 20 files, every validation check, payment idempotency, retries and chaos, the HITL queue, approval rules and the critic loop, a golden test (`tests/golden.yaml`) that pins the expected offline decision and paid amount for every sample, and `tests/test_agentic.py`, which drives the real `GrokClient` with a scripted OpenAI-compatible client to test the self-correction retry, the tool-call loop (including an unknown tool) and API retries. `tests/test_evals.py` runs the four evals offline and pins their numbers (see "Evals").
 - `pytest -m live`: one real Grok extraction of invoice 1001 (needs `XAI_API_KEY`).
 - CI runs the offline suite on Python 3.11 and 3.12 plus an offline batch run. The workflow source is in `ci/github-actions-ci.yml`; the active copy is `.github/workflows/ci.yml`.
 
