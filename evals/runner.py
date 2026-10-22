@@ -161,7 +161,7 @@ def grok_extract_all(gt: dict, workers: int = 4) -> tuple[dict, list[dict]]:
 # --- pipeline runs and trace rows ----------------------------------------------------
 def run_pipeline(llm, runs_dir: Path, db_dir: Path) -> dict:
     """Samples, then the adversarial set on the same database (so a copy of INV-1001 has an
-    original), then the 3 extra invoices on a fresh database."""
+    original), then the extra invoices on a fresh database."""
     out: dict[str, Any] = {"wall_s": {}}
     ctx = make_context(llm=llm, db=str(db_dir / "main.db"), runs_dir=runs_dir, run_id="main")
     for group, d in (("samples", SAMPLES), ("adversarial", ADV)):
@@ -638,7 +638,7 @@ def separate_run_live(out: Path, write: bool = True) -> int:
             "billed_usd": round(ticks / 1e10, 4) if ticks is not None else None,
             "returned_models": sorted({r.get("model") for r in client.usage_log if r.get("model")})}
     lines = [f"# Separate later run, live ({res['model']}, {res['generated_at']}, commit {res['commit']})", "",
-             "The 20 samples run first, then the 7 adversarial invoices as a new run on the same database.", "",
+             f"The 20 samples run first, then the {res['total']} adversarial invoices as a new run on the same database.", "",
              f"Caught {res['caught']}/{res['total']}. Missed: {', '.join(res['missed']) or 'none'}. "
              f"Both runs: {u['calls']} Grok calls, {res['wall_s']} s, billed ${res['billed_usd']} "
              f"(list price ${res['list_price_usd']}). Models the API reported: {', '.join(res['returned_models'])}.", "",

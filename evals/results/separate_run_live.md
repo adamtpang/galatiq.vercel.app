@@ -1,6 +1,6 @@
 # Separate later run, live (grok-4.7, 2026-10-22 18:12 CDT, commit 4719dbe)
 
-The 20 samples run first, then the 7 adversarial invoices as a new run on the same database.
+The 20 samples run first, then the 8 adversarial invoices as a new run on the same database.
 
 Caught 8/8. Missed: none. Both runs: 110 Grok calls, 980.4 s, billed $0.7336 (list price $0.7336). Models the API reported: grok-4.7.
 

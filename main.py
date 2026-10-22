@@ -5,7 +5,7 @@
   python main.py review                       # list the human review queue
   python main.py review INV-1012 --approve    # or --reject, optional --note
   python main.py ui [--port 8765]             # the review queue in the browser, with Approve and Reject
-  python main.py eval [--live]                # the four evals (same as python -m evals)
+  python main.py eval [--live]                # the five evals (same as python -m evals)
 """
 from __future__ import annotations
 
