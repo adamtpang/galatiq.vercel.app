@@ -2,8 +2,9 @@
 # Based on spec section 4, adjusted for Adam's decisions (DECISIONS.md) and validation findings:
 #   - over-stock is a REJECT (decision 1), so 1002, 1005, 1007, 1013 reject rather than partial-approve
 #   - 1007 and 1013 also have real arithmetic errors (total off by $110 and $50)
-#   - 1012 is near the limit, so the critic runs (decision 3); it objects to the rename and the near-limit total,
-#     the VP keeps approving with conditions, so after 2 rounds it is a deadlock => PENDING_HUMAN (decision 2)
+#   - 1012.pdf is a renamed vendor ("formerly FastShip Ltd."), so it is a hard hold for human verification
+#     (decision 9) before the VP or critic run. Before decision 9 it reached the same PENDING_HUMAN through a
+#     VP/critic deadlock. 1012.txt, 1011.txt and 1013.pdf stay duplicates of the earlier copy (same number).
 #   - approved amounts are paid in USD (1014 converted with the mock FX table)
 #   - offline VP/critic are deterministic; a live Grok run may differ (see docs/run_log.md)
 invoice_1001.txt:          {decision: APPROVED, paid: 5000.00}
@@ -19,10 +20,10 @@ invoice_1009.json:         {decision: REJECTED, must_flag: [NEGATIVE_QTY, MISSIN
 invoice_1010.txt:          {decision: APPROVED, paid: 7185.00}
 invoice_1011.pdf:          {decision: APPROVED, paid: 3000.00}
 invoice_1011.txt:          {decision: REJECTED, must_flag: [DUPLICATE_INVOICE]}
-invoice_1012.pdf:          {decision: PENDING_HUMAN}
+invoice_1012.pdf:          {decision: PENDING_HUMAN, by: hard_hold, must_flag: [VENDOR_RENAMED]}
 invoice_1012.txt:          {decision: REJECTED, must_flag: [DUPLICATE_INVOICE]}
 invoice_1013.json:         {decision: REJECTED, must_flag: [STOCK_EXCEEDED, TOTAL_MISMATCH]}
-invoice_1013.pdf:          {decision: REJECTED, must_flag: [DUPLICATE_INVOICE]}
+invoice_1013.pdf:          {decision: REJECTED, must_flag: [DUPLICATE_INVOICE, STOCK_EXCEEDED]}
 invoice_1014.xml:          {decision: APPROVED, paid: 4455.00}
 invoice_1015.csv:          {decision: APPROVED, paid: 6500.00}
 invoice_1016.json:         {decision: REJECTED, must_flag: [UNKNOWN_ITEM]}

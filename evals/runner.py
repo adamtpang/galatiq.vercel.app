@@ -8,9 +8,10 @@
 (c) adversarial  catch rate on data/invoices_adversarial/ against evals/adversarial_expected.yaml
 (d) cost         tokens for every LLM call, billed cost, latency per invoice and per batch
 
-Offline writes evals/results/offline.{json,md}. --live writes evals/results/live.{json,md} and the
-live traces under evals/results/runs/live/. Both refresh evals/results/summary.md, which combines
-the fresh offline numbers with the latest committed live run.
+Results go to evals/out/ (git-ignored): offline.{json,md}, with --live also live.{json,md} and the live
+traces in runs/live/, and summary.md, which combines the fresh offline numbers with the latest live run
+(this directory's, else the committed snapshot). Nothing tracked is modified. --write-snapshot writes the
+committed snapshot instead (evals/results/ and web/data/evals.json).
 """
 from __future__ import annotations
 
@@ -38,7 +39,8 @@ from invoice_agents.parsers import read_source
 from invoice_agents.pipeline import collect
 
 EVALS = Path(__file__).resolve().parent
-RESULTS = EVALS / "results"
+RESULTS = EVALS / "results"     # committed snapshot, written only with --write-snapshot
+OUT = EVALS / "out"             # default output, git-ignored
 SAMPLES, EXTRA, ADV = ROOT / "data" / "invoices", ROOT / "data" / "invoices_extra", ROOT / "data" / "invoices_adversarial"
 FIELDS = ["vendor", "invoice_number", "total", "line_items", "due_date"]
 MIN_CONF = 0.85
@@ -353,7 +355,7 @@ def summary_md(off: dict, live: dict | None) -> str:
         ob = off["cost_latency"]["batches"]["samples"]
         L.append(f"| (d) 20 samples: latency | {ob.get('latency_mean_ms', round(ob['latency_sum_s'] * 1000 / ob['invoices'], 1))} ms mean per invoice, {ob['wall_s']}s batch | "
                  f"{s['latency_mean_s']}s mean per invoice, {s['wall_s']}s batch |")
-    L += ["", "Details: `evals/results/offline.md` and `evals/results/live.md`."]
+    L += ["", "Details: `offline.md` and `live.md` next to this file."]
     return "\n".join(L) + "\n"
 
 
@@ -414,7 +416,8 @@ def detail_md(res: dict) -> str:
     return "\n".join(L) + "\n"
 
 
-def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Path | None = None) -> dict:
+def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Path | None = None,
+             live_ref: dict | None = None) -> dict:
     """Run every eval in one mode and return the result dict (no files written)."""
     gt, expected = load_yaml("ground_truth.yaml"), load_yaml("adversarial_expected.yaml")
     pricing = load_yaml("pricing.yaml")
@@ -441,7 +444,7 @@ def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Pa
                      groups["samples"], "committed demo runs (runs/demo/offline vs runs/demo/live), 20 samples")
     res["agreement"] = [demo]
     if mode == "live":
-        off = evaluate("offline")
+        off = evaluate("offline", live_ref={})
         res["offline_reference"] = {"commit": off["commit"]}
         for g in ("samples", "adversarial", "extra"):
             res["agreement"].append(agreement(off["rows"], rows, groups[g], f"this eval run, {g} ({len(groups[g])})"))
@@ -450,12 +453,11 @@ def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Pa
         res["extraction"]["grok_only"] = grok
         res["cost_latency"]["grok_only_extraction"] = extraction_cost(usage, pricing)
     else:
-        lp = RESULTS / "live.json"
-        if lp.exists():
-            live = json.loads(lp.read_text())
+        live = live_ref if live_ref is not None else latest_live(RESULTS)
+        if live:
             for g in ("samples", "adversarial", "extra"):
                 res["agreement"].append(agreement(rows, live["rows"], groups[g],
-                                                  f"committed eval live run ({live['generated_at']}) vs this offline run, {g} ({len(groups[g])})"))
+                                                  f"eval live run ({live['generated_at']}) vs this offline run, {g} ({len(groups[g])})"))
     return res
 
 
@@ -490,45 +492,58 @@ def web_summary(off: dict, live: dict | None) -> dict:
     }
 
 
+def latest_live(out: Path) -> dict | None:
+    """The live results to compare against: this output dir's own live run if any, else the committed snapshot."""
+    for d in (out, RESULTS):
+        if (d / "live.json").exists():
+            return json.loads((d / "live.json").read_text())
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evals", description=__doc__.split("\n\n")[0])
     ap.add_argument("--live", action="store_true", help="also run live against the xAI API (needs XAI_API_KEY)")
+    ap.add_argument("--out", type=Path, default=OUT, help=f"results directory (default {rel(OUT)}, git-ignored)")
+    ap.add_argument("--write-snapshot", action="store_true",
+                    help=f"write the committed snapshot instead: {rel(RESULTS)} and web/data/evals.json")
     ap.add_argument("--no-write", action="store_true", help="print the summary only, write no files")
     ap.add_argument("--report-only", action="store_true", help="re-render the .md files from the saved .json results")
-    ap.add_argument("--web", action="store_true", help="with --report-only: also write web/data/evals.json for the replay")
     args = ap.parse_args(argv)
-    if args.report_only:
-        saved = {m: json.loads((RESULTS / f"{m}.json").read_text()) for m in ("offline", "live") if (RESULTS / f"{m}.json").exists()}
-        for m, r in saved.items():
-            (RESULTS / f"{m}.md").write_text(detail_md(r))
-        md = summary_md(saved["offline"], saved.get("live"))
-        (RESULTS / "summary.md").write_text(md)
-        if args.web:
-            (ROOT / "web" / "data" / "evals.json").write_text(json.dumps(web_summary(saved["offline"], saved.get("live")), indent=1))
+    out = RESULTS if args.write_snapshot else args.out
+
+    def finish(off: dict, live: dict | None) -> int:
+        md = summary_md(off, live)
+        if not args.no_write:
+            (out / "summary.md").write_text(md)
+            if args.write_snapshot:
+                (ROOT / "web" / "data" / "evals.json").write_text(json.dumps(web_summary(off, live), indent=1))
         print(md)
         return 0
+
+    if args.report_only:
+        saved = {m: json.loads((out / f"{m}.json").read_text()) for m in ("offline", "live") if (out / f"{m}.json").exists()}
+        if not args.no_write:
+            for m, r in saved.items():
+                (out / f"{m}.md").write_text(detail_md(r))
+        return finish(saved["offline"], saved.get("live"))
     from dotenv import load_dotenv
     load_dotenv()
-    RESULTS.mkdir(parents=True, exist_ok=True)
+    if not args.no_write:
+        out.mkdir(parents=True, exist_ok=True)
     if args.live:
         import os
         if not os.environ.get("XAI_API_KEY"):
             print("XAI_API_KEY is not set. Set it (see .env.example) or run `python -m evals` offline.")
             return 2
         print("Live eval: pipeline on samples, adversarial and extra invoices, then Grok-only extraction ...")
-        traces = RESULTS / "runs" / "live"
+        traces = (out if not args.no_write else Path(tempfile.mkdtemp())) / "runs" / "live"
         res = evaluate("live", keep_traces=traces)
         if not args.no_write:
-            (RESULTS / "live.json").write_text(json.dumps(res, indent=1, default=str))
-            (RESULTS / "live.md").write_text(detail_md(res))
-    off = evaluate("offline")
+            (out / "live.json").write_text(json.dumps(res, indent=1, default=str))
+            (out / "live.md").write_text(detail_md(res))
+        live = res
+    off = evaluate("offline", live_ref=live if args.live else latest_live(out))
     if not args.no_write:
-        (RESULTS / "offline.json").write_text(json.dumps(off, indent=1, default=str))
-        (RESULTS / "offline.md").write_text(detail_md(off))
-    lp = RESULTS / "live.json"
-    live = json.loads(lp.read_text()) if lp.exists() else None
-    md = summary_md(off, live)
-    if not args.no_write:
-        (RESULTS / "summary.md").write_text(md)
-    print(md)
-    return 0
+        (out / "offline.json").write_text(json.dumps(off, indent=1, default=str))
+        (out / "offline.md").write_text(detail_md(off))
+    return finish(off, live if args.live else latest_live(out))

@@ -32,10 +32,19 @@ def test_golden_decision(results, name):
     assert s.decision.status.value == exp["decision"], s.decision.reasons
     codes = {f.code for f in s.flags}
     assert set(exp.get("must_flag", [])) <= codes
+    if "by" in exp:
+        assert s.decision.decided_by == exp["by"]
+    # duplicates are only ever flagged once, and only content matches carry match=content
+    assert [f.code for f in s.flags].count("DUPLICATE_INVOICE") <= 1
     if "paid" in exp:
         assert s.payment["status"] == "paid" and s.payment["amount"] == pytest.approx(exp["paid"])
     else:
         assert (s.payment or {}).get("status") != "paid"
+
+
+def test_no_content_duplicates_among_samples(results):
+    # the samples' duplicates all share their invoice number with the original; none is a content-only match
+    assert not [f for s in results[0].values() for f in s.flags if f.evidence.get("match") == "content"]
 
 
 def test_trace_written(results):

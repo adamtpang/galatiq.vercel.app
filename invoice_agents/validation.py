@@ -7,8 +7,10 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
+from difflib import SequenceMatcher
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from .db import Inventory
@@ -190,7 +192,18 @@ def check_line_notes(inv: Invoice) -> list[Flag]:
 
 
 # --- vendor -------------------------------------------------------------------------
-def check_vendor(inv: Invoice, inventory: Inventory) -> list[Flag]:
+def closest_vendor(name: str, inventory: Inventory) -> tuple[str | None, float]:
+    """Most similar vendor-master name or alias (normalized), with its similarity 0..1."""
+    key, best, score = _norm(name), None, 0.0
+    for v in inventory.vendors.values():
+        for cand in (v.name, *v.aliases):
+            r = SequenceMatcher(None, key, _norm(cand)).ratio()
+            if r > score:
+                best, score = v.name, r
+    return best, score
+
+
+def check_vendor(inv: Invoice, inventory: Inventory, policy: dict | None = None) -> list[Flag]:
     if not inv.vendor:
         return []
     out = []
@@ -202,6 +215,12 @@ def check_vendor(inv: Invoice, inventory: Inventory) -> list[Flag]:
                       vendor=inv.vendor, former=inv.vendor_former_name, former_on_file=bool(old)))
     elif v is None:
         out.append(_f("UNKNOWN_VENDOR", W, f"'{inv.vendor}' is not in the vendor master", vendor=inv.vendor))
+        min_sim = ((policy or {}).get("vendor_lookalike") or {}).get("min_similarity")
+        if min_sim:
+            near, sim = closest_vendor(inv.vendor, inventory)
+            if near and sim >= min_sim:
+                out.append(_f("VENDOR_LOOKALIKE", W, f"'{inv.vendor}' is not on file but looks like vendor '{near}' "
+                              f"(similarity {sim:.2f})", vendor=inv.vendor, lookalike_of=near, similarity=round(sim, 3)))
     if v is not None and not v.approved:
         out.append(_f("VENDOR_NOT_APPROVED", B, f"'{inv.vendor}' is not an approved vendor", vendor=inv.vendor))
     if re.search(r"\bacme\b", inv.vendor, re.I):
@@ -229,6 +248,14 @@ def _norm(s: str | None) -> str:
     return re.sub(r"[^a-z0-9]", "", (s or "").lower())
 
 
+def content_key(inv: Invoice) -> tuple | None:
+    """Vendor (normalized), line items with quantities, and total; the invoice number is left out."""
+    if not inv.vendor or not inv.items or inv.total is None:
+        return None
+    lines = Counter((li.sku or _norm(li.sku_raw), float(li.qty)) for li in inv.items)
+    return (_norm(inv.vendor), tuple(sorted(lines.items())), round(float(inv.total), 2))
+
+
 def fingerprint(inv: Invoice) -> str:
     key = f"{_norm(inv.number)}|{_norm(inv.vendor)}|{inv.total}|{inv.revision or ''}"
     return hashlib.sha256(key.encode()).hexdigest()[:16]
@@ -244,6 +271,23 @@ class DuplicateRegistry:
     """
     seen: dict[tuple[str, str], list[tuple[Invoice, InvoiceState | None]]] = field(default_factory=dict)
     order: dict[tuple[str, str], list[Invoice]] = field(default_factory=dict)
+    by_content: dict[tuple, Invoice] = field(default_factory=dict)   # first invoice seen with this content
+
+    def check_content(self, inv: Invoice) -> list[Flag]:
+        """Same vendor, items, quantities and total as an earlier invoice under a different number.
+        Same-number copies are handled by check_and_register (DUPLICATE_INVOICE by fingerprint)."""
+        k = content_key(inv)
+        if k is None:
+            return []
+        first = self.by_content.get(k)
+        if first is None:
+            self.by_content[k] = inv
+            return []
+        if _norm(first.number) == _norm(inv.number):
+            return []
+        return [_f("DUPLICATE_INVOICE", B, f"Same vendor, line items, quantities and total as {first.number} "
+                   f"({Path(first.source_file or '').name}) under a different number ({inv.number})",
+                   match="content", original_invoice=first.number, first_seen=first.source_file)]
 
     @staticmethod
     def key(inv: Invoice) -> tuple[str, str]:
@@ -314,13 +358,16 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
     flags += cur_flags
     flags += check_prices(inv, inventory, policy)
     flags += check_line_notes(inv)
-    flags += check_vendor(inv, inventory)
+    flags += check_vendor(inv, inventory, policy)
     flags += check_amount_thresholds(total_usd, policy)
     if any("OCR" in c for c in inv.corrections):
         flags.append(_f("OCR_CORRECTED", I, "Fixed OCR look-alike characters",
                         corrections=[c for c in inv.corrections if c.startswith("OCR")]))
     if registry is not None:
-        flags += registry.check_and_register(inv, state)
+        dup = registry.check_and_register(inv, state)
+        flags += dup
+        if (policy.get("duplicates") or {}).get("match_content") and not any(f.code == "DUPLICATE_INVOICE" for f in dup):
+            flags += registry.check_content(inv)
     state.flags.extend(flags)
     state.total_usd = total_usd
     state.trace.append(TraceEvent(agent="validation", step="validate", detail={

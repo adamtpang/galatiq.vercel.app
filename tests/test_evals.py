@@ -60,10 +60,13 @@ def test_offline_extraction_numbers(offline):
 
 def test_offline_adversarial_numbers(offline):
     adv = offline["adversarial"]
-    assert adv["total"] == 7 and adv["caught"] == 3
-    # Honest misses with the current policy (see README "Evals"); pinned so a change is visible.
-    assert sorted(adv["missed"]) == ["invoice_3001_injection_note.json", "invoice_3002_injection_reworded.txt",
-                                     "invoice_3004_renamed_vendor.txt", "invoice_3006_duplicate_new_number.txt"]
+    assert adv["total"] == 7 and adv["caught"] == 6
+    # Honest miss with the current policy (see README "Evals"): the reworded injection matches no pattern.
+    assert adv["missed"] == ["invoice_3002_injection_reworded.txt"]
+    by = {c["file"]: c for c in adv["cases"]}
+    assert by["invoice_3006_duplicate_new_number.txt"]["decision"] == "REJECTED"
+    assert {by[f]["decided_by"] for f in ("invoice_3001_injection_note.json", "invoice_3003_lookalike_vendor.txt",
+                                          "invoice_3004_renamed_vendor.txt")} == {"hard_hold"}
 
 
 def test_offline_makes_no_llm_calls(offline):
@@ -101,4 +104,19 @@ def test_grok_client_logs_usage_for_tool_rounds_and_structured_calls():
 
 
 def test_report_renders(offline):
-    assert "Extraction" in runner.detail_md(offline) and "| (c) Adversarial catch rate | 3/7" in runner.summary_md(offline, None)
+    assert "Extraction" in runner.detail_md(offline) and "| (c) Adversarial catch rate | 6/7" in runner.summary_md(offline, None)
+
+
+def test_default_run_modifies_no_tracked_files(tmp_path):
+    import shutil
+    import subprocess
+    if not shutil.which("git") or not (ROOT / ".git").exists():
+        pytest.skip("not a git checkout")
+    status = lambda: subprocess.run(["git", "status", "--porcelain", "--untracked-files=no"], cwd=ROOT,  # noqa: E731
+                                    capture_output=True, text=True).stdout
+    before = status()
+    assert runner.main([]) == 0
+    assert status() == before
+    assert (runner.OUT / "summary.md").exists()
+    ignored = subprocess.run(["git", "check-ignore", "-q", str(runner.OUT / "summary.md")], cwd=ROOT)
+    assert ignored.returncode == 0

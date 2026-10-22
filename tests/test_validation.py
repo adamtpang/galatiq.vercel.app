@@ -156,6 +156,27 @@ def test_duplicates_and_revisions(inventory, policy):
     assert "DUPLICATE_NUMBER_CONFLICT" in d
 
 
+def test_content_duplicate_under_new_number(inventory, policy):
+    # decision 7: same vendor, items, quantities and total as an earlier invoice, different number
+    reg = DuplicateRegistry()
+    run(mk(source_file="a.txt"), inventory, policy, reg)
+    b, _ = run(mk(source_file="b.txt", number="INV-9999"), inventory, policy, reg)
+    f = b["DUPLICATE_INVOICE"]
+    assert f.severity.value == "block" and f.evidence["match"] == "content" and f.evidence["original_invoice"]
+    c, _ = run(mk(source_file="c.txt", number="INV-9998", total=999.0), inventory, policy, reg)
+    assert "DUPLICATE_INVOICE" not in c                       # different total: not a duplicate
+    d, _ = run(mk(source_file="d.txt", number="INV-9997", vendor="Gadgets Co."), inventory, policy, reg)
+    assert "DUPLICATE_INVOICE" not in d                       # different vendor: not a duplicate
+
+
+def test_content_duplicate_can_be_turned_off(inventory, policy):
+    pol = dict(policy, duplicates={"match_content": False})
+    reg = DuplicateRegistry()
+    run(mk(source_file="a.txt"), inventory, pol, reg)
+    b, _ = run(mk(source_file="b.txt", number="INV-9999"), inventory, pol, reg)
+    assert "DUPLICATE_INVOICE" not in b
+
+
 def test_extraction_failed(tmp_path, inventory, policy):
     bad = tmp_path / "broken.json"
     bad.write_text("{not json")

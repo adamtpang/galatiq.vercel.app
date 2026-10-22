@@ -2,6 +2,7 @@
 
 Policy (Adam, DECISIONS.md; values in config/policy.yaml `approval:`):
   1. Any blocking flag => REJECTED by hard rules. No LLM call.
+  1b. Hard holds (decisions 8, 9): prompt injection, vendor rename or lookalike => PENDING_HUMAN. No LLM call.
   2. VP agent decides the rest with Adam's VP prompt.
   3. The critic (Adam's auditor prompt) runs only if total > approval threshold, total >=
      near limit, or risk >= high risk. The VP may revise after each objection, up to
@@ -202,11 +203,33 @@ def hard_rules(state: InvoiceState) -> Decision | None:
                     risk_score=(state.risk or {}).get("score"), decided_by="hard_rules")
 
 
+HOLD_FLAGS = {"vendor_renamed": "VENDOR_RENAMED", "vendor_lookalike": "VENDOR_LOOKALIKE"}
+
+
+def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
+    """Decisions 8 and 9: hold for a human, before any VP or critic call, regardless of the risk score."""
+    cfg = policy.get("approval", {}).get("hard_holds", {}) or {}
+    reasons = []
+    if cfg.get("prompt_injection"):
+        inj = [s for s in (state.risk or {}).get("signals", []) if s["signal"] == "prompt_injection"]
+        if inj:
+            reasons.append("Prompt injection: the invoice text tries to instruct the system "
+                           f"(matched {', '.join(map(str, inj[0].get('evidence') or []))}); a human must review it")
+    for key, code in HOLD_FLAGS.items():
+        if cfg.get(key):
+            reasons += [f"{code}: {f.message}; hold for human verification of the vendor and bank details"
+                        for f in state.flags if f.code == code]
+    if not reasons:
+        return None
+    return Decision(status=DecisionStatus.PENDING_HUMAN, reasons=reasons, risk_score=(state.risk or {}).get("score"),
+                    decided_by="hard_hold")
+
+
 STATUS = {"approve": DecisionStatus.APPROVED, "reject": DecisionStatus.REJECTED, "hold": DecisionStatus.PENDING_HUMAN}
 
 
 def decide(state: InvoiceState, vp: VP, critic: Critic, policy: dict[str, Any]) -> Decision:
-    hard = hard_rules(state)
+    hard = hard_rules(state) or hard_holds(state, policy)
     if hard:
         return hard
     f = facts(state, policy)
