@@ -4,7 +4,7 @@
 
 Four agents that read, check, approve and pay Acme Corp's invoices, with Grok (xAI) as the reasoning engine. Every decision comes with reasons and a full trace. Code does all the math; the model only extracts and argues.
 
-**Live demo:** https://galatiq.vercel.app replays the committed runs below, invoice by invoice, with every agent step, tool call, flag and VP/critic argument. It is a static page over exported traces; the system itself runs locally, as the brief asks.
+**Live demo:** https://galatiq.vercel.app replays the committed runs below, invoice by invoice, with every agent step, tool call, flag and VP/critic argument. It is a static page over exported traces; the system itself runs locally, as the brief asks. The guided view starts from the untouched inbox, plays back the live grok-4.7 trace at the recorded pace (scaled, with 1x, 4x and skip), then shows a handoff report built from the same data (`python scripts/export_web_data.py` rebuilds `web/data/demo.json`).
 
 **Walkthrough:** [docs/demo_script.md](docs/demo_script.md) (what to run, what to point at) and [docs/presentation.md](docs/presentation.md) (5 to 10 minute talk track).
 

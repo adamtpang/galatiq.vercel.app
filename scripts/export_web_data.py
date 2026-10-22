@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timezone
 from collections import OrderedDict
 from pathlib import Path
 
@@ -27,6 +28,8 @@ def export_run(name: str) -> dict:
         by_file.setdefault(ev["source"], []).append(ev)
     rows = {r["file"]: r for r in summary["rows"]}
     invoices = []
+    run_t0 = min(e["ts"] for evs in by_file.values() for e in evs)
+    run_t1 = max(e["ts"] for evs in by_file.values() for e in evs)
     for file, events in by_file.items():
         r = rows[file]
         inv = next((e["detail"]["invoice"] for e in events if e["step"] == "extracted"), None)
@@ -61,8 +64,18 @@ def export_run(name: str) -> dict:
                                                        "conditions", "arguments")},
             "payment": pay or {"status": r["payment"].split(" ")[0]},
             "timeline": timeline,
+            # Replay timing, straight from the trace timestamps.
+            "start_ms": round((t0 - run_t0) * 1000),
+            "duration_ms": round((events[-1]["ts"] - t0) * 1000),
+            "node_ms": {e["agent"]: e["detail"].get("ms") for e in events if e["step"] == "node_done"},
+            "format": next((e["detail"].get("format") for e in events if e["step"] == "read"), None),
+            "vendor_address": inv.get("vendor_address") if inv else None,
+            "date": inv.get("date") if inv else None,
+            "due_date_raw": inv.get("due_date_raw") if inv else None,
         })
-    return {"name": name, "mode": summary["mode"], "model": summary.get("model"), "invoices": invoices}
+    return {"name": name, "mode": summary["mode"], "model": summary.get("model"),
+            "recorded_at": datetime.fromtimestamp(run_t0, timezone.utc).isoformat(timespec="seconds"),
+            "duration_ms": round((run_t1 - run_t0) * 1000), "invoices": invoices}
 
 
 if __name__ == "__main__":
