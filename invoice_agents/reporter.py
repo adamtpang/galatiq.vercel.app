@@ -38,21 +38,35 @@ def row(s: InvoiceState) -> dict:
     }
 
 
+WIDE = 140   # below this terminal width the table drops the Vendor, Risk, Flags and By columns
+
+
 def print_summary(states: list[InvoiceState], console: Console, mode: str, run_dir: Path | None) -> None:
+    wide = console.width >= WIDE
+    cols = ["File", "Invoice", "Vendor", "Total USD", "Risk", "Flags", "Decision", "By", "Payment", "Reason"]
+    if not wide:
+        cols = ["File", "Total USD", "Decision", "Payment", "Reason"]
     t = Table(title=f"Run summary ({mode})", show_lines=False)
-    for c in ("File", "Invoice", "Vendor", "Total USD", "Risk", "Flags", "Decision", "By", "Payment", "Reason"):
-        t.add_column(c, overflow="fold")
+    for c in cols:
+        if c == "Reason":
+            t.add_column(c, overflow="fold", ratio=1)
+        else:
+            t.add_column(c, no_wrap=True, overflow="ellipsis", max_width=None if wide else 18)
     for s in states:
         r = row(s)
         flags = ", ".join(r["block_flags"][:3]) or (", ".join(r["warn_flags"][:2]) and "warn: " + ", ".join(r["warn_flags"][:2])) or "-"
-        t.add_row(r["file"], r["invoice"], r["vendor"], money(r["total_usd"]),
-                  "-" if r["risk"] is None else str(r["risk"]), flags,
-                  f"[{STATUS_STYLE.get(r['decision'], '')}]{r['decision']}[/]", r["decided_by"], r["payment"],
-                  r["reason"][:90])
+        decision = f"[{STATUS_STYLE.get(r['decision'], '')}]{r['decision'].replace('PENDING_HUMAN', 'HELD')}[/]"
+        cells = {"File": r["file"].removeprefix("invoice_"), "Invoice": r["invoice"], "Vendor": r["vendor"],
+                 "Total USD": money(r["total_usd"]), "Risk": "-" if r["risk"] is None else str(r["risk"]),
+                 "Flags": flags, "Decision": decision, "By": r["decided_by"], "Payment": r["payment"],
+                 "Reason": r["reason"][:90 if wide else 70]}
+        t.add_row(*(cells[c] for c in cols))
     console.print(t)
+    if not wide:
+        console.print(f"[dim]Narrow terminal ({console.width} columns): full table in report.md and summary.json.[/]")
     counts = {k: sum(row(s)["decision"] == k for s in states) for k in STATUS_STYLE}
     paid = sum((s.payment or {}).get("amount", 0) for s in states if (s.payment or {}).get("status") == "paid")
-    console.print(f"{len(states)} invoices: {counts['APPROVED']} approved, {counts['REJECTED']} rejected, "
+    console.print(f"{len(states)} invoice{'' if len(states) == 1 else 's'}: {counts['APPROVED']} approved, {counts['REJECTED']} rejected, "
                   f"{counts['PENDING_HUMAN']} pending human review. Paid this run: {money(paid)}.")
     if run_dir:
         console.print(f"Trace: {run_dir / 'trace.jsonl'}")

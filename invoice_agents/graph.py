@@ -25,7 +25,7 @@ from .hitl import enqueue
 from .llm import LLMClient, OfflineClient
 from .models import Decision, DecisionStatus, InvoiceState, TraceEvent
 from .parsers import parse_file
-from .validation import DuplicateRegistry, fingerprint, validate
+from .validation import DuplicateRegistry, content_hash, document_id, fingerprint, number_key, validate
 
 
 class GraphState(TypedDict):
@@ -83,8 +83,7 @@ def _safe(name: str, fn: Callable[[InvoiceState], InvoiceState], llm: Any = None
 
 def build_graph(ctx: RunContext):
     def do_ingest(s: InvoiceState) -> InvoiceState:
-        out = ingest(s.source, ctx.inventory, ctx.llm)
-        return out
+        return ingest(s.source, ctx.inventory, ctx.llm)
 
     def route(g: GraphState) -> str:
         d = g["s"].decision
@@ -95,13 +94,15 @@ def build_graph(ctx: RunContext):
     def report(s: InvoiceState) -> InvoiceState:
         inv = s.invoice
         status = s.decision.status.value if s.decision else "UNKNOWN"
-        if inv is not None:
+        if inv is not None:   # stored history for later runs (duplicate checks, vendor_history tool)
             ctx.conn.execute(
-                "INSERT INTO invoices (invoice_number, revision, vendor, total, currency, source_file, fingerprint, status) "
-                "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET status=excluded.status, "
-                "source_file=excluded.source_file",
-                (inv.number, inv.revision, inv.vendor, inv.total, inv.currency, s.source,
-                 fingerprint(inv) + "|" + Path(s.source).name, status))
+                "INSERT INTO invoices (invoice_number, revision, vendor, total, currency, source_file, fingerprint, status, "
+                "run_id, number_key, base_fp, content_key) VALUES (?,?,?,?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(fingerprint) DO UPDATE SET status=excluded.status, source_file=excluded.source_file, "
+                "run_id=COALESCE(invoices.run_id, excluded.run_id), number_key=excluded.number_key, "
+                "base_fp=excluded.base_fp, content_key=excluded.content_key",
+                (inv.number, inv.revision, inv.vendor, inv.total, inv.currency, s.source, document_id(inv, s.source),
+                 status, ctx.run_id, number_key(inv), fingerprint(inv), content_hash(inv)))
             ctx.conn.commit()
         path = ctx.trace_path()
         if path:
@@ -148,7 +149,7 @@ def make_context(llm: LLMClient | None = None, db: str | None = None, chaos: flo
         (run_dir / "trace.jsonl").write_text("")
     return RunContext(conn=conn, inventory=Inventory(conn), policy=load_policy(), llm=llm or OfflineClient(),
                       payments=PaymentAgent(conn, chaos=chaos, seed=seed, base_delay=base_delay, sleep=sleep),
-                      run_id=run_id, run_dir=run_dir)
+                      registry=DuplicateRegistry(conn=conn, run_id=run_id), run_id=run_id, run_dir=run_dir)
 
 
 def run_batch(paths: list[Path], ctx: RunContext) -> list[InvoiceState]:

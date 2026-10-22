@@ -52,12 +52,7 @@ def run(
         console.print(ctx.get_help())
         raise typer.Exit(1)
     if not target.exists():
-        console.print(f"[red]No such file or directory:[/] {target}")
-        if target.parent.is_dir():   # e.g. the brief's data/invoices/invoice1.txt: the samples are invoice_1001.txt ...
-            near = sorted(get_close_matches(target.name, [f.name for f in target.parent.iterdir()], n=50, cutoff=0.6))[:3]
-            if near:
-                console.print("Did you mean: " + ", ".join(str(target.parent / n) for n in near) + "?")
-        raise typer.Exit(2)
+        missing_path(target)
     try:
         llm = get_client("offline" if offline else mode)
     except LLMUnavailable as e:
@@ -74,26 +69,41 @@ def run(
         print(json.dumps([s.model_dump(mode="json", exclude={"raw_text"}) for s in states], indent=2, default=str))
     else:
         if log if log is not None else invoice_path is not None:
-            for st in states:
-                for ev in st.trace:
-                    if ev.step == "node_done":
-                        continue
-                    line = json.dumps({"agent": ev.agent, "step": ev.step, "detail": ev.detail}, default=str)
-                    print(line if len(line) <= 220 else line[:217] + "...")
+            print_step_log(states)
         for st in states:
-            msg = (st.payment or {}).get("bank_message") if isinstance(st.payment, dict) else None
+            msg = (st.payment or {}).get("bank_message")
             if msg:
                 print(f"mock_payment: {msg}")
         print_summary(states, console, llm.name, rc.run_dir)
 
 
+def missing_path(target: Path) -> None:
+    """Exit 2 with the nearest file names, e.g. for the brief's data/invoices/invoice1.txt."""
+    console.print(f"[red]No such file or directory:[/] {target}")
+    if target.parent.is_dir():
+        near = sorted(get_close_matches(target.name, [f.name for f in target.parent.iterdir()], n=50, cutoff=0.6))[:3]
+        if near:
+            console.print("Did you mean: " + ", ".join(str(target.parent / n) for n in near) + "?")
+    raise typer.Exit(2)
+
+
+def print_step_log(states) -> None:
+    """One JSON line per agent step (the structured log), long lines shortened for the terminal."""
+    for st in states:
+        for ev in st.trace:
+            if ev.step == "node_done":
+                continue
+            line = json.dumps({"agent": ev.agent, "step": ev.step, "detail": ev.detail}, default=str)
+            print(line if len(line) <= 220 else line[:217] + "...")
+
+
 @app.command()
 def review(
     invoice: Optional[str] = typer.Argument(None, help="Invoice number, e.g. INV-1012"),
-    approve: bool = typer.Option(False, "--approve"),
-    reject: bool = typer.Option(False, "--reject"),
-    note: Optional[str] = typer.Option(None, "--note"),
-    chaos: float = typer.Option(0.0, "--chaos", min=0.0, max=1.0),
+    approve: bool = typer.Option(False, "--approve", help="Approve and pay it (idempotent, with retries)"),
+    reject: bool = typer.Option(False, "--reject", help="Reject it; the reason goes to the audit log"),
+    note: Optional[str] = typer.Option(None, "--note", help="Reviewer note, stored with the decision"),
+    chaos: float = typer.Option(0.0, "--chaos", min=0.0, max=1.0, help="Probability each bank call fails"),
 ):
     """List the human review queue, or approve/reject one invoice in it."""
     conn = connect()
@@ -103,6 +113,8 @@ def review(
             console.print("Review queue is empty.")
         for r in rows:
             console.print(f"[yellow]{r['invoice_number']}[/] {r['vendor']} ({Path(r['source_file']).name}): {r['reason']}")
+        if rows:
+            console.print("Decide one with: python main.py review <invoice number> --approve | --reject [--note TEXT]")
         return
     if approve == reject:
         raise typer.BadParameter("pass exactly one of --approve or --reject")
@@ -115,7 +127,20 @@ def review(
         state = PaymentAgent(conn, chaos=chaos).pay(state)
     else:
         state = log_rejection(conn, state)
-    console.print(f"{state.invoice.number}: {state.decision.status.value} by human. Payment: {state.payment}")
+    p = state.payment or {}
+    num, vendor = state.invoice.number, state.invoice.vendor
+    if p.get("status") == "paid":
+        console.print(f"mock_payment: {p.get('bank_message')}")
+        outcome = f"paid ${p['amount']:,.2f} to {vendor} (attempts: {p['attempts']}, key {p['idempotency_key']})"
+    elif p.get("status") == "already_paid":
+        outcome = f"already paid ${p['amount']:,.2f} earlier; not paid again"
+    elif p.get("status") == "failed":
+        outcome = f"[red]payment failed[/] after {p['attempts']} attempts: {'; '.join(p.get('errors', []))}"
+    else:
+        outcome = "not paid; rejection written to the audit log"
+    console.print(f"{num}: {state.decision.status.value.lower()} by a human ({note or 'no note'}). {outcome}")
+    if p.get("status") == "failed":
+        raise typer.Exit(1)
 
 
 @app.command("eval")

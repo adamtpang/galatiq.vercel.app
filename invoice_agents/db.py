@@ -16,11 +16,28 @@ def db_path() -> Path:
     return Path(os.environ.get("INVENTORY_DB", ROOT / "inventory.db"))
 
 
+# Columns added to `invoices` after the first schema; migrate() adds them to older databases.
+INVOICE_COLUMNS = {"run_id": "TEXT", "number_key": "TEXT", "base_fp": "TEXT", "content_key": "TEXT"}
+INDEXES = ("CREATE INDEX IF NOT EXISTS ix_invoices_base_fp ON invoices(base_fp)",
+           "CREATE INDEX IF NOT EXISTS ix_invoices_number_key ON invoices(number_key)",
+           "CREATE INDEX IF NOT EXISTS ix_invoices_content_key ON invoices(content_key)")
+
+
+def migrate(conn: sqlite3.Connection) -> None:
+    have = {r[1] for r in conn.execute("PRAGMA table_info(invoices)")}
+    for col, typ in INVOICE_COLUMNS.items():
+        if col not in have:
+            conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} {typ}")
+    for st in INDEXES:
+        conn.execute(st)
+
+
 def init_db(path: Path | str | None = None) -> Path:
-    """Create tables and (re)apply the seed. Safe to run any number of times."""
+    """Create tables and (re)apply the seed. Safe to run any number of times; keeps processed invoices."""
     p = Path(path) if path else db_path()
     with sqlite3.connect(p) as conn:
         conn.executescript(SEED_SQL.read_text())
+        migrate(conn)
     return p
 
 
@@ -29,6 +46,7 @@ def ensure_schema(path: Path | str) -> None:
     with sqlite3.connect(path) as conn:
         for st in stmts:
             conn.execute(st)
+        migrate(conn)
 
 
 def connect(path: Path | str | None = None) -> sqlite3.Connection:

@@ -120,3 +120,17 @@ def test_money_and_ocr():
 def test_sku_normalizer(raw, sku, method):
     m = normalize_sku(raw, ["WidgetA", "WidgetB", "GadgetX", "FakeItem"])
     assert (m.sku, m.method) == (sku, method)
+
+
+def test_edge_files_are_rejected_not_crashing(tmp_path, inventory, policy):
+    from invoice_agents.agents.ingestion import MAX_BYTES, ingest
+    from invoice_agents.validation import validate
+    (tmp_path / "empty.txt").write_text("")
+    (tmp_path / "lunch.txt").write_text("Lunch is at noon on Friday.\n")
+    (tmp_path / "broken.pdf").write_text("%PDF-1.4 garbage")
+    with open(tmp_path / "huge.txt", "wb") as fh:
+        fh.truncate(MAX_BYTES + 1)
+    for name, code in (("empty.txt", "EXTRACTION_FAILED"), ("lunch.txt", "MISSING_ITEMS"),
+                       ("broken.pdf", "EXTRACTION_FAILED"), ("huge.txt", "EXTRACTION_FAILED")):
+        st = validate(ingest(tmp_path / name, inventory), inventory, policy)
+        assert code in {f.code for f in st.flags} and st.has_blocking(), name

@@ -2,7 +2,8 @@
 
 Policy (Adam, DECISIONS.md; values in config/policy.yaml `approval:`):
   1. Any blocking flag => REJECTED by hard rules. No LLM call.
-  1b. Hard holds (decisions 8, 9): prompt injection, vendor rename or lookalike => PENDING_HUMAN. No LLM call.
+  1b. Hard holds (decisions 8, 9): prompt injection (rule signal, or Grok's risk review sets
+      prompt_injection), vendor rename or lookalike => PENDING_HUMAN. No VP or critic call.
   2. VP agent decides the rest with Adam's VP prompt.
   3. The critic (Adam's auditor prompt) runs only if total > approval threshold, total >=
      near limit, or risk >= high risk. The VP may revise after each objection, up to
@@ -26,7 +27,6 @@ from ..llm import LLMClient
 from ..models import Decision, DecisionStatus, InvoiceState, Severity, TraceEvent
 
 AGENT = "approval"
-IS_STUB = False
 
 VP_PROMPT = (
     "You're Acme's VP of Finance. You see the invoice, the check flags and the risk score. Hard-rule failures "
@@ -211,10 +211,15 @@ def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
     cfg = policy.get("approval", {}).get("hard_holds", {}) or {}
     reasons = []
     if cfg.get("prompt_injection"):
-        inj = [s for s in (state.risk or {}).get("signals", []) if s["signal"] == "prompt_injection"]
+        risk = state.risk or {}
+        inj = [s for s in risk.get("signals", []) if s["signal"] == "prompt_injection"]
+        llm = risk.get("llm") or {}
         if inj:
             reasons.append("Prompt injection: the invoice text tries to instruct the system "
                            f"(matched {', '.join(map(str, inj[0].get('evidence') or []))}); a human must review it")
+        elif llm.get("prompt_injection"):   # structured field of Grok's risk review, not its prose
+            quote = f' ("{llm["injection_quote"]}")' if llm.get("injection_quote") else ""
+            reasons.append(f"Prompt injection found by the Grok risk review{quote}; a human must review it")
     for key, code in HOLD_FLAGS.items():
         if cfg.get(key):
             reasons += [f"{code}: {f.message}; hold for human verification of the vendor and bank details"

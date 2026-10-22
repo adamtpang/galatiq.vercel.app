@@ -71,7 +71,7 @@
       "decided_by": "hard_rules",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "SUPERSEDED_BY_REVISION: Replaced by revision R1 in data/invoices/invoice_1004_revised.json",
+      "reason": "SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json",
       "conditions": [],
       "errors": []
     },
@@ -242,7 +242,7 @@
       "decided_by": "hard_rules",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "DUPLICATE_INVOICE: Same invoice already received as data/invoices/invoice_1011.pdf",
+      "reason": "DUPLICATE_INVOICE: Same invoice already received as invoice_1011.pdf",
       "conditions": [],
       "errors": []
     },
@@ -280,7 +280,7 @@
       "decided_by": "hard_rules",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "DUPLICATE_INVOICE: Same invoice already received as data/invoices/invoice_1012.pdf",
+      "reason": "DUPLICATE_INVOICE: Same invoice already received as invoice_1012.pdf",
       "conditions": [],
       "errors": []
     },

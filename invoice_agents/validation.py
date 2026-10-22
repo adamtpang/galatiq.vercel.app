@@ -6,7 +6,9 @@ The approval agent decides what to do with them; these tools only report facts.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
+import sqlite3
 from collections import Counter, defaultdict
 from difflib import SequenceMatcher
 from dataclasses import dataclass, field
@@ -261,17 +263,108 @@ def fingerprint(inv: Invoice) -> str:
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
+def document_id(inv: Invoice, source: str | Path) -> str:
+    """One stored document: the invoice fingerprint plus its file name (the invoices.fingerprint column)."""
+    return fingerprint(inv) + "|" + Path(source).name
+
+
+def content_hash(inv: Invoice) -> str | None:
+    k = content_key(inv)
+    return None if k is None else hashlib.sha256(json.dumps(k).encode()).hexdigest()[:16]
+
+
+def number_key(inv: Invoice) -> str | None:
+    return f"{_norm(inv.number)}|{_norm(inv.vendor)}" if inv.number else None
+
+
 @dataclass
 class DuplicateRegistry:
-    """Duplicate and revision detection across one run.
+    """Duplicate and revision detection, within this run and against stored history.
 
-    Batch mode calls prescan() first with every file's parsed invoice, so an original
-    is flagged SUPERSEDED_BY_REVISION before it can be approved, even though the
+    Within a run: batch mode calls prescan() first with every file's parsed invoice, so an
+    original is flagged SUPERSEDED_BY_REVISION before it can be approved, even though the
     revision comes later in the batch. Without a prescan it works sequentially.
+
+    History: with a connection, check_history() also compares the invoice with every
+    document stored in the `invoices` table by an earlier run (see check_history).
     """
     seen: dict[tuple[str, str], list[tuple[Invoice, InvoiceState | None]]] = field(default_factory=dict)
     order: dict[tuple[str, str], list[Invoice]] = field(default_factory=dict)
     by_content: dict[tuple, Invoice] = field(default_factory=dict)   # first invoice seen with this content
+    conn: sqlite3.Connection | None = None   # stored history (invoices and payments tables)
+    run_id: str = ""                         # rows first stored by this run are not history
+
+    def _history(self, inv: Invoice) -> list[sqlite3.Row]:
+        if self.conn is None:
+            return []
+        q = ("SELECT id, invoice_number, revision, vendor, total, currency, source_file, fingerprint, status, "
+             "created_at, base_fp, number_key, content_key FROM invoices WHERE run_id IS NOT NULL AND run_id != ? "
+             "AND (base_fp = ? OR number_key = ? OR content_key = ?) ORDER BY id")
+        cur = self.conn.execute(q, (self.run_id, fingerprint(inv), number_key(inv), content_hash(inv)))
+        cur.row_factory = sqlite3.Row
+        return cur.fetchall()
+
+    def _paid(self, r: sqlite3.Row) -> str:
+        if self.conn is None:
+            return ""
+        p = self.conn.execute("SELECT amount, created_at FROM payments WHERE invoice_number IS ? AND vendor IS ? "
+                              "AND status = 'paid' ORDER BY id LIMIT 1", (r["invoice_number"], r["vendor"])).fetchone()
+        return f", paid {_money(p[0])} on {str(p[1])[:10]}" if p else ""
+
+    def _where(self, r: sqlite3.Row) -> str:
+        return (f"{Path(r['source_file'] or '').name} in an earlier run "
+                f"({(r['status'] or 'unknown').lower().replace('_', ' ')}{self._paid(r)})")
+
+    def check_history(self, inv: Invoice, source: str, have: set[str], match_content: bool) -> list[Flag]:
+        """Compare with documents stored by earlier runs. For each kind of match only the EARLIEST
+        stored document counts, so re-running the same file is idempotent: the original stays the
+        original (payment then reports already_paid) and a copy stays a copy.
+
+        - same fingerprint (number, vendor, total, revision), different file: DUPLICATE_INVOICE
+        - same number and vendor, different fingerprint: revision of it (REVISION_SUPERSEDES, plus
+          REVISION_AFTER_PAYMENT if the original was paid), replaced by it (SUPERSEDED_BY_REVISION),
+          or reused with different content (DUPLICATE_NUMBER_CONFLICT)
+        - same content under another number (decision 7): DUPLICATE_INVOICE, match=content
+        Codes in `have` (already raised within this run) are not repeated."""
+        rows = self._history(inv)
+        if not rows:
+            return []
+        fp, me, ck = fingerprint(inv), document_id(inv, source), content_hash(inv)
+        out: list[Flag] = []
+        same = [r for r in rows if r["base_fp"] == fp]
+        if same and same[0]["fingerprint"] != me and "DUPLICATE_INVOICE" not in have:
+            r = same[0]
+            out.append(_f("DUPLICATE_INVOICE", B, f"Same invoice already received as {self._where(r)}",
+                          match="history", first_seen=r["source_file"], original_invoice=r["invoice_number"],
+                          original_status=r["status"], fingerprint=fp))
+        if not out:   # an original re-run still learns about a revision or a conflict stored since
+            for r in (r for r in rows if inv.number and r["number_key"] == number_key(inv) and r["base_fp"] != fp):
+                if inv.revision and r["revision"] != inv.revision:
+                    out.append(_f("REVISION_SUPERSEDES", I, f"Revision {inv.revision} replaces {self._where(r)} "
+                                  f"(total {_money(r['total'] or 0)} -> {_money(inv.total or 0)})",
+                                  supersedes=r["source_file"], previous_total=r["total"],
+                                  delta=round((inv.total or 0) - (r["total"] or 0), 2)))
+                    if r["status"] == "APPROVED":
+                        out.append(_f("REVISION_AFTER_PAYMENT", W, f"The invoice it revises was already approved "
+                                      f"({self._where(r)}); paying the revision would pay twice",
+                                      original=r["source_file"], original_total=r["total"]))
+                elif r["revision"] and r["revision"] != inv.revision:
+                    out.append(_f("SUPERSEDED_BY_REVISION", B, f"Replaced by revision {r['revision']} "
+                                  f"in {self._where(r)}", superseded_by=r["source_file"]))
+                else:
+                    out.append(_f("DUPLICATE_NUMBER_CONFLICT", B, f"Invoice number reused with different content "
+                                  f"(see {self._where(r)})", other=r["source_file"], other_total=r["total"],
+                                  total=inv.total))
+                break   # the earliest stored document with this number decides
+        if match_content and ck and not any(f.code == "DUPLICATE_INVOICE" for f in out) \
+                and "DUPLICATE_INVOICE" not in have:
+            first = next((r for r in rows if r["content_key"] == ck), None)
+            if first is not None and _norm(first["invoice_number"]) != _norm(inv.number):
+                out.append(_f("DUPLICATE_INVOICE", B, f"Same vendor, line items, quantities and total as "
+                              f"{first['invoice_number']} ({self._where(first)}) under a different number "
+                              f"({inv.number})", match="content", original_invoice=first["invoice_number"],
+                              first_seen=first["source_file"], original_status=first["status"]))
+        return [f for f in out if f.code not in have]
 
     def check_content(self, inv: Invoice) -> list[Flag]:
         """Same vendor, items, quantities and total as an earlier invoice under a different number.
@@ -301,18 +394,18 @@ class DuplicateRegistry:
     def _compare(self, inv: Invoice, earlier: list[Invoice]) -> list[Flag]:
         for p_inv in earlier:
             if fingerprint(p_inv) == fingerprint(inv):
-                return [_f("DUPLICATE_INVOICE", B, f"Same invoice already received as {p_inv.source_file}",
+                return [_f("DUPLICATE_INVOICE", B, f"Same invoice already received as {Path(p_inv.source_file or '').name}",
                            first_seen=p_inv.source_file, fingerprint=fingerprint(inv))]
         out = []
         for p_inv in earlier:
             if inv.revision and inv.revision != p_inv.revision:
                 delta = round((inv.total or 0) - (p_inv.total or 0), 2)
-                out.append(_f("REVISION_SUPERSEDES", I, f"Revision {inv.revision} replaces {p_inv.source_file} "
+                out.append(_f("REVISION_SUPERSEDES", I, f"Revision {inv.revision} replaces {Path(p_inv.source_file or '').name} "
                               f"(total {_money(p_inv.total or 0)} -> {_money(inv.total or 0)})",
                               supersedes=p_inv.source_file, previous_total=p_inv.total, delta=delta))
             elif not (p_inv.revision and p_inv.revision != inv.revision):
                 out.append(_f("DUPLICATE_NUMBER_CONFLICT", B, f"Invoice number reused with different content "
-                              f"(see {p_inv.source_file})", other=p_inv.source_file,
+                              f"(see {Path(p_inv.source_file or '').name})", other=p_inv.source_file,
                               other_total=p_inv.total, total=inv.total))
         return out
 
@@ -327,7 +420,7 @@ class DuplicateRegistry:
             for later in planned[idx + 1:]:
                 if later.revision and later.revision != inv.revision and fingerprint(later) != fingerprint(inv):
                     out.append(_f("SUPERSEDED_BY_REVISION", B, f"Replaced by revision {later.revision} "
-                                  f"in {later.source_file}", superseded_by=later.source_file))
+                                  f"in {Path(later.source_file or '').name}", superseded_by=later.source_file))
                     break
             return out
         prior = self.seen.setdefault(k, [])
@@ -336,7 +429,7 @@ class DuplicateRegistry:
             for p_inv, p_state in prior:
                 if p_inv.revision != inv.revision and fingerprint(p_inv) != fingerprint(inv) and p_state is not None:
                     p_state.flags.append(_f("SUPERSEDED_BY_REVISION", B, f"Replaced by revision {inv.revision} "
-                                            f"in {inv.source_file}", superseded_by=inv.source_file))
+                                            f"in {Path(inv.source_file or '').name}", superseded_by=inv.source_file))
         prior.append((inv, state))
         return out
 
@@ -364,10 +457,12 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
         flags.append(_f("OCR_CORRECTED", I, "Fixed OCR look-alike characters",
                         corrections=[c for c in inv.corrections if c.startswith("OCR")]))
     if registry is not None:
+        match_content = bool((policy.get("duplicates") or {}).get("match_content"))
         dup = registry.check_and_register(inv, state)
+        if match_content and not any(f.code == "DUPLICATE_INVOICE" for f in dup):
+            dup += registry.check_content(inv)
+        dup += registry.check_history(inv, state.source, {f.code for f in dup}, match_content)
         flags += dup
-        if (policy.get("duplicates") or {}).get("match_content") and not any(f.code == "DUPLICATE_INVOICE" for f in dup):
-            flags += registry.check_content(inv)
     state.flags.extend(flags)
     state.total_usd = total_usd
     state.trace.append(TraceEvent(agent="validation", step="validate", detail={

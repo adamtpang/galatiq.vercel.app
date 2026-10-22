@@ -15,13 +15,13 @@ from pydantic import BaseModel, Field
 
 from ..db import Inventory
 from ..llm import LLMClient, LLMOutputError, LLMUnavailable, OfflineClient
-from ..models import InvoiceState, TraceEvent
+from ..models import Invoice, InvoiceState, TraceEvent
 from ..normalize import normalize_sku
 from ..parsers import PdfTextError, parse_raw, read_source
 from ..parsers.common import finish, item
-from ..models import Invoice
 
 AGENT = "ingestion"
+MAX_BYTES = 10_000_000   # 10 MB per invoice file
 
 
 class ExtractedItem(BaseModel):
@@ -94,6 +94,9 @@ def ingest(path: str | Path, inventory: Inventory, llm: LLMClient | None = None)
     llm = llm or OfflineClient()
     state = InvoiceState(source=str(path))
     try:
+        size = Path(path).stat().st_size
+        if size > MAX_BYTES:   # an invoice is kilobytes; a huge file is a mistake or an attack, not an invoice
+            raise OSError(f"file is {size / 1e6:.1f} MB, over the {MAX_BYTES / 1e6:.0f} MB limit for one invoice")
         raw, fmt = read_source(path)
     except (OSError, PdfTextError) as e:
         state.errors.append(f"read failed: {e}")

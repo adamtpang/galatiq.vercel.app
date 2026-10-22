@@ -60,13 +60,12 @@ def test_offline_extraction_numbers(offline):
 
 def test_offline_adversarial_numbers(offline):
     adv = offline["adversarial"]
-    assert adv["total"] == 7 and adv["caught"] == 6
-    # Honest miss with the current policy (see README "Evals"): the reworded injection matches no pattern.
-    assert adv["missed"] == ["invoice_3002_injection_reworded.txt"]
+    assert adv["total"] == 7 and adv["caught"] == 7 and adv["missed"] == []
     by = {c["file"]: c for c in adv["cases"]}
     assert by["invoice_3006_duplicate_new_number.txt"]["decision"] == "REJECTED"
-    assert {by[f]["decided_by"] for f in ("invoice_3001_injection_note.json", "invoice_3003_lookalike_vendor.txt",
-                                          "invoice_3004_renamed_vendor.txt")} == {"hard_hold"}
+    # 3002 (reworded injection) is caught by the generic injection patterns added in the reviewer pass
+    assert {by[f]["decided_by"] for f in ("invoice_3001_injection_note.json", "invoice_3002_injection_reworded.txt",
+                                          "invoice_3003_lookalike_vendor.txt", "invoice_3004_renamed_vendor.txt")} == {"hard_hold"}
 
 
 def test_offline_makes_no_llm_calls(offline):
@@ -76,7 +75,7 @@ def test_offline_makes_no_llm_calls(offline):
 def test_committed_demo_agreement(offline):
     demo = offline["agreement"][0]
     assert demo["invoices"] == 20 and demo["agree"] == 17
-    assert sorted(d["file"] for d in demo["disagreements"]) == ["invoice_1006.csv", "invoice_1010.txt", "invoice_1014.xml"]
+    assert sorted(d["file"] for d in demo["disagreements"]) == ["invoice_1001.txt", "invoice_1006.csv", "invoice_1010.txt"]
 
 
 def test_usage_record_counts_every_call_and_reasoning_tokens():
@@ -104,7 +103,7 @@ def test_grok_client_logs_usage_for_tool_rounds_and_structured_calls():
 
 
 def test_report_renders(offline):
-    assert "Extraction" in runner.detail_md(offline) and "| (c) Adversarial catch rate | 6/7" in runner.summary_md(offline, None)
+    assert "Extraction" in runner.detail_md(offline) and "| (c) Adversarial catch rate | 7/7" in runner.summary_md(offline, None)
 
 
 def test_default_run_modifies_no_tracked_files(tmp_path):

@@ -15,7 +15,7 @@ approval:
   # Hard holds (decisions 8 and 9): PENDING_HUMAN before any VP or critic call, whatever the risk score.
   # A blocking flag still rejects first (hard rules run before hard holds).
   hard_holds:
-    prompt_injection: true           # risk signal prompt_injection fired (risk.injection_patterns)
+    prompt_injection: true           # risk signal prompt_injection fired (risk.injection_patterns), or live Grok risk review set prompt_injection
     vendor_renamed: true             # VENDOR_RENAMED flag ("formerly X")
     vendor_lookalike: true           # VENDOR_LOOKALIKE flag (name close to a vendor on file, see vendor_lookalike)
 
@@ -56,7 +56,17 @@ risk:
     prompt_injection: 40       # text that tries to instruct the system ("ignore previous instructions")
   urgency_patterns: ['\burgent\b', 'pay immediately', '\basap\b', 'avoid penalt', 'final notice', 'immediately']
   wire_patterns: ['wire transfer', '\bwire\b', 'new bank', 'change of bank', 'gift card', 'crypto', 'bitcoin']
-  injection_patterns: ['ignore (all |any )?(previous|prior|above) instructions', 'automated system', 'set the risk score', 'approve this invoice']
+  injection_patterns:          # text that tries to instruct the reviewer; any match is a hard hold (decision 8)
+    - 'ignore (all |any )?(previous|prior|above) instructions'
+    - 'automated system'
+    - 'set the risk score'
+    - 'approve this invoice'
+    # Generic forms (added in the reviewer pass, checked for false positives on all 30 test invoices):
+    - '\b(ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}\b(instructions?|guidance|guidelines|rules|polic(y|ies)|prompts?)\b'   # override the rules
+    - '\b(ai|llm|assistant|bot)\b[\s-]{0,3}(reviewer|agent|system|assistant|model|checker)\b'                                        # addresses the AI
+    - '\b(skip|bypass|without)\b[^.\n]{0,20}\b(human|manual)\s+(review|approval|check|verification)\b'                              # skip the human
+    - '\bmark\s+(it|this(\s+invoice)?|the\s+invoice)\s+(as\s+)?(approved|paid|verified|low[\s-]risk)\b'                             # dictate the outcome
+    - '\b(report|set|assign|give|rate)\b[^.\n]{0,20}\b(a\s+)?(low|zero)\s+risk\b'                                                    # dictate the score
   suspicious_addresses: ['1600 pennsylvania ave', '742 evergreen terrace']   # White House; the Simpsons' fictional address (found by Grok on 1004_revised)
   llm_review: true             # live mode: Grok may add reasons and raise the score, never lower it
 

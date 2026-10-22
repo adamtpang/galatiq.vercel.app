@@ -24,6 +24,7 @@ T = TypeVar("T", bound=BaseModel)
 
 XAI_BASE_URL = "https://api.x.ai/v1"
 DEFAULT_MODEL = "grok-4.7"
+NO_RETRY = {400, 401, 403, 404, 422}   # HTTP status codes that fail the same way on every try
 
 
 class LLMUnavailable(RuntimeError):
@@ -116,7 +117,9 @@ class GrokClient:
                 resp = self._client.chat.completions.create(model=self.model, temperature=0, **kw)
                 self.usage_log.append(usage_record(resp, purpose, time.monotonic() - t0))
                 return resp
-            except Exception as e:  # network, rate limit, 5xx
+            except Exception as e:  # network, rate limit, 5xx: retry with backoff
+                if getattr(e, "status_code", None) in NO_RETRY:   # bad key or bad request: retrying cannot help
+                    raise LLMUnavailable(f"xAI API error {e.status_code}: {e}") from e
                 last = e
                 self._sleep(min(2 ** i, 8))
         raise LLMUnavailable(f"xAI API failed after {self.api_retries} tries: {last}")

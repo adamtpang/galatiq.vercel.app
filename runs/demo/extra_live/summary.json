@@ -7,17 +7,16 @@
       "invoice": "INV-2001",
       "vendor": "Widgets Inc.",
       "total_usd": 3000.0,
-      "risk": 22,
+      "risk": 15,
       "block_flags": [],
       "warn_flags": [],
       "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor is on file and catalog prices match the stated lines, but the bill is an informal email with no PO.",
+      "reason": "Vendor is on file and line math equals the $3,000 total, under the approval threshold.",
       "conditions": [
-        "Obtain a formal invoice and a purchase-order reference before payment.",
-        "Confirm a single payment term with the requester."
+        "Confirm the requester and obtain a PO or written order confirmation before payment."
       ],
       "errors": []
     },
@@ -35,7 +34,7 @@
       "decided_by": "hard_hold",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore (all |any )?(previous|prior|above) instructions, automated system, set the risk score, approve this invoice); a human must review it",
+      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, automated system, set the risk score, approve this invoice); a human must review it",
       "conditions": [],
       "errors": []
     },
@@ -44,18 +43,15 @@
       "invoice": "INV-2003",
       "vendor": "Reliable Components Inc.",
       "total_usd": 2000.0,
-      "risk": 8,
+      "risk": 5,
       "block_flags": [],
       "warn_flags": [],
-      "decision": "PENDING_HUMAN",
+      "decision": "APPROVED",
       "decided_by": "vp",
       "critique_rounds": 0,
-      "payment": "not_paid",
-      "reason": "Vendor is on file and the stated total matches the line items.",
-      "conditions": [
-        "Obtain a complete invoice before payment.",
-        "Confirm the bank details on file for this first payment."
-      ],
+      "payment": "paid $2,000.00",
+      "reason": "Vendor Reliable Components Inc. is on file",
+      "conditions": [],
       "errors": []
     }
   ]

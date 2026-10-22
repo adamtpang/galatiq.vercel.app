@@ -1,4 +1,5 @@
--- Schema and seed for the mock Acme ERP. Applied by scripts/init_db.py (idempotent).
+-- Schema and seed for the mock Acme ERP. Applied on first run and by scripts/init_db.py (idempotent).
+-- Columns added after a DB was created are migrated by invoice_agents/db.py migrate().
 CREATE TABLE IF NOT EXISTS inventory (
   item        TEXT PRIMARY KEY,
   stock       INTEGER NOT NULL CHECK (stock >= 0),
@@ -22,9 +23,13 @@ CREATE TABLE IF NOT EXISTS invoices (
   total          REAL,
   currency       TEXT,
   source_file    TEXT,
-  fingerprint    TEXT UNIQUE,
+  fingerprint    TEXT UNIQUE,      -- base fingerprint | file name: one row per document
   status         TEXT,
-  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  run_id         TEXT,             -- run that first processed this document
+  number_key     TEXT,             -- normalized invoice number | vendor (same-number checks)
+  base_fp        TEXT,             -- number, vendor, total, revision (same-invoice checks)
+  content_key    TEXT              -- vendor, items, quantities, total (decision 7, content duplicates)
 );
 
 CREATE TABLE IF NOT EXISTS payments (

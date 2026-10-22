@@ -39,7 +39,7 @@
       "decided_by": "hard_hold",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore (all |any )?(previous|prior|above) instructions, automated system, set the risk score, approve this invoice); a human must review it",
+      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, automated system, set the risk score, approve this invoice); a human must review it",
       "conditions": [],
       "errors": []
     },

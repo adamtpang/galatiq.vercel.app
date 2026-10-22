@@ -21,9 +21,9 @@ def pdf_to_text(path: str | Path) -> tuple[str, str]:
     except Exception as e:  # pragma: no cover - depends on the file
         errors.append(f"pdfplumber: {e}")
     try:
-        import fitz  # PyMuPDF
+        import pymupdf  # PyMuPDF (the old `fitz` import name prints a deprecation warning)
 
-        with fitz.open(path) as doc:
+        with pymupdf.open(path) as doc:
             text = "\n".join(page.get_text() for page in doc)
         if text.strip():
             return text, "pymupdf"

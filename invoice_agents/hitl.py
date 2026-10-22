@@ -3,13 +3,35 @@ from __future__ import annotations
 
 import sqlite3
 
+from .db import log_audit
 from .models import Decision, DecisionStatus, InvoiceState, TraceEvent
-from .validation import fingerprint
+from .normalize import normalize_invoice_number
+from .validation import document_id, fingerprint
+
+HUMAN = {"approved": DecisionStatus.APPROVED, "rejected": DecisionStatus.REJECTED}
 
 
 def enqueue(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState:
+    """Queue a held invoice for a person. If a person already decided this invoice in an earlier
+    run, that decision stands (re-running a file is idempotent): nothing is queued again."""
     inv, d = state.invoice, state.decision
     fp = fingerprint(inv) if inv else state.source
+    prev = conn.execute("SELECT status, reviewer_note, decided_at FROM review_queue WHERE fingerprint=?",
+                        (fp,)).fetchone()
+    if prev is not None and prev[0] in HUMAN:
+        status, note, at = prev[0], prev[1], prev[2]
+        state.decision = Decision(
+            status=HUMAN[status], decided_by="human", risk_score=d.risk_score if d else None,
+            reasons=[f"Already {status} by a human reviewer on {at} UTC" + (f": {note}" if note else "")],
+            arguments={"agents_decision": d.model_dump(mode="json") if d else None})
+        paid = status == "approved" and conn.execute(
+            "SELECT 1 FROM payments WHERE invoice_number IS ? AND vendor IS ? AND status='paid'",
+            (inv.number if inv else None, inv.vendor if inv else None)).fetchone()
+        state.payment = ({"status": "already_paid", "amount": state.total_usd} if paid
+                         else {"status": "not_paid", "reason": f"{status} by a human reviewer"})
+        state.trace.append(TraceEvent(agent="hitl", step="already_reviewed",
+                                      detail={"fingerprint": fp, "review": status, "note": note, "decided_at": at}))
+        return state
     conn.execute(
         "INSERT INTO review_queue (invoice_number, vendor, source_file, fingerprint, reason, state_json) "
         "VALUES (?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET state_json=excluded.state_json, "
@@ -27,14 +49,14 @@ def pending(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 
 
 def find(conn: sqlite3.Connection, invoice_number: str) -> sqlite3.Row | None:
-    from .normalize import normalize_invoice_number
-
     num = normalize_invoice_number(invoice_number)
     return conn.execute("SELECT * FROM review_queue WHERE invoice_number=? AND status='pending' "
                         "ORDER BY id DESC LIMIT 1", (num,)).fetchone()
 
 
 def resolve(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str | None) -> InvoiceState:
+    """Record a person's decision on a queued invoice: review_queue, the invoices history and the audit log.
+    The caller pays (approve) or logs the rejection."""
     state = InvoiceState.model_validate_json(row["state_json"])
     prior = state.decision
     state.decision = Decision(
@@ -46,6 +68,12 @@ def resolve(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str
         decided_by="human", arguments={"queued_reason": row["reason"]})
     conn.execute("UPDATE review_queue SET status=?, reviewer_note=?, decided_at=datetime('now') WHERE id=?",
                  ("approved" if approve else "rejected", note, row["id"]))
+    if state.invoice is not None:
+        conn.execute("UPDATE invoices SET status=? WHERE fingerprint=?",
+                     (state.decision.status.value, document_id(state.invoice, state.source)))
     conn.commit()
+    log_audit(conn, state.invoice.number if state.invoice else None, "hitl",
+              "human_approved" if approve else "human_rejected",
+              {"source": state.source, "note": note, "queued_reason": row["reason"]})
     state.trace.append(TraceEvent(agent="hitl", step="resolved", detail={"approve": approve, "note": note}))
     return state

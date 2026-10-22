@@ -115,3 +115,25 @@ def test_structured_output_raises_after_max_attempts():
     with pytest.raises(LLMOutputError) as e:
         GrokClient(client=fake, sleep=lambda s: None).complete_structured(RiskReview, [])
     assert len(e.value.attempts) == 3 and not any(a["ok"] for a in e.value.attempts)
+
+
+def test_api_auth_error_is_not_retried():
+    from invoice_agents.llm import GrokClient, LLMUnavailable
+
+    class AuthError(Exception):
+        status_code = 401
+
+    class Client:
+        calls = 0
+
+        class chat:  # noqa: N801
+            class completions:  # noqa: N801
+                @staticmethod
+                def create(**kw):
+                    Client.calls += 1
+                    raise AuthError("invalid api key")
+
+    g = GrokClient(client=Client, sleep=lambda s: None)
+    with pytest.raises(LLMUnavailable, match="401"):
+        g._create(messages=[])
+    assert Client.calls == 1
