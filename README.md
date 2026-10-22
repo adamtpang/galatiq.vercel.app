@@ -254,3 +254,7 @@ web/                        static trace-replay demo (Vercel), data in web/data/
 ```
 
 `data/invoices/` and `data/generate_pdfs.py` are copied unchanged from [galatiq-ai/galatiq-case-invoices](https://github.com/galatiq-ai/galatiq-case-invoices).
+
+## License
+
+Code is MIT licensed (see [LICENSE](LICENSE)). The sample invoices in data/invoices/ and data/generate_pdfs.py (and their copies in web/invoices/) come from https://github.com/galatiq-ai/galatiq-case-invoices and are not covered by that license.
