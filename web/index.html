@@ -34,7 +34,7 @@
     <h1 id="ov-h">Acme has an inbox full of invoices. Watch Grok work through it.</h1>
     <p class="lede">Four agents read every invoice, check it, argue about it and then pay it, reject it or hold it for a person. Press the button to watch the recorded run, step by step, with every tool call and argument.</p>
     <div class="honesty" id="honesty" role="note">Loading run data...</div>
-    <p class="small muted top-go">Already know the case? <button class="linkish" id="go-top" type="button">Run Grok on the inbox now</button></p>
+    <div class="top-go"><button class="btn ghost" id="go-top" type="button">Skip the overview and run Grok</button><span class="small muted">or read on for the full picture first</span></div>
 
     <h2 class="h2s">The situation</h2>
     <div class="sit">
@@ -96,6 +96,7 @@
         <button class="ctl" id="skip" type="button">Skip to end</button>
       </div>
     </div>
+    <p class="small muted speed-note" id="speed-note"></p>
     <div class="runbar card">
       <div class="prog-top"><b id="prog-label">0 of 20 invoices done</b><span class="small muted" id="prog-eta"></span></div>
       <div class="prog" role="progressbar" aria-label="Invoices processed" aria-valuemin="0" aria-valuemax="20" aria-valuenow="0" id="prog"><span id="prog-fill"></span></div>
@@ -111,13 +112,14 @@
       <div class="card feed-card">
         <div id="cur-head" class="cur-head"></div>
         <ol class="stepper" id="stepper" aria-label="Pipeline stage"></ol>
+        <p class="gloss small"><span><b>Flag</b> a finding from the checks</span><span><b>Blocking</b> a flag that rules out payment</span><span><b>Critic</b> a second agent that challenges VP approvals</span><span><b>Hold</b> wait for a person to decide</span></p>
         <ol class="feed" id="feed" aria-label="Agent activity"></ol>
         <div class="waiting" id="waiting" hidden></div>
+        <div class="inspector" role="region" id="inspector" hidden tabindex="-1" aria-label="Invoice detail">
+          <div class="insp-bar"><span class="small muted" id="insp-note"></span><button class="ctl" id="insp-close" type="button">Back to the run</button></div>
+          <div id="insp-body" class="detail"></div>
+        </div>
       </div>
-    </div>
-    <div class="inspector card" id="inspector" hidden tabindex="-1" aria-label="Invoice inspector">
-      <div class="insp-bar"><span class="small muted" id="insp-note"></span><button class="ctl" id="insp-close" type="button">Back to the run</button></div>
-      <div id="insp-body" class="detail"></div>
     </div>
   </section>
 
@@ -133,7 +135,7 @@
           <button class="seg-btn on" data-rep="live" type="button" aria-pressed="true">Live grok-4.7</button>
           <button class="seg-btn" data-rep="offline" type="button" aria-pressed="false">Offline rules</button>
         </div>
-        <button class="ctl" id="replay" type="button">Replay</button>
+        <button class="ctl" id="replay" type="button">Watch again</button>
       </div>
     </div>
     <article class="memo card" id="memo"></article>
@@ -147,8 +149,8 @@
 
     <div class="toolbar">
       <div class="seg" role="group" aria-label="Run">
-        <button class="seg-btn on" data-run="offline" type="button">Offline rules</button>
-        <button class="seg-btn" data-run="live" type="button">Live Grok</button>
+        <button class="seg-btn on" data-run="live" type="button">Live grok-4.7</button>
+        <button class="seg-btn" data-run="offline" type="button">Offline rules</button>
       </div>
       <div class="seg" role="group" aria-label="Invoice set">
         <button class="set-btn seg-btn on" data-set="case" type="button">Case samples</button>
@@ -156,6 +158,7 @@
       </div>
       <span class="small muted" id="run-meta"></span>
     </div>
+    <p class="showing" id="showing"></p>
     <p class="run-note small" id="run-note"></p>
 
     <div class="summary" id="summary"></div>

@@ -4,6 +4,9 @@
   var PILL = { APPROVED: ["approve", "Approved"], REJECTED: ["reject", "Rejected"], PENDING_HUMAN: ["review", "Held for a human"] };
   var BY = { hard_rules: "hard rules", vp: "the VP agent", "vp+critic": "the VP after critic review", deadlock: "deadlock (VP and critic still disagree)", error: "error fallback" };
   var TRIG = { over_threshold: "over the approval limit", near_limit: "near the approval limit", high_risk: "high risk score" };
+  var SEV = { block: "Blocking: this finding rules out payment", warn: "Warning: worth a look, does not block payment on its own", info: "Info: noted for the record" };
+  var STG_TIP = { ingestion: "Read the file and extract the invoice", validation: "Check inventory, math, dates, prices, vendor, duplicates", risk: "Score fraud signals; Grok checks claims with read-only tools", vp: "VP agent proposes approve, hold or reject", critic: "Second agent that challenges VP approvals", outcome: "Pay, reject, or hold for a person" };
+  var AGENT = { ingestion: "Ingest", validation: "Validate", risk: "Risk", approval: "Approval", payment: "Payment", hitl: "Human review" };
   var README = "https://github.com/adamtpang/galatiq.vercel.app#quickstart-offline-about-a-minute";
   var $ = function (id) { return document.getElementById(id); };
   var REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -130,7 +133,7 @@
         var nb = d.blocking.length;
         o.title = d.flags.length ? "Validation: " + plural(d.flags.length, "flag") + ", " + nb + " blocking" : "Validation: clean, no flags";
         o.what = "Checked every line against inventory, recomputed the math, and checked dates, currency, prices, vendor and duplicates." + (nb ? " A blocking flag means this invoice cannot be paid, whatever any model says." : "");
-        o.body = inv.flags.length ? '<ul class="fl">' + inv.flags.map(function (f) { return '<li><span class="sev ' + esc(f.severity) + '">' + esc(f.severity) + "</span><span>" + esc(f.message) + "</span></li>"; }).join("") + "</ul>" : "";
+        o.body = inv.flags.length ? '<ul class="fl">' + inv.flags.map(function (f) { return '<li><span class="sev ' + esc(f.severity) + '" title="' + esc(SEV[f.severity] || "") + '">' + esc(f.severity) + "</span><span>" + esc(f.message) + "</span></li>"; }).join("") + "</ul>" : "";
         o.cls = nb ? "bad" : "good";
         break;
       case "risk.tool_call":
@@ -180,7 +183,7 @@
       case "payment.paid":
         o.title = "Paid " + money(d.amount) + " on attempt " + esc(d.attempts);
         o.what = "Called the mock bank once, guarded by an idempotency key so it can never pay twice.";
-        o.body = '<span class="mono small">bank: ' + esc(d.bank_message) + "<br>key " + esc(d.idempotency_key) + "</span>";
+        o.body = "Bank reply: " + esc(d.bank_message) + '<br><span class="small muted">Idempotency key <span class="mono">' + esc(d.idempotency_key) + "</span></span>";
         o.cls = "good"; break;
       case "payment.bank_error": o.title = "Bank error, attempt " + esc(d.attempt); o.body = esc(d.error); o.cls = "bad"; break;
       case "payment.failed": o.title = "Payment failed"; o.body = esc((d.errors || []).join("; ")); o.cls = "bad"; break;
@@ -197,7 +200,7 @@
   }
   function stepHtml(ev, inv, r, extra) {
     var o = narrate(ev, inv, r);
-    return '<li class="step ' + o.cls + (extra || "") + '"><div class="step-head"><span class="agent">' + esc(o.agent) + '</span><span class="ms mono small muted">+' + esc(ev.ms) + ' ms</span><span class="step-title">' + o.title + "</span></div>" +
+    return '<li class="step ' + o.cls + (extra || "") + '"><div class="step-head"><span class="agent">' + esc(AGENT[o.agent] || o.agent) + '</span><span class="ms small muted" title="' + esc(Number(ev.ms).toLocaleString("en-US")) + ' ms after this invoice started (recorded)">' + fmtClock(ev.ms) + '</span><span class="step-title">' + o.title + "</span></div>" +
       (o.what ? '<div class="step-what">' + o.what + "</div>" : "") + (o.body ? '<div class="step-body">' + o.body + "</div>" : "") + "</li>";
   }
 
@@ -214,7 +217,7 @@
         return '<tr><td><span class="sev ' + esc(f.severity) + '">' + esc(f.severity) + "</span></td><td class='mono small'>" + esc(f.code) +
           "</td><td>" + esc(f.message) + "<details><summary>evidence</summary><pre>" + esc(JSON.stringify(f.evidence, null, 1)) + "</pre></details></td></tr>";
       }).join("") + "</tbody></table>" : '<p class="muted small">No flags.</p>';
-    return '<div class="inv-head"><div><div class="mono small muted">' + esc(inv.file) + '</div><div class="inv-id">' + esc(invNumber(inv.number)) + " · " + vendorHtml(inv.vendor) + "</div>" +
+    return '<div class="inv-head"><div><div class="small muted">' + esc(inv.file) + '</div><div class="inv-id">' + esc(invNumber(inv.number)) + " · " + vendorHtml(inv.vendor) + "</div>" +
       (inv.vendor ? '<div class="as-written">Names and labels are shown as written on the invoice, typos included.</div>' : "") + "</div>" + pill(d.status) + "</div>" +
       (dupNote(inv) ? '<div class="note">' + esc(dupNote(inv)) + ".</div>" : "") +
       '<div class="amount">' + money(inv.total_usd) + (inv.currency && inv.currency !== "USD" ? ' <span class="small muted">(' + esc(inv.currency) + " " + esc(inv.total) + ")</span>" : "") + "</div>" +
@@ -239,6 +242,7 @@
       card(String(held), "sent to a human") +
       card(money(fraud), plural(fraudN, "high-risk invoice") + " blocked", "Rejected invoices with risk score " + hr() + " or more");
     var r = run();
+    $("showing").innerHTML = "Showing the <b>" + esc(runName(MODE)) + "</b> run" + (SET === "extra" ? " on the 3 extra test invoices" : " on the 20 case invoices") + ", recorded " + esc(fmtWhen(r.recorded_at).full) + ". The handoff report uses the same run.";
     $("run-meta").textContent = r.mode === "offline" ? "Deterministic VP and critic rules, no API calls" : "Risk review (with tool calls), VP and critic by " + (r.model || "Grok");
     var o = other(), diff = [];
     if (o) r.invoices.forEach(function (i) {
@@ -259,7 +263,7 @@
       return '<li><button type="button" class="inv' + (i.file === SELECTED ? " on" : "") + '" data-file="' + esc(i.file) + '">' +
         '<span class="inv-main"><b>' + esc(invNumber(i.number)) + dupTag(i) + '</b><span class="small' + (i.vendor ? " muted" : "") + '">' + vendorHtml(i.vendor) + '</span></span>' +
         '<span class="inv-side"><span class="money">' + money(i.total_usd) + "</span>" + pill(i.decision.status) + "</span>" +
-        '<span class="inv-meta mono small muted">' + esc(i.file) + " · " + esc(riskText(i.risk)) + (blocks ? " · " + blocks + " blocking" : "") +
+        '<span class="inv-meta small muted">' + esc(i.file) + " · " + esc(riskText(i.risk)) + (blocks ? " · " + blocks + " blocking" : "") +
         (dn ? '<span class="why">' + esc(dn) + "</span>" : "") + "</span>" +
         "</button></li>";
     }).join("");
@@ -278,7 +282,7 @@
     document.querySelectorAll("[data-set]").forEach(function (x) { x.classList.toggle("on", x.dataset.set === SET); x.setAttribute("aria-pressed", x.dataset.set === SET); x.disabled = !DATA.runs[key(MODE, x.dataset.set)]; });
     if (!run().invoices.some(function (i) { return i.file === SELECTED; })) SELECTED = run().invoices[0].file;
   }
-  function renderAll() { renderSummary(); renderInbox(); renderDetail(); }
+  function renderAll() { labelButtons(); renderSummary(); renderInbox(); renderDetail(); }
 
   /* ---------- stage 1: overview ---------- */
   function renderOverview() {
@@ -297,12 +301,12 @@
       return '<li><span class="t-fmt">' + esc((i.format || "").toUpperCase()) + '</span><span class="mono t-name">' + esc(i.file) + "</span></li>";
     }).join("");
     var plan = schedule(live);
-    $("go-note").textContent = "Plays the " + live.model + " trace at " + SCALE + "x real speed. The real run took " + fmtDur(live.duration_ms) + "; this takes about " + fmtDur(plan.total) + " at 1x.";
+    $("go-note").textContent = "1x = about " + fmtDur(Math.round(plan.total / 1000) * 1000) + " (real run took " + fmtDur(live.duration_ms) + "). You can switch to 4x, pause or skip to the end.";
     $("go").disabled = false;
   }
 
   /* ---------- stage 2: playback ---------- */
-  var SCALE = 15, MIN_STEP = 200, INTRO = 450, OUTRO = 250;
+  var SCALE = 25, MIN_STEP = 130, INTRO = 280, OUTRO = 170;
   var P = null;
   function schedule(r) {
     var evs = [], at = 0, prevReal = 0;
@@ -332,12 +336,13 @@
     var plan = schedule(r);
     P = { r: r, evs: plan.evs, total: plan.total, T: 0, cur: 0, speed: P ? P.speed : 1, playing: true, done: 0, curInv: null, stage: {},
       tot: { paid: 0, nPaid: 0, rej: 0, held: 0, fraud: 0, nFraud: 0 }, status: {}, real: 0, finished: false, last: 0, raf: 0 };
-    $("run").hidden = false; $("report").hidden = true; $("inspector").hidden = true;
+    $("run").hidden = false; $("report").hidden = true; closeInspector();
     $("run-eyebrow").textContent = "Working · " + runLabel(r) + ", replayed";
     $("run-h").textContent = isLive(r) ? "Grok is working through the inbox" : "The offline rules are working through the inbox";
     $("prog").setAttribute("aria-valuemax", r.invoices.length);
+    $("speed-note").textContent = "1x = about " + fmtDur(Math.round(plan.total / 1000) * 1000) + ", 4x = about " + fmtDur(Math.round(plan.total / 4000) * 1000) + " (real run took " + fmtDur(r.duration_ms) + ")";
     $("queue").innerHTML = r.invoices.map(function (inv, k) {
-      return '<li><button type="button" class="q-item" data-q="' + k + '"><span class="q-num mono">' + (k + 1) + '</span><span class="q-main"><span class="mono small">' + esc(inv.file) + '</span><span class="small muted">' + esc(invNumber(inv.number)) + '</span></span><span class="q-st" id="qs-' + k + '"><span class="q-wait">Waiting</span></span></button></li>';
+      return '<li><button type="button" class="q-item" data-q="' + k + '"><span class="q-num">' + (k + 1) + '</span><span class="q-main"><span class="small q-file">' + esc(inv.file) + '</span><span class="small muted">' + esc(invNumber(inv.number)) + '</span></span><span class="q-st" id="qs-' + k + '"><span class="q-wait">Waiting</span></span></button></li>';
     }).join("");
     $("feed").innerHTML = ""; $("cur-head").innerHTML = ""; renderStepper();
     $("skip").disabled = false; $("pause").disabled = false; setPauseLabel();
@@ -365,7 +370,7 @@
       P.curInv = k; P.stage = {};
       setQ(k, '<span class="q-now">Working</span>', "now");
       if (show) {
-        $("cur-head").innerHTML = '<div class="mono small muted">Invoice ' + (k + 1) + " of " + P.r.invoices.length + " · " + esc(inv.file) + '</div><div class="cur-title">' + esc(invNumber(inv.number)) + dupTag(inv) + " · " + vendorHtml(inv.vendor) + "</div>" +
+        $("cur-head").innerHTML = '<div class="small muted">Invoice ' + (k + 1) + " of " + P.r.invoices.length + " · " + esc(inv.file) + '</div><div class="cur-title">' + esc(invNumber(inv.number)) + dupTag(inv) + " · " + vendorHtml(inv.vendor) + "</div>" +
           '<div class="small muted">' + money(inv.total_usd) + (inv.currency && inv.currency !== "USD" ? " (" + esc(inv.currency) + " " + esc(inv.total) + ")" : "") + " · recorded in " + fmtDur(inv.duration_ms) + "</div>";
         $("feed").innerHTML = ""; renderStepper();
       }
@@ -390,7 +395,7 @@
     if (ev.step === "paid") { P.tot.paid += ev.detail.amount || 0; P.tot.nPaid++; }
     if (show) {
       var feed = $("feed");
-      feed.insertAdjacentHTML("beforeend", stepHtml(ev, inv, P.r, REDUCED ? "" : " enter"));
+      feed.insertAdjacentHTML("beforeend", stepHtml(ev, inv, P.r));
       feed.scrollTop = feed.scrollHeight;
       renderStepper();
     }
@@ -407,7 +412,7 @@
     $("stepper").innerHTML = STAGES.map(function (x) {
       var v = s[x[0]] || (s.complete ? "skipped" : "");
       if (v === "on" && s.complete) v = "done";
-      return '<li class="stg ' + v + '"' + (v === "on" ? ' aria-current="step"' : "") + ">" + x[1] + (v === "skipped" ? '<span class="sr-only"> (skipped)</span>' : v === "done" ? '<span class="sr-only"> (done)</span>' : "") + "</li>";
+      return '<li class="stg ' + v + '" title="' + esc(STG_TIP[x[0]]) + '"' + (v === "on" ? ' aria-current="step"' : "") + ">" + x[1] + (v === "skipped" ? '<span class="sr-only"> (skipped)</span>' : v === "done" ? '<span class="sr-only"> (done)</span>' : "") + "</li>";
     }).join("");
   }
   function updateBar() {
@@ -416,7 +421,7 @@
     $("prog").setAttribute("aria-valuenow", P.done);
     $("prog-label").textContent = P.done + " of " + n + " invoices done";
     $("prog-eta").textContent = P.finished ? "Finished" : (P.playing ? "ETA " + fmtClock((P.total - P.T) / P.speed) + " at " + P.speed + "x" : "Paused · " + fmtClock((P.total - P.T) / P.speed) + " left at " + P.speed + "x");
-    $("prog-real").textContent = "Position in the recorded run: " + fmtClock(P.real) + " of " + fmtClock(P.r.duration_ms) + " real time";
+    $("prog-real").textContent = "About " + fmtClock(P.real) + " into the real run, which took " + fmtDur(P.r.duration_ms) + ".";
     var t = P.tot;
     $("totals").innerHTML =
       tcard(money(t.paid), "paid · " + plural(t.nPaid, "invoice"), "good") +
@@ -461,7 +466,7 @@
     $("run-h").textContent = "All " + P.r.invoices.length + " invoices handled";
     $("live-status").textContent = "Run complete. The handoff report is below.";
     REPORT = P.r.name.replace(/^extra_/, "");
-    renderReport();
+    renderReport(); setRun(REPORT, "case"); renderAll();
     $("report").hidden = false;
     if (scroll) setTimeout(function () { jump("report"); }, REDUCED ? 0 : 500);
   }
@@ -475,7 +480,28 @@
     var inv = P.r.invoices[k], reached = k < P.curInv || (k === P.curInv && P.stage.complete) || P.finished;
     $("insp-note").textContent = (reached ? "Paused. Full recorded trace for this invoice." : "Paused. The replay has not reached this invoice yet; this is its full recorded trace.") ;
     $("insp-body").innerHTML = detailHtml(inv, P.r);
-    var box = $("inspector"); box.hidden = false; box.focus({ preventScroll: true }); jump("inspector");
+    document.querySelectorAll(".q-item.picked").forEach(function (x) { x.classList.remove("picked"); });
+    var qb = document.querySelector('[data-q="' + k + '"]'); if (qb) qb.classList.add("picked");
+    var box = $("inspector"), cardEl = box.closest(".feed-card");
+    box.hidden = false; cardEl.classList.add("inspecting"); document.body.classList.add("sheet-open");
+    box.scrollTop = 0; $("insp-body").scrollTop = 0;
+    box.focus({ preventScroll: true });
+    // Desktop: keep queue and detail side by side; only scroll the page if the panel top is out of view.
+    if (window.innerWidth > 900) {
+      var top = cardEl.getBoundingClientRect().top, navH = document.querySelector(".nav").offsetHeight;
+      if (top < navH + 8 || top > window.innerHeight * 0.4) window.scrollTo({ top: window.scrollY + top - navH - 12, behavior: REDUCED ? "auto" : "smooth" });
+    } else if (qb) {
+      // Phone: the detail opens as a bottom sheet; keep the tapped queue row visible in the strip above it.
+      var nh = document.querySelector(".nav").offsetHeight, sheetTop = box.getBoundingClientRect().top, qr = qb.getBoundingClientRect();
+      var want = nh + Math.max(4, (sheetTop - nh - qr.height) / 2);
+      if (qr.top < nh || qr.bottom > sheetTop) window.scrollTo({ top: window.scrollY + qr.top - want, behavior: "auto" });
+    }
+  }
+  function closeInspector() {
+    var box = $("inspector"); box.hidden = true;
+    var c = box.closest(".feed-card"); if (c) c.classList.remove("inspecting");
+    document.body.classList.remove("sheet-open");
+    document.querySelectorAll(".q-item.picked").forEach(function (x) { x.classList.remove("picked"); });
   }
 
   /* ---------- stage 3: report ---------- */
@@ -506,9 +532,17 @@
   }
   function statusRank(s) { return { APPROVED: 0, PENDING_HUMAN: 1, REJECTED: 2 }[s]; }
 
+  function syncRepButtons() {
+    document.querySelectorAll("[data-rep]").forEach(function (b) { b.classList.toggle("on", b.dataset.rep === REPORT); b.setAttribute("aria-pressed", b.dataset.rep === REPORT); });
+  }
+  function runName(mode) { var r = DATA.runs[mode]; return mode === "live" ? "Live " + (r.model || "Grok") : "Offline rules"; }
+  function labelButtons() {
+    document.querySelectorAll("[data-rep]").forEach(function (b) { var r = DATA.runs[b.dataset.rep]; if (r) b.innerHTML = esc(runName(b.dataset.rep)) + '<span class="seg-sub">' + esc(fmtWhen(r.recorded_at).time) + "</span>"; });
+    document.querySelectorAll("[data-run]").forEach(function (b) { var r = DATA.runs[key(b.dataset.run, SET)]; if (r) b.innerHTML = esc(runName(b.dataset.run)) + '<span class="seg-sub">' + esc(fmtWhen(r.recorded_at).time) + "</span>"; });
+  }
   function renderReport() {
     var r = DATA.runs[REPORT], o = DATA.runs[REPORT === "live" ? "offline" : "live"], invs = r.invoices, n = invs.length, w = fmtWhen(r.recorded_at);
-    document.querySelectorAll("[data-rep]").forEach(function (b) { b.classList.toggle("on", b.dataset.rep === REPORT); b.setAttribute("aria-pressed", b.dataset.rep === REPORT); });
+    syncRepButtons();
     var by = function (s) { return invs.filter(function (i) { return i.decision.status === s; }); };
     var paid = invs.filter(function (i) { return i.payment && i.payment.status === "paid"; }), rej = by("REJECTED"), held = by("PENDING_HUMAN"), appr = by("APPROVED");
     var paidSum = paid.reduce(function (a, i) { return a + i.payment.amount; }, 0);
@@ -620,19 +654,19 @@
     if (t.closest("#go") || t.closest("#go-top")) { startRun("live"); return; }
     if (t.closest("#go-offline")) { startRun("offline"); return; }
     if (t.closest("#replay")) { startRun(REPORT); return; }
-    if (t.closest("#pause")) { if (P && !P.finished) { P.playing = !P.playing; P.last = performance.now(); setPauseLabel(); updateBar(); if (P.playing) $("inspector").hidden = true; } return; }
+    if (t.closest("#pause")) { if (P && !P.finished) { P.playing = !P.playing; P.last = performance.now(); setPauseLabel(); updateBar(); if (P.playing) closeInspector(); } return; }
     if (t.closest("#skip")) { skipToEnd(); return; }
     var sp = t.closest("[data-speed]");
     if (sp) { if (P) P.speed = +sp.dataset.speed; document.querySelectorAll("[data-speed]").forEach(function (x) { x.classList.toggle("on", x === sp); x.setAttribute("aria-pressed", x === sp); }); if (P) updateBar(); return; }
     var q = t.closest("[data-q]");
     if (q) { inspect(+q.dataset.q); return; }
-    if (t.closest("#insp-close")) { $("inspector").hidden = true; if (P && !P.finished) { P.playing = true; P.last = performance.now(); setPauseLabel(); updateBar(); } jump("run"); return; }
+    if (t.closest("#insp-close")) { var k0 = document.querySelector(".q-item.picked"); closeInspector(); if (P && !P.finished) { P.playing = true; P.last = performance.now(); setPauseLabel(); updateBar(); } if (k0) k0.focus({ preventScroll: true }); return; }
     var rp = t.closest("[data-rep]");
-    if (rp) { REPORT = rp.dataset.rep; renderReport(); return; }
+    if (rp) { REPORT = rp.dataset.rep; renderReport(); setRun(REPORT); renderAll(); return; }
     var of = t.closest("[data-open-file]");
-    if (of) { setRun(REPORT, "case"); SELECTED = of.dataset.openFile; renderAll(); jump("detail"); return; }
+    if (of) { setRun(REPORT, "case"); SELECTED = of.dataset.openFile; renderAll(); jump("demo"); return; }
     var b = t.closest("[data-run]");
-    if (b) { setRun(b.dataset.run); renderAll(); return; }
+    if (b) { setRun(b.dataset.run); renderAll(); if (DATA.runs[b.dataset.run] && REPORT !== b.dataset.run) { REPORT = b.dataset.run; if (!$("report").hidden) renderReport(); else syncRepButtons(); } return; }
     var st = t.closest("[data-set]");
     if (st) { setRun(MODE, st.dataset.set); renderAll(); return; }
     var c = t.closest("#filters .chip");
@@ -648,8 +682,9 @@
     DATA = d;
     var qs = new URLSearchParams(location.search);
     var want = qs.get("inv");
-    setRun("offline", "case");
-    setRun(qs.get("run") || "offline", qs.get("set") || "case");
+    setRun("live", "case");
+    setRun(qs.get("run") || "live", qs.get("set") || "case");
+    if (DATA.runs[MODE]) REPORT = MODE;
     if (want && run().invoices.some(function (i) { return i.file === want; })) SELECTED = want;
     renderOverview(); renderAll();
     if (location.hash === "#report") { P = null; startRun("live"); skipToEnd(); }
