@@ -505,7 +505,7 @@ def detail_md(res: dict) -> str:
     cl = res["cost_latency"]
     L += ["", "## (d) Cost and latency", ""]
     if live:
-        L += [f"Every LLM call is counted (extraction repair, risk tool rounds, risk review, VP, critic). Billed cost is "
+        L += [f"Every LLM call is counted (cross-check reading, extraction repair, risk tool rounds, risk review, VP, critic, memo). Billed cost is "
               f"the API's `cost_in_usd_ticks`; list price is recomputed from {cl['pricing_source']}.", ""]
     L += ["| Batch | Invoices | LLM calls | Prompt (cached) | Completion | Reasoning | Billed USD | List price USD | Latency mean per invoice | Batch wall s |",
           "|---|---|---|---|---|---|---|---|---|---|"]

@@ -100,7 +100,7 @@ Rejected 0, held 1, paid 3, read correctly 4 of 4; met the expectation: 3/4.
 
 ## (d) Cost and latency
 
-Every LLM call is counted (extraction repair, risk tool rounds, risk review, VP, critic). Billed cost is the API's `cost_in_usd_ticks`; list price is recomputed from docs.x.ai/docs/models (grok-4.7: $2.00 input, $0.50 cached input, $6.00 output per 1M tokens; reasoning billed as output), fetched 2026-10-22.
+Every LLM call is counted (cross-check reading, extraction repair, risk tool rounds, risk review, VP, critic, memo). Billed cost is the API's `cost_in_usd_ticks`; list price is recomputed from docs.x.ai/docs/models (grok-4.7: $2.00 input, $0.50 cached input, $6.00 output per 1M tokens; reasoning billed as output), fetched 2026-10-22.
 
 | Batch | Invoices | LLM calls | Prompt (cached) | Completion | Reasoning | Billed USD | List price USD | Latency mean per invoice | Batch wall s |
 |---|---|---|---|---|---|---|---|---|---|
