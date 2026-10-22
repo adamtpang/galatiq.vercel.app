@@ -2,8 +2,9 @@
 
 Policy (Adam, DECISIONS.md; values in config/policy.yaml `approval:`):
   1. Any blocking flag => REJECTED by hard rules. No LLM call.
-  1b. Hard holds (decisions 8, 9): prompt injection (rule signal, or Grok's risk review sets
-      prompt_injection), vendor rename or lookalike => PENDING_HUMAN. No VP or critic call.
+  1b. Hard holds (decisions 8, 9, 10): prompt injection (rule signal, or Grok's risk review sets
+      prompt_injection), vendor rename or lookalike, or an invoice Grok rebuilt from raw text because
+      the parser could not read it => PENDING_HUMAN. No VP or critic call.
   2. VP agent decides the rest with Adam's VP prompt.
   3. The critic (Adam's auditor prompt) runs only if total > approval threshold, total >=
      near limit, or risk >= high risk. The VP may revise after each objection, up to
@@ -25,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from ..llm import LLMClient
 from ..models import Decision, DecisionStatus, InvoiceState, Severity, TraceEvent
+from ..validation import ADVISORY
 
 AGENT = "approval"
 
@@ -66,7 +68,8 @@ def facts(state: InvoiceState, policy: dict[str, Any]) -> dict[str, Any]:
         "currency": inv.currency, "total": inv.total, "total_usd": state.total_usd,
         "items": [{"item": li.sku or li.sku_raw, "qty": li.qty, "unit_price": li.unit_price, "note": li.note}
                   for li in inv.items],
-        "flags": [{"code": f.code, "severity": f.severity.value, "message": f.message} for f in state.flags],
+        "flags": [{"code": f.code, "severity": f.severity.value, "message": f.message} for f in state.flags
+                  if f.code not in ADVISORY],
         "risk_score": (state.risk or {}).get("score"), "risk_reasons": (state.risk or {}).get("reasons", []),
         "policy": {"approval_threshold_usd": ap.get("approval_threshold_usd"), "near_limit_usd": ap.get("near_limit_usd"),
                    "high_risk_score": ap.get("high_risk_score")},
@@ -148,7 +151,7 @@ class OfflineVP:
             return VPOpinion(decision="hold", reasons=[f"Vendor address is on the watch list: {', '.join(watch[0]['evidence'])}"])
         if (f["risk_score"] or 0) >= f["policy"]["high_risk_score"]:
             return VPOpinion(decision="hold", reasons=[f"Risk score {f['risk_score']} is high: " + "; ".join(f["risk_reasons"][:2])])
-        warns = [fl for fl in state.flags if fl.severity == Severity.WARN]
+        warns = [fl for fl in state.flags if fl.severity == Severity.WARN and fl.code not in ADVISORY]
         other = [fl.code for fl in warns if fl.code not in CONDITIONS]
         if other:
             return VPOpinion(decision="hold", reasons=[f"Needs a human look: {', '.join(other)}"])
@@ -207,7 +210,7 @@ HOLD_FLAGS = {"vendor_renamed": "VENDOR_RENAMED", "vendor_lookalike": "VENDOR_LO
 
 
 def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
-    """Decisions 8 and 9: hold for a human, before any VP or critic call, regardless of the risk score."""
+    """Decisions 8, 9 and 10: hold for a human, before any VP or critic call, regardless of the risk score."""
     cfg = policy.get("approval", {}).get("hard_holds", {}) or {}
     reasons = []
     if cfg.get("prompt_injection"):
@@ -220,6 +223,11 @@ def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
         elif llm.get("prompt_injection"):   # structured field of Grok's risk review, not its prose
             quote = f' ("{llm["injection_quote"]}")' if llm.get("injection_quote") else ""
             reasons.append(f"Prompt injection found by the Grok risk review{quote}; a human must review it")
+    if cfg.get("llm_repaired") and state.extraction_mode == "llm_repair":   # decision 10
+        reasons.append("LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw "
+                       "text; a person compares the original with Grok's reading before anything is paid "
+                       "(python main.py review " + (state.invoice.number if state.invoice and state.invoice.number
+                                                    else "<invoice number>") + ")")
     for key, code in HOLD_FLAGS.items():
         if cfg.get(key):
             reasons += [f"{code}: {f.message}; hold for human verification of the vendor and bank details"

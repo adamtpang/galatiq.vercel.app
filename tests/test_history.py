@@ -37,7 +37,7 @@ def test_content_duplicate_is_caught_in_a_later_separate_run(db):
     st = run(db, collect(ADV), "adversarial")["invoice_3006_duplicate_new_number.txt"]
     dup = [f for f in st.flags if f.code == "DUPLICATE_INVOICE"]
     assert st.decision.status == DecisionStatus.REJECTED and dup[0].evidence["match"] == "content"
-    assert dup[0].evidence["original_invoice"] == "INV-1001" and "invoice_1001.txt in an earlier run" in dup[0].message
+    assert dup[0].evidence["original_invoice"] == "INV-1001" and "invoice_1001.txt, seen in an earlier run" in dup[0].message
     assert "paid $5,000.00" in dup[0].message
 
 
@@ -127,3 +127,60 @@ def test_trace_paths_are_repo_relative(tmp_path):
     text = (tmp_path / "runs" / "t" / "trace.jsonl").read_text()
     assert '"data/invoices/invoice_1004.json"' in text
     assert str(ROOT) not in text
+
+
+class RepairGrok:
+    """Scripted Grok: rebuilds the truncated 2003 file, scores it low risk, and would approve it as VP."""
+    name, available, model = "fake", True, "fake"
+
+    def __init__(self):
+        self.schemas = []
+
+    def complete_structured(self, schema, messages, max_attempts=3):
+        from invoice_agents.agents.approval import VPOpinion
+        from invoice_agents.agents.ingestion import ExtractedInvoice, ExtractedItem
+        from invoice_agents.agents.risk import RiskReview
+        from invoice_agents.llm import LLMResult
+        self.schemas.append(schema.__name__)
+        if schema is ExtractedInvoice:
+            v = ExtractedInvoice(invoice_number="INV-2003", vendor="Reliable Components Inc.", date="2026-10-18",
+                                 due_date="2026-11-17", items=[ExtractedItem(name="WidgetA", qty=4, unit_price=250.0),
+                                                               ExtractedItem(name="WidgetB", qty=2, unit_price=500.0)],
+                                 total=2000.0)
+        elif schema is RiskReview:
+            v = RiskReview(score=5, extra_reasons=["looks routine"])
+        else:
+            v = VPOpinion(decision="approve", reasons=["fine"])
+        return LLMResult(value=v, model="fake")
+
+
+def test_decision_10_llm_repaired_invoice_is_held_with_original_shown(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+    import main
+    db = tmp_path / "inv.db"
+    llm = RepairGrok()
+    ctx = make_context(llm=llm, db=str(db), runs_dir=None, run_id="r", base_delay=0, sleep=lambda s: None)
+    st = run_batch([ROOT / "data" / "invoices_extra" / "invoice_2003_truncated.json"], ctx)[0]
+    assert st.extraction_mode == "llm_repair"
+    assert st.decision.status == DecisionStatus.PENDING_HUMAN and st.decision.decided_by == "hard_hold"
+    assert st.decision.reasons[0].startswith("LLM_REPAIRED") and "VPOpinion" not in llm.schemas
+    assert st.payment["status"] == "not_paid"
+    monkeypatch.setenv("INVENTORY_DB", str(db))
+    monkeypatch.setenv("COLUMNS", "160")
+    out = CliRunner().invoke(main.app, ["review", "INV-2003"]).output
+    raw = (ROOT / "data" / "invoices_extra" / "invoice_2003_truncated.json").read_text()
+    assert "Original text, as received" in out and "Grok's reading" in out
+    assert "Reliable Components" in out and raw.splitlines()[1].strip()[:20] in out
+    assert "Total: $2,000.00" in out
+    r = CliRunner().invoke(main.app, ["review", "INV-2003", "--approve", "--note", "checked the original"])
+    assert r.exit_code == 0 and "paid $2,000.00" in r.output
+
+
+def test_decision_10_off_switch(tmp_path):
+    from invoice_agents.config import load_policy
+    db = tmp_path / "inv.db"
+    ctx = make_context(llm=RepairGrok(), db=str(db), runs_dir=None, run_id="r", base_delay=0, sleep=lambda s: None)
+    ctx.policy = load_policy()
+    ctx.policy["approval"]["hard_holds"]["llm_repaired"] = False
+    st = run_batch([ROOT / "data" / "invoices_extra" / "invoice_2003_truncated.json"], ctx)[0]
+    assert st.decision.decided_by == "vp"

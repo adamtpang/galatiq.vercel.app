@@ -235,8 +235,30 @@ def agreement(offline: dict[str, dict], live: dict[str, dict], files: list[str],
                         "offline_risk": (o.get("risk") or {}).get("score"),
                         "grok_risk_reasons": (l.get("risk") or {}).get("grok_reasons", [])})
     n = len(common)
+    # Repeatability metric, not a policy: if a disagreement between live and offline sent the invoice to a
+    # person, how many would go, and how much would one side have paid without that check.
+    one_side = [{"file": d["file"], "paid_by": "live" if d["live"] == "APPROVED" else "offline",
+                 "amount": (live[d["file"]] if d["live"] == "APPROVED" else offline[d["file"]]).get("paid")}
+                for d in dis if "APPROVED" in (d["live"], d["offline"])]
+    both = [f for f in common if offline[f]["decision"] == live[f]["decision"] == "APPROVED"]
+    routing = {"to_human": len(dis), "paid_on_one_side": one_side,
+               "paid_on_one_side_usd": round(sum(x["amount"] or 0 for x in one_side), 2),
+               "paid_by_both": len(both)}
     return {"label": label, "invoices": n, "agree": n - len(dis), "rate": round((n - len(dis)) / n, 4) if n else None,
-            "disagreements": dis}
+            "disagreements": dis, "disagreement_routing": routing}
+
+
+# --- (c2) the duplicate traps across separate runs -------------------------------------
+def separate_run_eval(expected: dict, db_dir: Path) -> dict:
+    """The adversarial set as its own later run, after the samples were processed in an earlier run on the
+    same database (what an AP team does day to day). Rules only: the duplicate checks run before any Grok call."""
+    db = str(db_dir / "separate.db")
+    run_batch(collect(SAMPLES), make_context(llm=OfflineClient(), db=db, runs_dir=None, run_id="separate-samples"))
+    states = run_batch(collect(ADV), make_context(llm=OfflineClient(), db=db, runs_dir=None, run_id="separate-adversarial"))
+    res = adversarial_eval(states, expected)
+    dup = next(c for c in res["cases"] if c["file"] == "invoice_3006_duplicate_new_number.txt")
+    return res | {"duplicate_3006": {k: dup[k] for k in ("decision", "decided_by", "caught", "flags")}
+                  | {"reason": (dup["reasons"] or [""])[0]}}
 
 
 # --- (c) adversarial -----------------------------------------------------------------
@@ -347,6 +369,19 @@ def summary_md(off: dict, live: dict | None) -> str:
     la = live["adversarial"] if live else None
     L.append(f"| (c) Adversarial catch rate | {oa['caught']}/{oa['total']} ({pct(oa['catch_rate'])}) | "
              + (f"{la['caught']}/{la['total']} ({pct(la['catch_rate'])})" if la else "-") + " |")
+    sr = off.get("adversarial_separate_run")
+    if sr:
+        d = sr["duplicate_3006"]
+        L.append(f"| (c) Adversarial set as a separate later run (after the samples) | {sr['caught']}/{sr['total']} "
+                 f"({pct(sr['catch_rate'])}); 3006 {d['decision']} | - (rules only; the duplicate checks run before any Grok call) |")
+    routed = live if live and any(a.get("disagreement_routing") for a in live["agreement"]) else off
+    for a in routed["agreement"]:
+        r = a.get("disagreement_routing")
+        if r and "samples" in a["label"]:
+            L.append(f"| (b) Disagreement routing (a metric; sending disagreements to a person is a plan, not policy), "
+                     f"{a['label'].split(',')[0].replace('this eval run', 'eval live run')} | - | "
+                     f"{r['to_human']} of {a['invoices']} would go to a person; without that check one side paid "
+                     f"{len(r['paid_on_one_side'])} of them (${r['paid_on_one_side_usd']:,.2f}) |")
     if live:
         b = live["cost_latency"]["batches"]
         s = b["samples"]
@@ -399,6 +434,22 @@ def detail_md(res: dict) -> str:
     for c in a["cases"]:
         L.append(f"| {c['file']} | {c['trap']} | {c['decision']} ({c['decided_by']}) | {'yes' if c['caught'] else 'NO'} | "
                  f"{c['risk_score']} | {', '.join(c['signals'] + c['flags']) or '-'} |")
+    sr = res.get("adversarial_separate_run")
+    if sr:
+        L += ["", "### (c2) Separate later run", "",
+              "The samples run first; the adversarial set runs later as its own run on the same database, so the "
+              "duplicate checks must use stored history. Rules only (offline): these checks run before any Grok call.", "",
+              f"Caught: {sr['caught']}/{sr['total']} ({pct(sr['catch_rate'])}). Missed: {', '.join(sr['missed']) or 'none'}.", "",
+              f"3006: {sr['duplicate_3006']['decision']} ({sr['duplicate_3006']['decided_by']}). {sr['duplicate_3006']['reason']}"]
+    routing = [a for a in res["agreement"] if a.get("disagreement_routing")]
+    if routing:
+        L += ["", "### Repeatability: disagreement routing (a metric, not a policy)", "",
+              "If every invoice where live and offline disagree went to a person:", ""]
+        for a in routing:
+            r = a["disagreement_routing"]
+            paid = "; ".join(f"{x['file']} paid by {x['paid_by']} (${(x['amount'] or 0):,.2f})" for x in r["paid_on_one_side"]) or "none"
+            L.append(f"- {a['label']}: {r['to_human']} of {a['invoices']} to a person; paid on one side only: {paid}; "
+                     f"approved by both: {r['paid_by_both']}.")
     cl = res["cost_latency"]
     L += ["", "## (d) Cost and latency", ""]
     if live:
@@ -435,6 +486,8 @@ def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Pa
               "adversarial": [Path(s.source).name for s in run["adversarial"]],
               "extra": [Path(s.source).name for s in run["extra"]]}
     res["adversarial"] = adversarial_eval(run["adversarial"], expected)
+    if mode == "offline":
+        res["adversarial_separate_run"] = separate_run_eval(expected, workdir)
     res["cost_latency"] = cost_eval(rows, groups, run["wall_s"], pricing) | {
         "pricing_source": "docs.x.ai/docs/models (grok-4.7: $2.00 input, $0.50 cached input, $6.00 output per 1M tokens; "
                           "reasoning billed as output), fetched " + pricing["fetched"]}
@@ -447,6 +500,7 @@ def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Pa
     if mode == "live":
         off = evaluate("offline", live_ref={})
         res["offline_reference"] = {"commit": off["commit"]}
+        res["adversarial_separate_run"] = off["adversarial_separate_run"] | {"note": "rules only, run offline"}
         for g in ("samples", "adversarial", "extra"):
             res["agreement"].append(agreement(off["rows"], rows, groups[g], f"this eval run, {g} ({len(groups[g])})"))
         print("  Grok-only extraction of all ground-truth files ...")
@@ -477,9 +531,12 @@ def web_summary(off: dict, live: dict | None) -> dict:
                        "live_grok_only": live and ext(live["extraction"]["grok_only"]),
                        "ambiguous": {k: list(v["ambiguous"]) for k, v in load_yaml("ground_truth.yaml").items() if v.get("ambiguous")}},
         "agreement": [{k: a[k] for k in ("label", "invoices", "agree", "rate")}
+                      | {"disagreement_routing": a.get("disagreement_routing")}
                       | {"disagreements": [{"file": d["file"], "offline": d["offline"], "live": d["live"],
                                             "live_reason": (d["live_reasons"] or [""])[0]} for d in a["disagreements"]]}
                       for a in (live or off)["agreement"]],
+        "separate_run": off.get("adversarial_separate_run") and {
+            k: off["adversarial_separate_run"][k] for k in ("caught", "total", "catch_rate", "missed", "duplicate_3006")},
         "adversarial": {"offline": {k: off["adversarial"][k] for k in ("caught", "total", "catch_rate")},
                         "live": live and {k: live["adversarial"][k] for k in ("caught", "total", "catch_rate")},
                         "cases": [{"file": f, "trap": c["trap"], "offline": c["decision"], "offline_caught": c["caught"],

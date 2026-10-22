@@ -24,7 +24,7 @@ from invoice_agents.graph import make_context, run_batch
 from invoice_agents.llm import LLMUnavailable, get_client
 from invoice_agents.models import DecisionStatus
 from invoice_agents.pipeline import collect
-from invoice_agents.reporter import print_summary, write_artifacts
+from invoice_agents.reporter import print_review, print_summary, write_artifacts
 
 app = typer.Typer(add_completion=False, invoke_without_command=True, no_args_is_help=False)
 console = Console()
@@ -99,13 +99,14 @@ def print_step_log(states) -> None:
 
 @app.command()
 def review(
-    invoice: Optional[str] = typer.Argument(None, help="Invoice number, e.g. INV-1012"),
+    invoice: Optional[str] = typer.Argument(None, help="Invoice number, e.g. INV-1012; alone, shows that invoice"),
     approve: bool = typer.Option(False, "--approve", help="Approve and pay it (idempotent, with retries)"),
     reject: bool = typer.Option(False, "--reject", help="Reject it; the reason goes to the audit log"),
     note: Optional[str] = typer.Option(None, "--note", help="Reviewer note, stored with the decision"),
     chaos: float = typer.Option(0.0, "--chaos", min=0.0, max=1.0, help="Probability each bank call fails"),
 ):
-    """List the human review queue, or approve/reject one invoice in it."""
+    """List the human review queue, show one queued invoice (with the original text next to Grok's
+    reading when Grok rebuilt it), or approve/reject it."""
     conn = connect()
     if invoice is None:
         rows = hitl.pending(conn)
@@ -116,12 +117,15 @@ def review(
         if rows:
             console.print("Decide one with: python main.py review <invoice number> --approve | --reject [--note TEXT]")
         return
-    if approve == reject:
-        raise typer.BadParameter("pass exactly one of --approve or --reject")
+    if approve and reject:
+        raise typer.BadParameter("pass only one of --approve or --reject")
     row = hitl.find(conn, invoice)
     if row is None:
         console.print(f"[red]No pending review for {invoice}[/]")
         raise typer.Exit(1)
+    if not (approve or reject):
+        print_review(hitl.queued_state(row), row["reason"], console)
+        return
     state = hitl.resolve(conn, row, approve, note)
     if state.decision.status == DecisionStatus.APPROVED:
         state = PaymentAgent(conn, chaos=chaos).pay(state)

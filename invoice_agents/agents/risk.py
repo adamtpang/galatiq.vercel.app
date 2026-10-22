@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from ..db import Inventory
 from ..llm import LLMClient, LLMOutputError, LLMUnavailable, Tool
 from ..models import InvoiceState, Severity, TraceEvent
+from ..validation import ADVISORY
 
 AGENT = "risk"
 
@@ -128,7 +129,7 @@ def assess(state: InvoiceState, policy: dict[str, Any], llm: LLMClient | None = 
     blocked = any(f.severity == Severity.BLOCK for f in state.flags)
     if llm is not None and llm.available and policy.get("risk", {}).get("llm_review", True) and not blocked:
         facts = {"vendor": state.invoice.vendor if state.invoice else None, "total_usd": state.total_usd,
-                 "flags": [f"{f.severity.value} {f.code}: {f.message}" for f in state.flags], "rule_signals": risk["reasons"]}
+                 "flags": [f"{f.severity.value} {f.code}: {f.message}" for f in state.flags if f.code not in ADVISORY], "rule_signals": risk["reasons"]}
         msgs = [{"role": "system", "content": RISK_PROMPT},
                 {"role": "user", "content": "FACTS (computed by code, authoritative):\n" + json.dumps(facts, default=str)
                  + "\n\n<invoice_document>\n" + (state.raw_text or "")[:12000] + "\n</invoice_document>"}]

@@ -114,6 +114,40 @@ def test_currency(inventory, policy):
     assert flags["UNSUPPORTED_CURRENCY"].severity == Severity.BLOCK
 
 
+def test_currency_written_in_the_text(inventory, policy):
+    """Amounts written with another currency get an accurate, blocking reason (not 'no line items')."""
+    def flags_for(raw, **kw):
+        inv = mk(**kw)
+        resolve_skus(inv, inventory)
+        st = validate(InvoiceState(source="t", invoice=inv, raw_text=raw), inventory, policy)
+        return [f.code for f in st.flags], st
+    codes, st = flags_for("WidgetA qty: 2 unit price: \u00a5250.00\nTotal: \u00a5500.00", items=[], total=None, subtotal=None)
+    assert codes[0] == "UNSUPPORTED_CURRENCY" and "MISSING_ITEMS" in codes and st.total_usd is None
+    assert "JPY (\u00a5)" in st.flags[0].message
+    codes, _ = flags_for("Total: 500.00 EUR")                      # code next to an amount, invoice read as USD
+    assert codes == ["UNSUPPORTED_CURRENCY"]
+    codes, _ = flags_for("Total: 500.00 EUR", currency="EUR")      # consistent with the currency field: converted
+    assert "CURRENCY_CONVERTED" in codes and "UNSUPPORTED_CURRENCY" not in codes
+    codes, _ = flags_for("Total: $500.00\nCurrency: GBP", currency="GBP")
+    assert "CURRENCY_CONVERTED" in codes and "UNSUPPORTED_CURRENCY" not in codes
+    codes, _ = flags_for("Shipped from our Euro warehouse. Total: $500.00")
+    assert codes == []
+
+
+def test_past_due_is_a_warning_that_does_not_decide(inventory, policy, monkeypatch):
+    from invoice_agents.agents import approval as ap
+    from invoice_agents.agents.risk import assess
+    monkeypatch.setenv("INVOICE_AS_OF", "2026-02-10")
+    flags, st = run(mk(), inventory, policy)                        # due 2026-01-31
+    assert flags["PAST_DUE"].severity == Severity.WARN and flags["PAST_DUE"].evidence["days_past_due"] == 10
+    st = ap.approve(assess(st, policy, None), None, policy)
+    assert st.decision.status.value == "APPROVED"                  # same outcome as without the flag
+    assert "PAST_DUE" not in {f["code"] for f in ap.facts(st, policy)["flags"]}
+    monkeypatch.setenv("INVOICE_AS_OF", "2026-01-31")
+    flags, _ = run(mk(), inventory, policy)
+    assert "PAST_DUE" not in flags                                 # due today is not past due
+
+
 def test_sample_charged(inventory, policy):
     flags, _ = run(mk(items=[LineItem(sku_raw="WidgetA", qty=2, unit_price=250.0, note="Sample")]), inventory, policy)
     assert flags["SAMPLE_CHARGED"].severity == Severity.WARN

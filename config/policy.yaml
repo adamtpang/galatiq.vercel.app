@@ -12,12 +12,13 @@ approval:
   critic_max_rounds: 2               # VP proposes, critic objects, at most 2 rounds
   on_deadlock: PENDING_HUMAN         # VP approves but critic still objects after max rounds
   critic_loop_only_when: [over_threshold, near_limit, high_risk]   # otherwise VP decides alone, after hard rules
-  # Hard holds (decisions 8 and 9): PENDING_HUMAN before any VP or critic call, whatever the risk score.
+  # Hard holds (decisions 8, 9 and 10): PENDING_HUMAN before any VP or critic call, whatever the risk score.
   # A blocking flag still rejects first (hard rules run before hard holds).
   hard_holds:
     prompt_injection: true           # risk signal prompt_injection fired (risk.injection_patterns), or live Grok risk review set prompt_injection
     vendor_renamed: true             # VENDOR_RENAMED flag ("formerly X")
     vendor_lookalike: true           # VENDOR_LOOKALIKE flag (name close to a vendor on file, see vendor_lookalike)
+    llm_repaired: true               # decision 10: Grok rebuilt the invoice from raw text because the parser could not read it
 
 # Decision 7: duplicates by content. An invoice with the same vendor (normalized name), line items,
 # quantities and total as an earlier one is a DUPLICATE_INVOICE (blocking) even under a new number.
@@ -35,6 +36,12 @@ arithmetic:
 price_variance:
   warn_above_pct: 10                 # unit price more than 10% above catalog -> warn
   info_below_pct: 10                 # more than 10% below catalog -> info
+
+# Past due dates: a non-blocking PAST_DUE warning for people (CLI table, report, site). It is display only:
+# the risk, VP and critic agents do not see it, so it never changes a decision.
+due_dates:
+  past_due_warning: true
+  as_of: null                        # reference date, YYYY-MM-DD; null = the day of the run (env INVOICE_AS_OF overrides)
 
 payment_terms:
   tolerance_days: 1                  # "Net 30" vs actual due-date gap (31-day months pass)
@@ -58,12 +65,13 @@ risk:
   wire_patterns: ['wire transfer', '\bwire\b', 'new bank', 'change of bank', 'gift card', 'crypto', 'bitcoin']
   injection_patterns:          # text that tries to instruct the reviewer; any match is a hard hold (decision 8)
     - 'ignore (all |any )?(previous|prior|above) instructions'
-    - 'automated system'
+    - '\b(note|message|instructions?|attention)\b[^.\n]{0,15}\b(to|for)\s+(the\s+|any\s+)?(automated|ai)\s+(system|reviewer|processor|agent)s?\b'   # a note addressed to the automated system (2002)
     - 'set the risk score'
-    - 'approve this invoice'
-    # Generic forms (added in the reviewer pass, checked for false positives on all 30 test invoices):
+    - '\bapprove\s+(this|the)\s+invoice\b[^.\n]{0,30}\b(without|no)\s+(review|checks?|verification|approval)\b|\b(auto-?approve|automatically\s+approve)\s+(this|the)\s+invoice\b'   # approve and skip the checks (3001)
+    # Generic forms (reviewer pass). Every pattern is checked on all 30 test invoices and on harmless notes in
+    # tests/test_approval.py; a plain 'approve this invoice' or 'automated system' no longer matches on its own.
     - '\b(ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}\b(instructions?|guidance|guidelines|rules|polic(y|ies)|prompts?)\b'   # override the rules
-    - '\b(ai|llm|assistant|bot)\b[\s-]{0,3}(reviewer|agent|system|assistant|model|checker)\b'                                        # addresses the AI
+    - '\b(to|for|dear|hey|hello|attention)\b[^.\n]{0,12}\b(ai|llm|assistant|bot)\b[\s-]{0,3}(reviewer|agent|system|assistant|model|checker)\b'   # addresses the AI (3002)
     - '\b(skip|bypass|without)\b[^.\n]{0,20}\b(human|manual)\s+(review|approval|check|verification)\b'                              # skip the human
     - '\bmark\s+(it|this(\s+invoice)?|the\s+invoice)\s+(as\s+)?(approved|paid|verified|low[\s-]risk)\b'                             # dictate the outcome
     - '\b(report|set|assign|give|rate)\b[^.\n]{0,20}\b(a\s+)?(low|zero)\s+risk\b'                                                    # dictate the score

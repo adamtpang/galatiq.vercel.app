@@ -78,6 +78,22 @@ def test_committed_demo_agreement(offline):
     assert sorted(d["file"] for d in demo["disagreements"]) == ["invoice_1001.txt", "invoice_1006.csv", "invoice_1010.txt"]
 
 
+def test_adversarial_as_a_separate_later_run(offline):
+    sr = offline["adversarial_separate_run"]
+    assert (sr["caught"], sr["total"], sr["missed"]) == (7, 7, [])
+    d = sr["duplicate_3006"]
+    assert d["decision"] == "REJECTED" and d["decided_by"] == "hard_rules" and "DUPLICATE_INVOICE" in d["flags"]
+    assert "INV-1001" in d["reason"] and "earlier run" in d["reason"]
+
+
+def test_disagreement_routing_metric(offline):
+    r = offline["agreement"][0]["disagreement_routing"]
+    demo = offline["agreement"][0]
+    assert r["to_human"] == len(demo["disagreements"]) == demo["invoices"] - demo["agree"]
+    assert all(x["paid_by"] in ("live", "offline") for x in r["paid_on_one_side"])
+    assert r["paid_on_one_side_usd"] == round(sum(x["amount"] or 0 for x in r["paid_on_one_side"]), 2)
+
+
 def test_usage_record_counts_every_call_and_reasoning_tokens():
     resp = NS(model="grok-4.7", usage=NS(prompt_tokens=1246, completion_tokens=1, cost_in_usd_ticks=22640000,
                                           completion_tokens_details=NS(reasoning_tokens=249),

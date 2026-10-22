@@ -7,11 +7,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import sqlite3
 from collections import Counter, defaultdict
 from difflib import SequenceMatcher
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -126,6 +128,27 @@ def check_math(inv: Invoice, policy: dict) -> list[Flag]:
 
 
 # --- dates and terms ----------------------------------------------------------------
+# Flags shown to people but kept from the deciding agents (risk, VP, critic), so they cannot change a decision.
+ADVISORY = {"PAST_DUE"}
+
+
+def as_of_date(policy: dict) -> date:
+    raw = os.environ.get("INVOICE_AS_OF") or (policy.get("due_dates") or {}).get("as_of")
+    return date.fromisoformat(str(raw)) if raw else date.today()
+
+
+def check_past_due(inv: Invoice, policy: dict) -> list[Flag]:
+    if not (policy.get("due_dates") or {}).get("past_due_warning") or inv.due_date is None:
+        return []
+    today = as_of_date(policy)
+    days = (today - inv.due_date).days
+    if days <= 0:
+        return []
+    return [_f("PAST_DUE", W, f"Due date {inv.due_date} passed {days} day{'s' if days != 1 else ''} before this run "
+               f"({today}); shown for information, it does not change the decision",
+               due_date=str(inv.due_date), as_of=str(today), days_past_due=days)]
+
+
 def check_dates(inv: Invoice, policy: dict) -> list[Flag]:
     out = []
     if inv.due_date_raw is not None and inv.due_date is None:
@@ -150,10 +173,37 @@ def fx_rate(currency: str, policy: dict) -> float | None:
     return policy.get("fx_to_usd", {}).get((currency or "USD").upper())
 
 
+# Currency symbols and ISO codes written next to an amount. The parsers read "$" and plain amounts only.
+CURRENCY_SYMBOLS = {"€": "EUR", "£": "GBP", "¥": "JPY", "₹": "INR", "₩": "KRW", "₽": "RUB", "₺": "TRY", "₱": "PHP"}
+_SYMBOL_AMOUNT = re.compile(r"([€£¥₹₩₽₺₱])\s?\d|\d\s?([€£¥₹₩₽₺₱])")
+_ISO = "EUR|GBP|JPY|CNY|CAD|AUD|CHF|INR|MXN|BRL|KRW|SEK|NOK|DKK|PLN|ZAR|SGD|HKD|NZD|RUB|TRY"
+_CODE_AMOUNT = re.compile(rf"\b({_ISO})\s?\$?\d|\d[\d,.]*\s?({_ISO})\b")
+
+
+def check_currency_text(raw: str | None, inv: Invoice) -> list[Flag]:
+    """Amounts written in another currency (a symbol such as ¥ or a code such as JPY next to a number).
+    The parsers only read dollar amounts, so such an invoice cannot be read correctly: block it with an
+    accurate reason instead of letting it fail later as 'no line items' or, worse, be read as USD."""
+    if not raw:
+        return []
+    symbols = {CURRENCY_SYMBOLS[a or b] for a, b in _SYMBOL_AMOUNT.findall(raw)}
+    codes = {(a or b).upper() for a, b in _CODE_AMOUNT.findall(raw)}
+    seen = sorted(symbols | codes)
+    if not symbols and not (codes - {inv.currency}):
+        return []
+    sign = {v: k for k, v in CURRENCY_SYMBOLS.items()}
+    shown = ", ".join(f"{c} ({sign[c]})" if c in symbols else c for c in seen)
+    return [_f("UNSUPPORTED_CURRENCY", B, f"Amounts are written in {shown}; this system reads amounts in dollars only "
+               f"(the invoice reads as {inv.currency}), so it cannot be paid. A person must enter it.",
+               currencies=seen, invoice_currency=inv.currency)]
+
+
 def check_currency(inv: Invoice, policy: dict) -> tuple[list[Flag], float | None]:
     rate = fx_rate(inv.currency, policy)
     if rate is None:
-        return [_f("UNSUPPORTED_CURRENCY", B, f"No FX rate for {inv.currency}", currency=inv.currency)], None
+        return [_f("UNSUPPORTED_CURRENCY", B, f"Billed in {inv.currency}; there is no FX rate for {inv.currency} "
+                   "(config/policy.yaml fx_to_usd), so it cannot be converted to USD or paid",
+                   currency=inv.currency)], None
     total_usd = round(inv.total * rate, 2) if inv.total is not None else None
     if inv.currency != "USD":
         return [_f("CURRENCY_CONVERTED", W, f"Billed in {inv.currency}; {_money(inv.total or 0)} "
@@ -311,9 +361,11 @@ class DuplicateRegistry:
                               "AND status = 'paid' ORDER BY id LIMIT 1", (r["invoice_number"], r["vendor"])).fetchone()
         return f", paid {_money(p[0])} on {str(p[1])[:10]}" if p else ""
 
+    STATUS_WORDS = {"APPROVED": "approved", "REJECTED": "rejected", "PENDING_HUMAN": "held for a person"}
+
     def _where(self, r: sqlite3.Row) -> str:
-        return (f"{Path(r['source_file'] or '').name} in an earlier run "
-                f"({(r['status'] or 'unknown').lower().replace('_', ' ')}{self._paid(r)})")
+        return (f"{Path(r['source_file'] or '').name}, seen in an earlier run and "
+                f"{self.STATUS_WORDS.get(r['status'] or '', 'not decided')}{self._paid(r)}")
 
     def check_history(self, inv: Invoice, source: str, have: set[str], match_content: bool) -> list[Flag]:
         """Compare with documents stored by earlier runs. For each kind of match only the EARLIEST
@@ -447,7 +499,12 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
     flags += check_inventory(inv, inventory, policy)
     flags += check_math(inv, policy)
     flags += check_dates(inv, policy)
+    flags += check_past_due(inv, policy)
     cur_flags, total_usd = check_currency(inv, policy)
+    if not cur_flags or cur_flags[0].code != "UNSUPPORTED_CURRENCY":
+        cur_flags = check_currency_text(state.raw_text, inv) + cur_flags
+    if any(f.code == "UNSUPPORTED_CURRENCY" for f in cur_flags):
+        total_usd = None
     flags += cur_flags
     flags += check_prices(inv, inventory, policy)
     flags += check_line_notes(inv)
@@ -463,6 +520,8 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
             dup += registry.check_content(inv)
         dup += registry.check_history(inv, state.source, {f.code for f in dup}, match_content)
         flags += dup
+    # the currency problem is the root cause of any missing items or totals, so it leads the reasons
+    flags.sort(key=lambda f: f.code != "UNSUPPORTED_CURRENCY")
     state.flags.extend(flags)
     state.total_usd = total_usd
     state.trace.append(TraceEvent(agent="validation", step="validate", detail={

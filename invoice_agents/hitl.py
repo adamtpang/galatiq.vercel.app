@@ -37,7 +37,9 @@ def enqueue(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState:
         "VALUES (?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET state_json=excluded.state_json, "
         "reason=excluded.reason, source_file=excluded.source_file",
         (inv.number if inv else None, inv.vendor if inv else None, state.source, fp,
-         "; ".join(d.reasons) if d else None, state.model_dump_json(exclude={"raw_text"})))
+         "; ".join(d.reasons) if d else None,
+         # decision 10: a rebuilt invoice keeps its raw text so the reviewer sees the original next to Grok's reading
+         state.model_dump_json(exclude=None if state.extraction_mode == "llm_repair" else {"raw_text"})))
     conn.commit()
     state.payment = {"status": "not_paid", "reason": "pending human review"}
     state.trace.append(TraceEvent(agent="hitl", step="queued", detail={"fingerprint": fp}))
@@ -46,6 +48,10 @@ def enqueue(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState:
 
 def pending(conn: sqlite3.Connection) -> list[sqlite3.Row]:
     return conn.execute("SELECT * FROM review_queue WHERE status='pending' ORDER BY id").fetchall()
+
+
+def queued_state(row: sqlite3.Row) -> InvoiceState:
+    return InvoiceState.model_validate_json(row["state_json"])
 
 
 def find(conn: sqlite3.Connection, invoice_number: str) -> sqlite3.Row | None:
