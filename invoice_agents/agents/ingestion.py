@@ -88,11 +88,18 @@ def llm_extract(raw: str, source: str, fmt: str, llm: LLMClient, problem: str | 
 
 
 _NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
+_CELL_NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
 
 def printed_numbers(raw: str) -> set[float]:
+    """Every number printed in the file. In a CSV row (3 or more commas) each cell is read on its own too,
+    so "1,250.00,1250.00" gives 1, 250.00 and 1250.00, not only "1,250.00"."""
+    found = _NUMBER.findall(raw or "")
+    for line in (raw or "").splitlines():
+        if line.count(",") >= 3:
+            found += [c.strip() for c in line.split(",") if _CELL_NUMBER.fullmatch(c.strip())]
     out = set()
-    for m in _NUMBER.findall(raw or ""):
+    for m in found:
         try:
             out.add(round(float(m.replace(",", "")), 2))
         except ValueError:

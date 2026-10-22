@@ -10,6 +10,7 @@ from invoice_agents.db import connect, init_db
 from invoice_agents.models import Decision, DecisionStatus, Invoice, InvoiceState, LineItem
 from invoice_agents.validation import validate
 
+from .conftest import ROOT
 from .test_validation import mk, run
 
 
@@ -261,3 +262,11 @@ def test_summary_at_80_columns_wraps_on_word_boundaries(tmp_path):
         for w in _tw.shorten(s.decision.reasons[0], width=100, placeholder=" ...").split():
             if len(w) <= 36:   # a word longer than the column must fold; no reason here has one
                 assert w in tokens, (s.source, w)
+
+
+def test_grounding_reads_csv_cells_one_by_one():
+    from invoice_agents.agents.ingestion import printed_numbers
+    raw = (ROOT / "data" / "invoices_unseen" / "invoice_4004_odd_headers.csv").read_text()
+    assert {1.0, 2.0, 250.0, 500.0, 1250.0} <= printed_numbers(raw)
+    # prose keeps thousands commas together: "$1,250.00" is 1250, and no stray 1 or 250 is added
+    assert printed_numbers("Total due: $1,250.00") == {1250.0}
