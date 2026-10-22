@@ -459,11 +459,43 @@ def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Pa
     return res
 
 
+def web_summary(off: dict, live: dict | None) -> dict:
+    """Compact eval summary for the web replay (web/data/evals.json). Written only with --web."""
+    def ext(e):
+        return {f: e["per_field"][f] for f in FIELDS} | {"overall": e["overall"]}
+    offc = {c["file"]: c for c in off["adversarial"]["cases"]}
+    livc = {c["file"]: c for c in live["adversarial"]["cases"]} if live else {}
+    return {
+        "source": "evals/results (python -m evals)",
+        "offline_generated_at": off["generated_at"], "live_generated_at": live and live["generated_at"],
+        "model": live and live["model"],
+        "extraction": {"offline": ext(off["extraction"]["pipeline"]),
+                       "live_pipeline": live and ext(live["extraction"]["pipeline"]),
+                       "live_grok_only": live and ext(live["extraction"]["grok_only"]),
+                       "ambiguous": {k: list(v["ambiguous"]) for k, v in load_yaml("ground_truth.yaml").items() if v.get("ambiguous")}},
+        "agreement": [{k: a[k] for k in ("label", "invoices", "agree", "rate")}
+                      | {"disagreements": [{"file": d["file"], "offline": d["offline"], "live": d["live"],
+                                            "live_reason": (d["live_reasons"] or [""])[0]} for d in a["disagreements"]]}
+                      for a in (live or off)["agreement"]],
+        "adversarial": {"offline": {k: off["adversarial"][k] for k in ("caught", "total", "catch_rate")},
+                        "live": live and {k: live["adversarial"][k] for k in ("caught", "total", "catch_rate")},
+                        "cases": [{"file": f, "trap": c["trap"], "offline": c["decision"], "offline_caught": c["caught"],
+                                   "live": livc.get(f, {}).get("decision"), "live_caught": livc.get(f, {}).get("caught")}
+                                  for f, c in offc.items()]},
+        "cost_latency": live and {"batches": live["cost_latency"]["batches"],
+                                  "grok_only_extraction": live["cost_latency"].get("grok_only_extraction"),
+                                  "pricing_source": live["cost_latency"]["pricing_source"]},
+        "offline_latency": {g: {"latency_mean_ms": b.get("latency_mean_ms"), "wall_s": b["wall_s"]}
+                            for g, b in off["cost_latency"]["batches"].items()},
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m evals", description=__doc__.split("\n\n")[0])
     ap.add_argument("--live", action="store_true", help="also run live against the xAI API (needs XAI_API_KEY)")
     ap.add_argument("--no-write", action="store_true", help="print the summary only, write no files")
     ap.add_argument("--report-only", action="store_true", help="re-render the .md files from the saved .json results")
+    ap.add_argument("--web", action="store_true", help="with --report-only: also write web/data/evals.json for the replay")
     args = ap.parse_args(argv)
     if args.report_only:
         saved = {m: json.loads((RESULTS / f"{m}.json").read_text()) for m in ("offline", "live") if (RESULTS / f"{m}.json").exists()}
@@ -471,6 +503,8 @@ def main(argv: list[str] | None = None) -> int:
             (RESULTS / f"{m}.md").write_text(detail_md(r))
         md = summary_md(saved["offline"], saved.get("live"))
         (RESULTS / "summary.md").write_text(md)
+        if args.web:
+            (ROOT / "web" / "data" / "evals.json").write_text(json.dumps(web_summary(saved["offline"], saved.get("live")), indent=1))
         print(md)
         return 0
     from dotenv import load_dotenv

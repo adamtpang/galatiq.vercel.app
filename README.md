@@ -76,7 +76,7 @@ From [docs/run_log.md](docs/run_log.md), two committed runs on fresh databases (
 
 ## Evals
 
-`python -m evals` runs four evals offline in about a second with no API key; `--live` adds the live runs. Results go to `evals/results/` (`summary.md`, `offline.md`, `live.md` and the JSON behind them, plus the live traces in `evals/results/runs/live/`). Every number below comes from the committed run of Oct 22, 2026 (grok-4.7; `evals/results/live.md`). `tests/test_evals.py` runs the offline evals in CI and pins their numbers.
+`python -m evals` runs four evals offline in about a second with no API key; `--live` adds the live runs. Results go to `evals/results/` (`summary.md`, `offline.md`, `live.md` and the JSON behind them, plus the live traces in `evals/results/runs/live/`). Every number below comes from the committed run of Oct 22, 2026 (grok-4.7; `evals/results/live.md`). `tests/test_evals.py` runs the offline evals in CI and pins their numbers. `python -m evals --report-only --web` re-renders the reports from the saved JSON and writes a compact copy to `web/data/evals.json` for the site.
 
 | Eval | Offline | Live (grok-4.7) |
 |---|---|---|
