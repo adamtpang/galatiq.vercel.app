@@ -6,7 +6,8 @@ __pycache__/
 .venv/
 venv/
 inventory.db
-runs/
+runs/*
+!runs/demo/
 node_modules/
 .vercel/
 .DS_Store

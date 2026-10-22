@@ -1,32 +1,32 @@
-"""Approval agent (VP persona + critic/reflection loop). NOT BUILT YET.
+"""Approval agent. STUB: applies only the hard rule until Adam's VP + critic logic lands.
 
-TODO(Adam): design and implement. This is deliberately left to Adam to own and explain.
-Inputs available today: state.invoice, state.flags (code, severity, message, evidence),
-state.total_usd, and config/policy.yaml (approval_threshold_usd, decisions.*).
+Hard rule (Adam, DECISIONS.md #1 and the spec): any blocking flag => REJECTED, no LLM.
+Everything else => PENDING_HUMAN with reason "approval agent not built".
 
-Decisions already made (README "Decisions", values in config/policy.yaml `approval:`):
-  1. Over-stock -> REJECT. Validation emits a blocking STOCK_EXCEEDED flag with
-     evidence {item, requested, stock}.
-  2. VP/critic deadlock after critic_max_rounds (2): PENDING_HUMAN, both arguments attached.
-  3. Critic loop only when total > approval_threshold_usd (10000), total >= near_limit_usd
-     (9500), or risk_score >= high_risk_score (50). Otherwise the VP decides alone after hard rules.
-
-Still open for Adam: how risk_score is computed (risk agent not built), the VP and critic
-prompts, and how to treat revisions and FX invoices.
+TODO(Adam): VP agent, critic loop (critic_max_rounds), deadlock => PENDING_HUMAN.
 """
 from __future__ import annotations
 
-from typing import Any, Protocol
+from typing import Any
 
 from ..llm import LLMClient
-from ..models import Decision, InvoiceState
+from ..models import Decision, DecisionStatus, InvoiceState, Severity, TraceEvent
+
+NOT_BUILT = "approval agent not built"
+IS_STUB = True  # tests xfail golden cases that need the real approval agent
 
 
-class ApprovalAgent(Protocol):
-    def decide(self, state: InvoiceState, llm: LLMClient, policy: dict[str, Any]) -> Decision:
-        """Return APPROVED, REJECTED or PENDING_HUMAN with reasons, conditions and critique_rounds."""
-        ...
+def hard_rules(state: InvoiceState) -> Decision | None:
+    blocks = [f for f in state.flags if f.severity == Severity.BLOCK]
+    if not blocks:
+        return None
+    return Decision(status=DecisionStatus.REJECTED, reasons=[f"{f.code}: {f.message}" for f in blocks],
+                    risk_score=(state.risk or {}).get("score"), decided_by="hard_rules")
 
 
-def approve(state: InvoiceState, llm: LLMClient, policy: dict[str, Any]) -> Decision:
-    raise NotImplementedError("Approval agent not built yet (owned by Adam).")
+def approve(state: InvoiceState, llm: LLMClient, policy: dict[str, Any]) -> InvoiceState:
+    d = hard_rules(state) or Decision(status=DecisionStatus.PENDING_HUMAN, reasons=[NOT_BUILT],
+                                      risk_score=(state.risk or {}).get("score"), decided_by="stub")
+    state.decision = d
+    state.trace.append(TraceEvent(agent="approval", step="decide", detail=d.model_dump(mode="json")))
+    return state

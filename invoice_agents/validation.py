@@ -236,32 +236,63 @@ def fingerprint(inv: Invoice) -> str:
 
 @dataclass
 class DuplicateRegistry:
-    """Invoices seen in this run, keyed by (number, vendor). Not persisted yet."""
-    seen: dict[tuple[str, str], list[tuple[Invoice, InvoiceState]]] = field(default_factory=dict)
+    """Duplicate and revision detection across one run.
 
-    def check_and_register(self, inv: Invoice, state: InvoiceState) -> list[Flag]:
-        if not inv.number:
-            return []
-        key = (_norm(inv.number), _norm(inv.vendor))
-        prior = self.seen.setdefault(key, [])
-        out: list[Flag] = []
-        for p_inv, p_state in prior:
-            same = fingerprint(p_inv) == fingerprint(inv)
-            if same:
-                out.append(_f("DUPLICATE_INVOICE", B, f"Same invoice already received as {p_inv.source_file}",
-                              first_seen=p_inv.source_file, fingerprint=fingerprint(inv)))
-                break
+    Batch mode calls prescan() first with every file's parsed invoice, so an original
+    is flagged SUPERSEDED_BY_REVISION before it can be approved, even though the
+    revision comes later in the batch. Without a prescan it works sequentially.
+    """
+    seen: dict[tuple[str, str], list[tuple[Invoice, InvoiceState | None]]] = field(default_factory=dict)
+    order: dict[tuple[str, str], list[Invoice]] = field(default_factory=dict)
+
+    @staticmethod
+    def key(inv: Invoice) -> tuple[str, str]:
+        return (_norm(inv.number), _norm(inv.vendor))
+
+    def prescan(self, invoices: list[Invoice]) -> None:
+        for inv in invoices:
+            if inv.number:
+                self.order.setdefault(self.key(inv), []).append(inv)
+
+    def _compare(self, inv: Invoice, earlier: list[Invoice]) -> list[Flag]:
+        for p_inv in earlier:
+            if fingerprint(p_inv) == fingerprint(inv):
+                return [_f("DUPLICATE_INVOICE", B, f"Same invoice already received as {p_inv.source_file}",
+                           first_seen=p_inv.source_file, fingerprint=fingerprint(inv))]
+        out = []
+        for p_inv in earlier:
             if inv.revision and inv.revision != p_inv.revision:
                 delta = round((inv.total or 0) - (p_inv.total or 0), 2)
                 out.append(_f("REVISION_SUPERSEDES", I, f"Revision {inv.revision} replaces {p_inv.source_file} "
                               f"(total {_money(p_inv.total or 0)} -> {_money(inv.total or 0)})",
                               supersedes=p_inv.source_file, previous_total=p_inv.total, delta=delta))
-                p_state.flags.append(_f("SUPERSEDED_BY_REVISION", B, f"Replaced by revision {inv.revision} "
-                                        f"in {inv.source_file}", superseded_by=inv.source_file))
-            else:
+            elif not (p_inv.revision and p_inv.revision != inv.revision):
                 out.append(_f("DUPLICATE_NUMBER_CONFLICT", B, f"Invoice number reused with different content "
                               f"(see {p_inv.source_file})", other=p_inv.source_file,
                               other_total=p_inv.total, total=inv.total))
+        return out
+
+    def check_and_register(self, inv: Invoice, state: InvoiceState) -> list[Flag]:
+        if not inv.number:
+            return []
+        k = self.key(inv)
+        planned = self.order.get(k, [])
+        idx = next((i for i, x in enumerate(planned) if x.source_file == inv.source_file), None)
+        if idx is not None:
+            out = self._compare(inv, planned[:idx])
+            for later in planned[idx + 1:]:
+                if later.revision and later.revision != inv.revision and fingerprint(later) != fingerprint(inv):
+                    out.append(_f("SUPERSEDED_BY_REVISION", B, f"Replaced by revision {later.revision} "
+                                  f"in {later.source_file}", superseded_by=later.source_file))
+                    break
+            return out
+        prior = self.seen.setdefault(k, [])
+        out = self._compare(inv, [p for p, _ in prior])
+        if inv.revision:
+            for p_inv, p_state in prior:
+                if p_inv.revision != inv.revision and fingerprint(p_inv) != fingerprint(inv) and p_state is not None:
+                    p_state.flags.append(_f("SUPERSEDED_BY_REVISION", B, f"Replaced by revision {inv.revision} "
+                                            f"in {inv.source_file}", superseded_by=inv.source_file))
         prior.append((inv, state))
         return out
 

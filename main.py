@@ -1,9 +1,9 @@
-"""Acme invoice agents CLI (work in progress: ingest + validate only).
+"""Acme invoice agents CLI.
 
   python main.py --invoice_path=data/invoices/invoice_1001.txt
-  python main.py --batch data/invoices
-  python main.py --batch data/invoices --json      # machine-readable output
-  python main.py --invoice_path=... --mode live    # allow Grok repair when the parser fails
+  python main.py --batch data/invoices [--offline] [--chaos 0.3] [--json]
+  python main.py review                       # list the human review queue
+  python main.py review INV-1012 --approve    # or --reject, optional --note
 """
 from __future__ import annotations
 
@@ -14,76 +14,82 @@ from typing import Optional
 import typer
 from dotenv import load_dotenv
 from rich.console import Console
-from rich.table import Table
 
-from invoice_agents.db import db_path, init_db
+from invoice_agents import hitl
+from invoice_agents.agents.payment import PaymentAgent, log_rejection
+from invoice_agents.db import connect, db_path
+from invoice_agents.graph import make_context, run_batch
 from invoice_agents.llm import get_client
-from invoice_agents.models import Severity
-from invoice_agents.pipeline import collect, run_files
+from invoice_agents.models import DecisionStatus
+from invoice_agents.pipeline import collect
+from invoice_agents.reporter import print_summary, write_artifacts
 
-app = typer.Typer(add_completion=False)
+app = typer.Typer(add_completion=False, invoke_without_command=True, no_args_is_help=False)
 console = Console()
-SEV_STYLE = {Severity.BLOCK: "bold red", Severity.WARN: "yellow", Severity.INFO: "dim"}
-PENDING = "pending: approval agent not built"
 
 
-def _money(v, cur="USD"):
-    if v is None:
-        return "-"
-    return f"{'$' if cur == 'USD' else cur + ' '}{v:,.2f}"
+@app.callback()
+def run(
+    ctx: typer.Context,
+    invoice_path: Optional[Path] = typer.Option(None, "--invoice_path", "--invoice-path", help="One invoice file"),
+    batch: Optional[Path] = typer.Option(None, "--batch", help="Directory of invoices"),
+    offline: bool = typer.Option(False, "--offline", help="Never call an LLM (same as --mode offline)"),
+    mode: str = typer.Option("auto", "--mode", help="auto (Grok if XAI_API_KEY is set) | offline | live"),
+    chaos: float = typer.Option(0.0, "--chaos", min=0.0, max=1.0, help="Probability each bank call fails"),
+    seed: Optional[int] = typer.Option(None, "--seed", help="Seed for --chaos"),
+    as_json: bool = typer.Option(False, "--json", help="Print full JSON states"),
+    run_id: Optional[str] = typer.Option(None, "--run-id", help="Name of the runs/<run_id> folder"),
+):
+    load_dotenv()
+    if ctx.invoked_subcommand:
+        return
+    target = invoice_path or batch
+    if target is None:
+        console.print(ctx.get_help())
+        raise typer.Exit(1)
+    llm = get_client("offline" if offline else mode)
+    rc = make_context(llm=llm, chaos=chaos, seed=seed, run_id=run_id)
+    model = getattr(llm, "model", None)
+    if not as_json:
+        console.print(f"[bold]Acme invoice agents[/]  mode=[cyan]{llm.name}[/]{' ' + model if model else ''}  "
+                      f"chaos={chaos}  db={db_path()}  run={rc.run_id}")
+    states = run_batch(collect(target), rc)
+    write_artifacts(states, rc.run_dir, llm.name, model)
+    if as_json:
+        print(json.dumps([s.model_dump(mode="json", exclude={"raw_text"}) for s in states], indent=2, default=str))
+    else:
+        print_summary(states, console, llm.name, rc.run_dir)
 
 
 @app.command()
-def main(
-    invoice_path: Optional[Path] = typer.Option(None, "--invoice_path", "--invoice-path", help="One invoice file"),
-    batch: Optional[Path] = typer.Option(None, "--batch", help="Directory of invoices"),
-    mode: str = typer.Option("offline", "--mode", help="offline | auto | live"),
-    as_json: bool = typer.Option(False, "--json", help="Print JSON instead of tables"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show every flag message and the trace"),
+def review(
+    invoice: Optional[str] = typer.Argument(None, help="Invoice number, e.g. INV-1012"),
+    approve: bool = typer.Option(False, "--approve"),
+    reject: bool = typer.Option(False, "--reject"),
+    note: Optional[str] = typer.Option(None, "--note"),
+    chaos: float = typer.Option(0.0, "--chaos", min=0.0, max=1.0),
 ):
-    load_dotenv()
-    target = invoice_path or batch
-    if target is None:
-        raise typer.BadParameter("pass --invoice_path or --batch")
-    if not db_path().exists():
-        init_db()
-    llm = get_client(mode)
-    files = collect(target)
-    states = run_files(files, llm)
-
-    if as_json:
-        print(json.dumps([s.model_dump(mode="json", exclude={"raw_text"}) for s in states], indent=2))
+    """List the human review queue, or approve/reject one invoice in it."""
+    conn = connect()
+    if invoice is None:
+        rows = hitl.pending(conn)
+        if not rows:
+            console.print("Review queue is empty.")
+        for r in rows:
+            console.print(f"[yellow]{r['invoice_number']}[/] {r['vendor']} ({Path(r['source_file']).name}): {r['reason']}")
         return
-
-    console.print(f"[bold]Acme invoice agents[/]  mode=[cyan]{llm.name}[/]  files={len(files)}  "
-                  f"db={db_path()}  [dim](ingest + validate only)[/]")
-    t = Table(show_lines=True, expand=False)
-    for c, kw in (("File", {"max_width": 22}), ("Invoice", {"no_wrap": True}), ("Vendor", {"max_width": 22}),
-                  ("Total", {"justify": "right", "no_wrap": True}), ("Items", {"no_wrap": True}),
-                  ("Due", {"no_wrap": True}), ("Flags", {"no_wrap": True}), ("Approval", {"max_width": 18})):
-        t.add_column(c, overflow="fold", **kw)
-    for s in states:
-        inv = s.invoice
-        if inv is None:
-            t.add_row(Path(s.source).name, "-", "-", "-", "-", "-", "[bold red]EXTRACTION_FAILED[/]", PENDING)
-            continue
-        items = "\n".join(f"{li.qty:g} x {li.sku or li.sku_raw + '?'} @ {_money(li.unit_price, inv.currency)}"
-                          for li in inv.items)
-        flags = "\n".join(f"[{SEV_STYLE[f.severity]}]{f.severity.value}: {f.code}[/]" for f in s.flags) or "[green]none[/]"
-        total = _money(inv.total, inv.currency) + (f"\n= {_money(s.total_usd)}" if inv.currency != "USD" else "")
-        due = str(inv.due_date) if inv.due_date else (inv.due_date_raw or "-")
-        t.add_row(Path(s.source).name, f"{inv.number or '-'}{' ' + inv.revision if inv.revision else ''}",
-                  inv.vendor or "[red]missing[/]", total, items, due, flags, f"[dim]{PENDING}[/]")
-    console.print(t)
-    if verbose:
-        for s in states:
-            console.rule(Path(s.source).name)
-            for f in s.flags:
-                console.print(f"[{SEV_STYLE[f.severity]}]{f.severity.value:>5} {f.code}[/]: {f.message}")
-            for e in s.trace:
-                console.print(f"[dim]trace {e.agent}.{e.step} {e.detail}[/]")
-    blocked = sum(s.has_blocking() for s in states)
-    console.print(f"{len(states)} processed, {blocked} with blocking flags. Decisions: {PENDING}.")
+    if approve == reject:
+        raise typer.BadParameter("pass exactly one of --approve or --reject")
+    row = hitl.find(conn, invoice)
+    if row is None:
+        console.print(f"[red]No pending review for {invoice}[/]")
+        raise typer.Exit(1)
+    state = hitl.resolve(conn, row, approve, note)
+    if state.decision.status == DecisionStatus.APPROVED:
+        state = PaymentAgent(conn, chaos=chaos).pay(state)
+    else:
+        state = log_rejection(conn, state)
+    console.print(f"{state.invoice.number}: {state.decision.status.value} by human. Payment: {state.payment}")
 
 
 if __name__ == "__main__":

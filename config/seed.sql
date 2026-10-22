@@ -38,6 +38,20 @@ CREATE TABLE IF NOT EXISTS payments (
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS review_queue (     -- human-in-the-loop queue (PENDING_HUMAN)
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_number TEXT,
+  vendor         TEXT,
+  source_file    TEXT,
+  fingerprint    TEXT NOT NULL UNIQUE,
+  reason         TEXT,
+  state_json     TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'pending',   -- pending | approved | rejected
+  reviewer_note  TEXT,
+  created_at     TEXT NOT NULL DEFAULT (datetime('now')),
+  decided_at     TEXT
+);
+
 CREATE TABLE IF NOT EXISTS audit_log (
   id             INTEGER PRIMARY KEY AUTOINCREMENT,
   ts             TEXT NOT NULL DEFAULT (datetime('now')),

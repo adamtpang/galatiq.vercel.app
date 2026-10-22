@@ -1,6 +1,7 @@
 """Typed data passed between agents. Deterministic code and the LLM both produce these."""
 from __future__ import annotations
 
+import time
 from datetime import date as Date
 from enum import Enum
 from typing import Any, Literal
@@ -68,12 +69,15 @@ class Decision(BaseModel):
     conditions: list[str] = Field(default_factory=list)
     risk_score: int | None = Field(default=None, ge=0, le=100)
     critique_rounds: int = 0
+    decided_by: str = "unknown"   # hard_rules | vp | vp+critic | human | stub | error
+    arguments: dict[str, Any] = Field(default_factory=dict)  # e.g. VP and critic positions on deadlock
 
 
 class TraceEvent(BaseModel):
     agent: str
     step: str
     detail: dict[str, Any] = Field(default_factory=dict)
+    ts: float = Field(default_factory=time.time)
 
 
 class InvoiceState(BaseModel):

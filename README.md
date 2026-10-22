@@ -1,5 +1,6 @@
 # Acme invoice agents (Galatiq case)
 
+
 **Work in progress:** multi-agent invoice processing for the Galatiq case. Landing page: https://galatiq.vercel.app
 
 Acme Corp loses about $2M a year to manual invoice processing (30% error rate, 5-day delays).
@@ -11,27 +12,32 @@ This repo is building a four-stage agent pipeline: **Ingest -> Validate -> Appro
 |---|---|
 | Ingestion agent (PDF, TXT/email, CSV, JSON, XML) | Built. Deterministic parsers read all 20 sample files. Grok repair runs only when the parser fails. |
 | Validation agent (inventory, math, dates, FX, prices, vendors, duplicates) | Built. Emits typed flags (info, warn, block) with evidence. |
-| Risk scoring | Not built. |
-| Approval agent (VP + critic loop) | **Not built.** Interface stub only in `invoice_agents/agents/approval.py`. Adam owns this part. |
-| Payment agent | Not built. The `payments` table with a unique idempotency key exists. |
-| LangGraph orchestration | Not built yet. `main.py` runs ingest + validate in sequence for now. |
+| Risk agent | **Stub.** Returns score 0. Adam is designing it. |
+| Approval agent | **Stub.** Applies only the hard rule: any blocking flag means REJECTED. Everything else goes to PENDING_HUMAN with "approval agent not built". VP and critic loop are Adam's to design. |
+| Payment agent | Built. Wraps the case's `mock_payment` unchanged, checks an idempotency key in SQLite before paying, retries 3 times with exponential backoff, `--chaos` fault injection, rejection log. |
+| Human review queue | Built. PENDING_HUMAN invoices go to a SQLite queue; `python main.py review INV-1012 --approve`. |
+| Orchestration | Built with LangGraph: ingest, validate, risk, approval, then pay, reject or hold, then report. JSONL trace per run in `runs/<run_id>/trace.jsonl`. |
+| Golden tests | `tests/golden.yaml` lists the expected decision for all 20 files. Cases that need the real approval agent are marked xfail ("approval agent pending"). |
+
+## CI
+
+The GitHub Actions workflow is ready in `ci/github-actions-ci.yml` (offline suite on Python 3.11 and 3.12, plus an offline batch run). It is not active yet: it needs to be copied to `.github/workflows/ci.yml` by an account allowed to push workflow files. The badge goes here once it runs.
 
 ## Quickstart
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python scripts/init_db.py                     # optional, main.py creates the DB on first run
 python main.py --invoice_path=data/invoices/invoice_1001.txt
-python main.py --batch data/invoices          # all 20 samples, one table
-python main.py --batch data/invoices --json   # full structured output, including flag evidence
-pytest                                        # offline suite, well under 10 s
+python main.py --batch data/invoices --offline          # all 20 samples
+python main.py --batch data/invoices --chaos 0.3        # bank fails 30% of calls; watch the retries
+python main.py review                                   # human review queue
+python main.py review INV-1012 --approve --note "called vendor"
+pytest                                                  # offline suite, a few seconds
 ```
 
-Runs fully offline by default. To let Grok repair invoices the parser cannot read, copy `.env.example` to `.env`, set `XAI_API_KEY`, and pass `--mode live` (or `--mode auto`).
-`pytest -m live` runs one real extraction call against the xAI API.
-
-The Approval column in the output reads `pending: approval agent not built`. No invoice is approved or paid yet.
+Without `XAI_API_KEY` everything runs offline. With a key, `--mode auto` (the default) lets Grok repair invoices the parser cannot read. `pytest -m live` runs one real call.
+The database (`inventory.db`) is created on first run. Payments are idempotent across runs, so a second batch run pays nothing new.
 
 ## How it works
 
@@ -86,14 +92,15 @@ Items 2 to 4 are recorded in `config/policy.yaml` (`approval:`) and will be used
 - **Catalog prices** (`config/seed.sql`): WidgetA $250, WidgetB $500, GadgetX $750, the price each item has on most sample invoices. FakeItem has no price (NULL). Stock levels follow the case brief.
 - **Vendor master** is a mock. It lists the vendors on the samples that show no other red flags. Fraudster LLC, NoProd Industries and Global Supply Chain Partners are not on file. FastShip Ltd. is on file and its new name, QuickShip Distributers, is not.
 - **FX** is a fixed mock table (EUR 1.08 USD) so runs are deterministic.
-- **Duplicates** are detected within one run (in memory). Persisting them to the `invoices` table comes with the payment agent.
+- **Duplicates and revisions**: a batch is prescanned before any decision, so an original that has a later revision is flagged SUPERSEDED_BY_REVISION and never paid. Across runs, the payment idempotency key prevents paying the same invoice twice.
 - **Batch order** is filename order, so `invoice_1011.pdf` counts as the first copy and `invoice_1011.txt` as the duplicate.
+- **Payment currency**: the mock bank is paid in USD, using the deterministic FX conversion (1014: EUR 4,125 is paid as $4,455).
 - Validation does not decrement stock.
 
 ## Project layout
 
 ```
-main.py                     temporary CLI: ingest + validate
+main.py                     CLI: single, --batch, review, --offline, --chaos
 config/policy.yaml          thresholds, FX table, Adam's decisions
 config/seed.sql             schema + seed (inventory, vendors, invoices, payments, audit_log)
 scripts/init_db.py          idempotent DB setup
@@ -102,10 +109,15 @@ invoice_agents/
   normalize.py              OCR, money, dates, invoice numbers, SKUs
   parsers/                  text/email, csv (key-value and table), json, xml, pdf
   agents/ingestion.py       parse + optional Grok repair loop
-  agents/approval.py        stub: interface and TODO only
+  agents/risk.py            stub (score 0)
+  agents/approval.py        stub: hard rule only
+  agents/payment.py         mock_payment wrapper, idempotency, retries, chaos, rejection log
+  graph.py                  LangGraph StateGraph
+  hitl.py                   human review queue
+  reporter.py               summary table, summary.json, report.md
   validation.py             validation tools and flags
   llm.py                    GrokClient, OfflineClient
-tests/                      test_parsers.py, test_validation.py, test_llm.py
+tests/                      parsers, validation, llm, payment, golden (golden.yaml)
 web/                        landing page (Vercel)
 ```
 

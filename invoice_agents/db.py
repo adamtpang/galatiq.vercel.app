@@ -24,11 +24,20 @@ def init_db(path: Path | str | None = None) -> Path:
     return p
 
 
+def ensure_schema(path: Path | str) -> None:
+    stmts = [st for st in SEED_SQL.read_text().split(";") if "CREATE TABLE" in st]
+    with sqlite3.connect(path) as conn:
+        for st in stmts:
+            conn.execute(st)
+
+
 def connect(path: Path | str | None = None) -> sqlite3.Connection:
     p = Path(path) if path else db_path()
     if not p.exists():
         init_db(p)
-    conn = sqlite3.connect(p)
+    else:
+        ensure_schema(p)  # adds tables introduced since the DB was created, keeps data
+    conn = sqlite3.connect(p, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
