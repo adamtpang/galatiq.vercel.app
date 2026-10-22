@@ -30,5 +30,5 @@ Weeks 1 to 2: mailbox and ERP connectors, PO matching, shadow mode next to the A
 
 - **Why LangGraph?** Explicit nodes and edges make the flow auditable and easy to test, and conditional routing (pay, reject, hold) is a first-class edge.
 - **How do you stop the model inventing amounts?** It never computes them. Totals and FX come from code; the model can only add reasons and raise a risk score.
-- **Prompt injection?** Invoice text goes inside `<invoice_document>` tags as data. The rules also flag instruction-like text, and any match holds the invoice for a person whatever the score (invoice 2002, decision 8). The risk agent cannot lower the rule score.
+- **Prompt injection?** Invoice text goes inside `<invoice_document>` tags as data. The rules flag instruction-like text, Grok's risk review has a structured `prompt_injection` field, and either one holds the invoice for a person whatever the score (invoices 2002, 3001, 3002; decision 8). The risk agent cannot lower the rule score.
 - **Why do live and offline differ?** Grok is more cautious than the rules and holds invoices the rules would pay. Every difference so far goes that way; see run_log.md.

@@ -503,7 +503,7 @@
     h.push('<section class="m-sec"><h3>Need you ' + held.length + "</h3>" + (held.length ? held.map(function (i) {
       var ow = owners(i), crit = i.timeline.filter(function (e) { return e.step === "critic_review"; });
       return '<div class="hold"><div class="r-row"><span><b>' + esc(invNumber(i.number)) + '</b> <span class="muted">' + vendorHtml(i.vendor) + '</span></span><span class="r-right">' + money(i.total_usd) + "</span></div>" +
-        '<div class="r-sub small muted">' + esc(riskText(i.risk)) + " · " + (ow.length ? esc(ow.join(" and ")) + " named by the VP" : "AP reviewer, no team named in the trace") + ' · <button type="button" class="linkish" data-open-file="' + esc(i.file) + '">' + esc(i.file) + "</button></div>" +
+        '<div class="r-sub small muted">' + esc(riskText(i.risk)) + " · " + (ow.length ? esc(ow.join(" and ")) + " named by the VP" : "Owner: AP reviewer") + ' · <button type="button" class="linkish" data-open-file="' + esc(i.file) + '">' + esc(i.file) + "</button></div>" +
         '<div class="sub-h">Next steps</div>' + ((i.decision.conditions || []).length ? list(i.decision.conditions) : '<p class="small muted">None recorded.</p>') +
         more("Why I held it", list(i.decision.reasons) + (crit.length ? "<div class='sub-h'>Critic</div>" + list(crit.map(function (c) { return "Round " + c.detail.round + ": " + c.detail.reason; })) : "")) +
         more("Review command", '<code class="block">python main.py review ' + esc(i.number) + ' --approve --note "..."</code>') + "</div>";

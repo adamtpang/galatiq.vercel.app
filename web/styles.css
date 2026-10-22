@@ -29,7 +29,7 @@ section[id]{scroll-margin-top:76px}
 /* nav */
 .nav{position:sticky;top:0;z-index:20;background:rgba(0,0,0,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
 .nav-inner{display:flex;align-items:center;gap:24px;height:60px}
-.brand{font-weight:500;text-decoration:none;color:var(--ink);letter-spacing:.01em}
+.brand{display:inline-block;padding:8px 0;font-weight:500;text-decoration:none;color:var(--ink);letter-spacing:.01em}
 .nav nav{display:flex;gap:4px;margin-left:auto}
 .nav nav a{text-decoration:none;color:var(--muted);font-size:14px;padding:10px 12px;border-radius:var(--r-s);transition:color .2s}
 .nav nav a:hover{color:var(--ink)}
@@ -57,6 +57,7 @@ h4{font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;
 .ctl:disabled{opacity:.4;cursor:not-allowed}
 .linkish{font:inherit;background:none;border:0;padding:0;color:var(--ink2);cursor:pointer;text-decoration:underline;text-decoration-color:var(--faint);text-underline-offset:3px}
 .linkish:hover{color:var(--ink)}
+.go .linkish{min-height:32px;padding:6px 4px}
 .seg{display:inline-flex;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:3px;gap:2px}
 .seg-btn{font:inherit;font-size:14px;font-weight:500;border:0;background:transparent;color:var(--muted);min-height:38px;padding:4px 14px;border-radius:9px;cursor:pointer;line-height:1.2;transition:background .2s,color .2s}
 .seg-btn.on{background:#fff;color:#000}
