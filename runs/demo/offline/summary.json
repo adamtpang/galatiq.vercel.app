@@ -1,6 +1,7 @@
 {
   "mode": "offline",
   "model": null,
+  "grok": null,
   "rows": [
     {
       "file": "invoice_1001.txt",
@@ -18,7 +19,10 @@
       "payment": "paid $5,000.00",
       "reason": "Vendor is on file",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1001 from Widgets Inc. for $5,000.00 was approved for payment by the VP agent. Main reason: Vendor is on file.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1002.txt",
@@ -38,7 +42,10 @@
       "payment": "not_paid",
       "reason": "STOCK_EXCEEDED: GadgetX: requested 20, only 5 in stock",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1002 from Gadgets Co. for $15,000.00 was rejected by the hard rules (no model can override them). Main reason: STOCK_EXCEEDED: GadgetX: requested 20, only 5 in stock.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1003.txt",
@@ -59,14 +66,17 @@
       "payment": "not_paid",
       "reason": "ZERO_STOCK: FakeItem has zero stock (requested 100)",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1003 from Fraudster LLC for $100,000.00 was rejected by the hard rules (no model can override them). Main reason: ZERO_STOCK: FakeItem has zero stock (requested 100).",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1004.json",
       "invoice": "INV-1004",
       "vendor": "Precision Parts Ltd.",
       "total_usd": 1890.0,
-      "risk": 30,
+      "risk": 0,
       "block_flags": [
         "SUPERSEDED_BY_REVISION"
       ],
@@ -79,25 +89,31 @@
       "payment": "not_paid",
       "reason": "SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1004 from Precision Parts Ltd. for $1,890.00 was rejected by the hard rules (no model can override them). Main reason: SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1004_revised.json",
       "invoice": "INV-1004 R1",
       "vendor": "Precision Parts Ltd.",
       "total_usd": 5940.0,
-      "risk": 30,
+      "risk": 0,
       "block_flags": [],
       "warn_flags": [
         "PAST_DUE"
       ],
-      "decision": "PENDING_HUMAN",
+      "decision": "APPROVED",
       "decided_by": "vp",
       "critique_rounds": 0,
-      "payment": "not_paid",
-      "reason": "Vendor address is on the watch list: 742 evergreen terrace",
+      "payment": "paid $5,940.00",
+      "reason": "Vendor is on file",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1004 from Precision Parts Ltd. for $5,940.00 was approved for payment by the VP agent. Main reason: Vendor is on file.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1005.json",
@@ -118,7 +134,10 @@
       "payment": "not_paid",
       "reason": "STOCK_EXCEEDED: GadgetX: requested 8, only 5 in stock",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1005 from Global Supply Chain Partners for $15,225.00 was rejected by the hard rules (no model can override them). Main reason: STOCK_EXCEEDED: GadgetX: requested 8, only 5 in stock.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1006.csv",
@@ -136,7 +155,10 @@
       "payment": "paid $2,750.00",
       "reason": "Vendor is on file",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1006 from Acme Industrial Supplies for $2,750.00 was approved for payment by the VP agent. Main reason: Vendor is on file.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1007.csv",
@@ -158,7 +180,10 @@
       "payment": "not_paid",
       "reason": "STOCK_EXCEEDED: WidgetA: requested 20, only 15 in stock",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1007 from MegaWidgets Corp for $15,525.00 was rejected by the hard rules (no model can override them). Main reason: STOCK_EXCEEDED: WidgetA: requested 20, only 15 in stock.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1008.txt",
@@ -180,7 +205,10 @@
       "payment": "not_paid",
       "reason": "UNKNOWN_ITEM: 'SuperGizmo' is not in inventory",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1008 from NoProd Industries for $9,900.00 was rejected by the hard rules (no model can override them). Main reason: UNKNOWN_ITEM: 'SuperGizmo' is not in inventory.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1009.json",
@@ -204,7 +232,10 @@
       "payment": "not_paid",
       "reason": "MISSING_VENDOR: Vendor name is missing",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1009 for $-250.00 was rejected by the hard rules (no model can override them). Main reason: MISSING_VENDOR: Vendor name is missing.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1010.txt",
@@ -225,7 +256,10 @@
       "conditions": [
         "Confirm the price against the PO: WidgetA at $300.00 is 20% above catalog $250.00."
       ],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1010 from Consolidated Materials Group for $7,185.00 was approved for payment by the VP agent. Main reason: Vendor is on file. Condition: Confirm the price against the PO: WidgetA at $300.00 is 20% above catalog $250.00.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1011.pdf",
@@ -243,7 +277,10 @@
       "payment": "paid $3,000.00",
       "reason": "Vendor is on file",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1011 from Summit Manufacturing Co. for $3,000.00 was approved for payment by the VP agent. Main reason: Vendor is on file.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1011.txt",
@@ -263,7 +300,10 @@
       "payment": "not_paid",
       "reason": "DUPLICATE_INVOICE: Same invoice already received as invoice_1011.pdf",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1011 from Summit Manufacturing Co. for $3,000.00 was rejected by the hard rules (no model can override them). Main reason: DUPLICATE_INVOICE: Same invoice already received as invoice_1011.pdf.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1012.pdf",
@@ -282,7 +322,10 @@
       "payment": "not_paid",
       "reason": "VENDOR_RENAMED: Vendor says it was formerly 'FastShip Ltd.' (on file); new name is not, so verify bank details; hold for human verification of the vendor and bank details",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1012 from QuickShip Distributers for $9,975.00 was held for a person by a hard hold. Main reason: VENDOR_RENAMED: Vendor says it was formerly 'FastShip Ltd.' (on file); new name is not, so verify bank details; hold for human verification of the vendor and bank details.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1012.txt",
@@ -303,7 +346,10 @@
       "payment": "not_paid",
       "reason": "DUPLICATE_INVOICE: Same invoice already received as invoice_1012.pdf",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1012 from QuickShip Distributers for $9,975.00 was rejected by the hard rules (no model can override them). Main reason: DUPLICATE_INVOICE: Same invoice already received as invoice_1012.pdf.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1013.json",
@@ -327,7 +373,10 @@
       "payment": "not_paid",
       "reason": "STOCK_EXCEEDED: WidgetA: requested 22 across lines [1, 4, 7], only 15 in stock",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1013 from Atlas Industrial Supply for $22,562.80 was rejected by the hard rules (no model can override them). Main reason: STOCK_EXCEEDED: WidgetA: requested 22 across lines [1, 4, 7], only 15 in stock.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1013.pdf",
@@ -352,7 +401,10 @@
       "payment": "not_paid",
       "reason": "STOCK_EXCEEDED: WidgetA: requested 22 across lines [1, 4, 7], only 15 in stock",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1013 from Atlas Industrial Supply for $22,562.80 was rejected by the hard rules (no model can override them). Main reason: STOCK_EXCEEDED: WidgetA: requested 22 across lines [1, 4, 7], only 15 in stock.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1014.xml",
@@ -373,7 +425,10 @@
       "conditions": [
         "Pay the USD amount from the mock FX conversion; treasury confirms the rate (Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08)."
       ],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1014 from TechParts International for $4,455.00 was approved for payment by the VP agent. Main reason: Vendor is on file. Condition: Pay the USD amount from the mock FX conversion; treasury confirms the rate (Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08).",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1015.csv",
@@ -391,7 +446,10 @@
       "payment": "paid $6,500.00",
       "reason": "Vendor is on file",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1015 from Reliable Components Inc. for $6,500.00 was approved for payment by the VP agent. Main reason: Vendor is on file.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_1016.json",
@@ -411,7 +469,10 @@
       "payment": "not_paid",
       "reason": "UNKNOWN_ITEM: 'WidgetC' is not in inventory",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-1016 from Widgets Inc. for $3,233.00 was rejected by the hard rules (no model can override them). Main reason: UNKNOWN_ITEM: 'WidgetC' is not in inventory.",
+      "memo_by": "template",
+      "grok_calls": 0
     }
   ]
 }

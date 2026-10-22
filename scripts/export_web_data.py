@@ -1,4 +1,4 @@
-"""Export the committed demo runs (runs/demo/{offline,live,extra_offline,extra_live}) to web/data/demo.json.
+"""Export the committed demo runs (runs/demo/{offline,live,extra_offline,extra_live,critic_offline,critic_live}) to web/data/demo.json.
 
 The web page only replays this file. Every number on it comes from these traces.
 Usage: python scripts/export_web_data.py
@@ -41,6 +41,17 @@ def export_run(name: str) -> dict:
         decision = next((e["detail"] for e in events if e["agent"] == "approval" and e["step"] == "decide"), {})
         pay = next((e["detail"] for e in events if e["agent"] == "payment" and e["step"] in ("paid", "failed",
                                                                                           "idempotency_skip")), None)
+        memo = next((e["detail"] for e in events if e["agent"] == "memo" and e["step"] == "memo"), None)
+        cc = next((e["detail"] for e in events if e["step"] == "grok_cross_check"), None)
+        flags = list(val.get("flags", []))
+        # flags raised outside the validation step (ingestion cross-check, approval hold), rebuilt from their trace steps
+        if cc and cc.get("differences"):
+            flags.append({"code": "EXTRACTION_DISAGREEMENT", "severity": "warn", "evidence": {"differences": cc["differences"]},
+                          "message": "Grok and the parser read this invoice differently: " + "; ".join(cc["differences"])})
+        for reason in decision.get("reasons") or []:
+            if reason.startswith("UNREADABLE_LAYOUT: "):
+                flags.append({"code": "UNREADABLE_LAYOUT", "severity": "warn", "evidence": {},
+                              "message": reason.removeprefix("UNREADABLE_LAYOUT: ")})
         t0 = events[0]["ts"]
         timeline = []
         for e in events:
@@ -61,7 +72,8 @@ def export_run(name: str) -> dict:
             "file": file, "number": r["invoice"], "vendor": None if r["vendor"] in (None, "", "-") else r["vendor"], "total_usd": r["total_usd"],
             "currency": inv.get("currency") if inv else None, "total": inv.get("total") if inv else None,
             "items": [{k: li.get(k) for k in ("sku_raw", "sku", "qty", "unit_price", "note")} for li in (inv or {}).get("items", [])],
-            "flags": val.get("flags", []), "risk": {"score": risk.get("score"), "deterministic_score": risk.get("deterministic_score"), "reasons": risk.get("reasons", []),
+            "flags": flags, "memo": memo and {k: memo.get(k) for k in ("text", "next_step", "by", "model")},
+            "cross_check": cc and {k: cc.get(k) for k in ("ok", "agree", "differences", "model", "error")}, "risk": {"score": risk.get("score"), "deterministic_score": risk.get("deterministic_score"), "reasons": risk.get("reasons", []),
                                                     "signals": risk.get("signals", []), "llm": risk.get("llm")},
             "decision": {k: decision.get(k) for k in ("status", "decided_by", "critique_rounds", "reasons",
                                                        "conditions", "arguments")},
@@ -123,7 +135,7 @@ if __name__ == "__main__":
                        "near_limit_usd": pol["approval"]["near_limit_usd"],
                        "high_risk_score": pol["approval"]["high_risk_score"],
                        "critic_max_rounds": pol["approval"]["critic_max_rounds"]},
-            "runs": {n: export_run(n) for n in ("offline", "live", "extra_offline", "extra_live") if (RUNS / n / "summary.json").exists()}}
+            "runs": {n: export_run(n) for n in ("offline", "live", "extra_offline", "extra_live", "critic_offline", "critic_live") if (RUNS / n / "summary.json").exists()}}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(data, separators=(",", ":"), default=str))
     srcs = export_sources({i["file"] for r in data["runs"].values() for i in r["invoices"]})

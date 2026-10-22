@@ -5,7 +5,7 @@
   var BY = { hard_rules: "hard rules", hard_hold: "a hard hold rule", vp: "the VP agent", "vp+critic": "the VP after critic review", deadlock: "deadlock, VP and critic disagree", error: "error fallback" };
   var TRIG = { over_threshold: "over the limit", near_limit: "near the limit", high_risk: "high risk" };
   var SEV = { block: "Blocking: rules out payment", warn: "Warning: does not block on its own", info: "Info: noted for the record" };
-  var AGENT = { ingestion: "Ingest", validation: "Validate", risk: "Risk", approval: "Approval", payment: "Payment", hitl: "Review" };
+  var AGENT = { ingestion: "Ingest", validation: "Validate", risk: "Risk", approval: "Approval", memo: "Memo", payment: "Payment", hitl: "Review" };
   var STAGES = [["ingestion", "Ingest", "Read the file"], ["validation", "Validate", "Stock, math, dates, duplicates"], ["risk", "Risk", "Fraud score; Grok checks claims with read-only tools"], ["vp", "VP", "Proposes approve, hold or reject"], ["critic", "Critic", "Second agent that challenges VP approvals"], ["outcome", "Outcome", "Pay, reject, or hold for a person"]];
   var README = "https://github.com/adamtpang/galatiq.vercel.app#quickstart-offline-about-a-minute";
   var SCALE = 25, MIN_STEP = 130, INTRO = 280, OUTRO = 170;
@@ -25,7 +25,7 @@
   function pill(status) { var p = PILL[status] || ["", status || "-"]; return '<span class="pill ' + p[0] + '">' + p[1] + "</span>"; }
   function statusName(s) { return (PILL[s] || [0, s])[1]; }
   function plural(n, one, many) { return n + " " + (n === 1 ? one : (many || one + "s")); }
-  function key(mode, set) { return (set === "extra" ? "extra_" : "") + mode; }
+  function key(mode, set) { return (set && set !== "case" ? set + "_" : "") + mode; }
   function run() { return DATA.runs[key(MODE, SET)]; }
   function invNumber(n) { return n ? String(n).replace(/\s+R(\d+)$/, ", Revision $1") : "No invoice number"; }
   function vendorHtml(v) { return v ? esc(v) : '<span class="missing">Missing vendor</span>'; }
@@ -148,6 +148,17 @@
           o.cls = "good";
         } else { o.title = "Grok extraction failed"; o.what = esc(d.error); o.cls = "bad"; }
         break;
+      case "ingestion.grok_cross_check":
+        if (!d.ok) { o.title = "Grok cross-check failed"; o.what = esc(d.error); o.cls = "warn"; break; }
+        o.title = d.agree ? "Grok read it too: same reading" : "Grok and the parser read it differently";
+        o.what = d.agree ? "Independent Grok extraction matches the parser (vendor, number, total, lines, prices)" : esc((d.differences || []).join("; "));
+        o.body = d.grok_reading ? more("Grok's reading", esc(d.grok_reading.vendor) + " · " + esc(d.grok_reading.number) + " · " + money(d.grok_reading.total) + "<br>" +
+          (d.grok_reading.items || []).map(function (x) { return esc(x[1]) + " x " + esc(x[0]) + " @ " + money(x[2]); }).join("<br>")) : "";
+        o.cls = d.agree ? "good" : "warn"; break;
+      case "memo.memo":
+        o.title = "Decision memo" + (d.by === "grok" ? " by Grok" : " (template, offline)"); o.what = esc(d.text);
+        o.body = d.next_step ? '<p class="small muted">Next step: ' + esc(d.next_step) + "</p>" : ""; break;
+      case "payment.guard_refused": o.title = "Payment refused by the last guard"; o.what = "Amount " + esc(d.amount) + " is not a finite number above zero"; o.cls = "bad"; break;
       case "ingestion.extracted":
         o.title = "Extracted " + esc(invNumber(inv.number));
         o.what = plural(inv.items.length, "line") + " · " + money(inv.total_usd) + (inv.currency && inv.currency !== "USD" ? " (" + esc(inv.currency) + " " + esc(inv.total) + ")" : "");
@@ -185,7 +196,7 @@
         o.what = list(d.reasons);
         var notes = [];
         if (d.decided_by === "hard_rules") notes.push("Blocking flags decide on their own.");
-        else if (d.decided_by === "hard_hold") notes.push("Held for a person before the VP: prompt injection, or a renamed or lookalike vendor.");
+        else if (d.decided_by === "hard_hold") notes.push("Held for a person before the VP by a hard hold rule (prompt injection, renamed or lookalike vendor, changed bank details, Grok and parser disagree, or a layout nobody could confirm).");
         else if (trig.length && !d.critique_rounds) notes.push("Critic not run (" + trig.map(function (t) { return TRIG[t] || t; }).join(", ") + "): it only reviews approvals.");
         o.body = (notes.length ? '<p class="small muted">' + notes.join(" ") + "</p>" : "") + (d.conditions && d.conditions.length ? more("Next steps (" + d.conditions.length + ")", list(d.conditions), true) : "");
         o.cls = "decide " + (d.status === "APPROVED" ? "good" : d.status === "REJECTED" ? "bad" : "warn"); break;
@@ -221,7 +232,8 @@
       (dupNote(inv) ? '<p class="note">' + esc(dupNote(inv)) + "</p>" : "") +
       '<div class="amount">' + money(inv.total_usd) + (inv.currency && inv.currency !== "USD" ? ' <span class="small muted">' + esc(inv.currency) + " " + esc(inv.total) + "</span>" : "") + "</div>" +
       riskMeter(inv.risk.score) +
-      '<div class="why"><div class="sub-h">Why</div>' + list(d.reasons) + (d.conditions && d.conditions.length ? "<div class='sub-h'>Conditions</div>" + list(d.conditions) : "") + "</div>" +
+      '<div class="why"><div class="sub-h">Why</div>' + list(d.reasons) + (d.conditions && d.conditions.length ? "<div class='sub-h'>Conditions</div>" + list(d.conditions) : "") +
+      (inv.memo ? "<div class='sub-h'>Memo" + (inv.memo.by === "grok" ? " by Grok" : " (template)") + "</div><p class='small'>" + esc(inv.memo.text) + "</p>" : "") + "</div>" +
       compareHtml(inv) +
       more("Agent steps (" + inv.timeline.length + ")", "<ol class='timeline'>" + inv.timeline.map(function (ev) { return stepHtml(ev, inv, r); }).join("") + "</ol>") +
       (flags ? more("Flags (" + inv.flags.length + ")", flags) : "");
@@ -240,11 +252,11 @@
       if (i.decision.status === "PENDING_HUMAN") held++;
       if (isFraudBlocked(i)) { fraud += i.total_usd || 0; fraudN++; }
     });
-    $("showing").innerHTML = "Showing <b>" + esc(runName(MODE)) + "</b>, " + (SET === "extra" ? "3 extra test invoices" : "20 case invoices") + ", recorded " + esc(fmtWhen(r.recorded_at).full) + ". Same run as the report.";
+    $("showing").innerHTML = "Showing <b>" + esc(runName(MODE)) + "</b>, " + (SET === "extra" ? invs.length + " extra test invoices (added, not case data)" : SET === "critic" ? "extra invoice 2004 ($12,500, added, not case data) run on its own, so the critic loop runs" : "20 case invoices") + ", recorded " + esc(fmtWhen(r.recorded_at).full) + ". Same run as the report.";
     $("summary").innerHTML = card(money(paid), "paid · " + nPaid) + card(String(rej), "rejected") + card(String(held), "held") + card(money(fraud), "high-risk blocked · " + fraudN, "Rejected with risk score " + hr() + " or more");
     var o = DATA.runs[key(MODE === "offline" ? "live" : "offline", SET)], diff = [];
     if (o) r.invoices.forEach(function (i) { var j = o.invoices.find(function (x) { return x.file === i.file; }); if (j && j.decision.status !== i.decision.status) diff.push(invNumber(i.number)); });
-    $("run-note").textContent = (MODE === "offline" ? "Offline: VP and critic are fixed rules, no API calls." : "Live: Grok does the risk review, the VP and the critic. The critic only reviews approvals. Live decisions can differ run to run even at temperature 0; hard rules run first, and Grok can only raise risk or hold, never pay what the rules block.") +
+    $("run-note").textContent = (MODE === "offline" ? "Offline: VP and critic are fixed rules, no API calls." : "Live: Grok reads every invoice (a cross-check against the parser), does the risk review, the VP and the critic, and writes every decision memo. The critic only reviews approvals over $10,000, near the limit or high risk. Live decisions can differ run to run even at temperature 0; hard rules run first, and Grok can only raise risk or hold, never pay what the rules block.") +
       (diff.length ? " Differs from the other run on " + diff.join(", ") + "." : o ? " Same outcomes as the other run." : "");
   }
   function card(big, cap, title) { return '<div class="sum"' + (title ? ' title="' + esc(title) + '"' : "") + '><div class="sum-big">' + esc(big) + '</div><div class="small muted">' + esc(cap) + "</div></div>"; }
@@ -594,6 +606,9 @@
     if (ag) cards.push(evCard(frac(ag.agree, ag.invoices), "live decisions that match the offline rules",
       ag.disagreement_routing ? (function (d) { var n = ag.invoices - ag.agree, lv = (d.paid_on_one_side || []).filter(function (p) { return p.paid_by === "live"; }).length;
         return n + (n === 1 ? " differs" : " differ") + "; disagreement routing sends " + (d.to_human === 1 ? "it" : "them") + " to a person. Live paid " + (lv ? lv + " invoice(s)" : "nothing") + " the rules would not."; })(ag.disagreement_routing) : ""));
+    var un = E.unseen || {};
+    if (un.offline) cards.push(evCard(frac(un.offline.total - un.offline.rejected, un.offline.total), "unseen layouts not rejected offline (" + un.offline.held + " held for a person)",
+      un.live ? "Live: " + frac(un.live.read_correctly, un.live.total) + " read correctly by Grok, " + frac(un.live.paid, un.live.total) + " paid, " + un.live.held + " held, " + un.live.rejected + " rejected. Layouts the parsers were never tuned on." : "Layouts the parsers were never tuned on."));
     if (cl) cards.push(evCard("$" + cl.billed_usd, "Grok cost for the 20 samples, live",
       cl.calls + " calls, " + cl.latency_mean_s + " s per invoice on average over all 20. Offline costs $0."));
     $("ev-cards").innerHTML = cards.join("");

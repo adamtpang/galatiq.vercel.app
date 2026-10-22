@@ -1,0 +1,26 @@
+{
+  "mode": "offline",
+  "model": null,
+  "grok": null,
+  "rows": [
+    {
+      "file": "invoice_2004_over_limit_clean.txt",
+      "invoice": "INV-2004",
+      "vendor": "Widgets Inc.",
+      "total_usd": 12500.0,
+      "risk": 0,
+      "block_flags": [],
+      "warn_flags": [],
+      "decision": "APPROVED",
+      "decided_by": "vp+critic",
+      "critique_rounds": 1,
+      "payment": "paid $12,500.00",
+      "reason": "Vendor is on file",
+      "conditions": [],
+      "errors": [],
+      "memo": "INV-2004 from Widgets Inc. for $12,500.00 was approved for payment by the VP agent after the critic's review. Main reason: Vendor is on file.",
+      "memo_by": "template",
+      "grok_calls": 0
+    }
+  ]
+}

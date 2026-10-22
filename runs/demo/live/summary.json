@@ -1,26 +1,30 @@
 {
   "mode": "grok",
   "model": "grok-4.7",
+  "grok": "Grok worked on 20 of 20 invoices (71 API calls this run; reused cached answers are not counted as calls). Hard rules rejected 12 of them; Grok cannot override those, it only cross-checked the reading and wrote the memo.",
   "rows": [
     {
       "file": "invoice_1001.txt",
       "invoice": "INV-1001",
       "vendor": "Widgets Inc.",
       "total_usd": 5000.0,
-      "risk": 12,
+      "risk": 10,
       "block_flags": [],
       "warn_flags": [
         "PAST_DUE"
       ],
-      "decision": "PENDING_HUMAN",
+      "decision": "APPROVED",
       "decided_by": "vp",
       "critique_rounds": 0,
-      "payment": "not_paid",
-      "reason": "Vendor Widgets Inc. is on file and the $5000 total matches the line items.",
+      "payment": "paid $5,000.00",
+      "reason": "Vendor Widgets Inc. is on file",
       "conditions": [
-        "Confirm whether payment follows Net 15 or the stated due date before release."
+        "Pay on Net 15 from the issue date rather than the stated due date of 2026-02-01"
       ],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1001 from Widgets Inc. is for $5000.00 and has been approved by the VP. The vendor is on file, the authoritative total of $5000.00 matches the line items, and the risk score of 10 is low. The only flag is informational: TERMS_MISMATCH, because the terms say Net 15 but the due date is 17 days after the issue date. Pay on Net 15 from the issue date rather than the stated due date of 2026-02-01.",
+      "memo_by": "grok",
+      "grok_calls": 6
     },
     {
       "file": "invoice_1002.txt",
@@ -40,7 +44,10 @@
       "payment": "not_paid",
       "reason": "STOCK_EXCEEDED: GadgetX: requested 20, only 5 in stock",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1002 from Gadgets Co. for $15,000.00 was rejected. The blocking reason is STOCK_EXCEEDED: GadgetX was requested for 20 units, but only 5 are in stock. Info flags also note a terms mismatch (Net 30 vs a due date 0 days after issue) and that $15,000.00 is over the $10,000.00 approval threshold.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1003.txt",
@@ -61,14 +68,17 @@
       "payment": "not_paid",
       "reason": "ZERO_STOCK: FakeItem has zero stock (requested 100)",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1003 from Fraudster LLC for $100,000.00 was rejected. FakeItem has zero stock (100 were requested), and the due date \u201cyesterday\u201d is not a real calendar date. Fraudster LLC is not in the vendor master, and $100,000.00 is over the $10,000.00 threshold that calls for extra scrutiny.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1004.json",
       "invoice": "INV-1004",
       "vendor": "Precision Parts Ltd.",
       "total_usd": 1890.0,
-      "risk": 30,
+      "risk": 0,
       "block_flags": [
         "SUPERSEDED_BY_REVISION"
       ],
@@ -81,14 +91,17 @@
       "payment": "not_paid",
       "reason": "SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1004 from Precision Parts Ltd. is for $1890.00 USD. It was rejected because it has been replaced by revision R1 in invoice_1004_revised.json (flag: SUPERSEDED_BY_REVISION). The vendor address matches the vendor master (flag: ADDRESS_ON_FILE), but that does not override the supersession block.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1004_revised.json",
       "invoice": "INV-1004 R1",
       "vendor": "Precision Parts Ltd.",
       "total_usd": 5940.0,
-      "risk": 48,
+      "risk": 38,
       "block_flags": [],
       "warn_flags": [
         "PAST_DUE"
@@ -97,12 +110,14 @@
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor is on file and the $5,940.00 total matches the stated lines and tax, but the vendor address is on the watch list.",
+      "reason": "Known vendor and line math match the $5,940.00 total, under the approval threshold.",
       "conditions": [
-        "Do not pay until a human confirms the PO amendment and why the prior rejection was cleared.",
-        "Confirm the watch-list address before any payment is released."
+        "Do not pay until a human confirms the PO amendment and that the prior rejection is cleared."
       ],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1004 from Precision Parts Ltd. is revision R1 for $5,940.00. It is pending human review: the vendor is known and the line math matches the $5,940.00 total, under the approval threshold, but the earlier INV-1004 was rejected at $1,890.00 and this resubmission uses the same number at $5,940.00, and the notes cite a PO amendment with no PO number or amendment identifier. Flags: ADDRESS_ON_FILE (vendor address matches the vendor master) and REVISION_SUPERSEDES (R1 replaces the prior invoice, $1,890.00 to $5,940.00).",
+      "memo_by": "grok",
+      "grok_calls": 6
     },
     {
       "file": "invoice_1005.json",
@@ -123,27 +138,33 @@
       "payment": "not_paid",
       "reason": "STOCK_EXCEEDED: GadgetX: requested 8, only 5 in stock",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1005 from Global Supply Chain Partners is for $15,225.00. It was rejected because GadgetX was requested at 8 units when only 5 are in stock (STOCK_EXCEEDED). The vendor is also not in the vendor master (UNKNOWN_VENDOR), and the amount is over the $10,000.00 approval threshold and needs extra scrutiny.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1006.csv",
       "invoice": "INV-1006",
       "vendor": "Acme Industrial Supplies",
       "total_usd": 2750.0,
-      "risk": 15,
+      "risk": 20,
       "block_flags": [],
       "warn_flags": [
         "PAST_DUE"
       ],
-      "decision": "APPROVED",
+      "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
-      "payment": "paid $2,750.00",
-      "reason": "Vendor is on the approved master file with bank details on file.",
+      "payment": "not_paid",
+      "reason": "Vendor is on file and line math matches the $2750 total, under the approval threshold.",
       "conditions": [
-        "Confirm bank details against the vendor master before this first payment is released."
+        "Confirm remit-to address and that bank details match the approved vendor record before release."
       ],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1006 from Acme Industrial Supplies is for $2750.00 and is pending a human decision. The vendor is on file and the line math matches the $2750 total, which is under the approval threshold, but this is the first recorded invoice and the vendor master address is blank. A human should clear the info flag VENDOR_NAME_LOOKALIKE because the vendor name resembles the buyer (Acme) before any payment is released.",
+      "memo_by": "grok",
+      "grok_calls": 6
     },
     {
       "file": "invoice_1007.csv",
@@ -165,7 +186,10 @@
       "payment": "not_paid",
       "reason": "STOCK_EXCEEDED: WidgetA: requested 20, only 15 in stock",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1007 from MegaWidgets Corp, totaling $15,525.00, was rejected. It was blocked because WidgetA requested 20 but only 15 are in stock, and WidgetB requested 15 but only 10 are in stock. It was also blocked because subtotal + tax + shipping equals $15,635.00 while the invoice total says $15,525.00. The amount is over the $10,000.00 approval threshold and needs extra scrutiny.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1008.txt",
@@ -187,7 +211,10 @@
       "payment": "not_paid",
       "reason": "UNKNOWN_ITEM: 'SuperGizmo' is not in inventory",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1008 from NoProd Industries for $9,900.00 was rejected. The items SuperGizmo and MegaSprocket are not in inventory, which blocked payment. NoProd Industries is also not in the vendor master, and the total of $9,900.00 sits just under the $10,000.00 limit.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1009.json",
@@ -211,14 +238,17 @@
       "payment": "not_paid",
       "reason": "MISSING_VENDOR: Vendor name is missing",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1009 has no vendor name and a total of $-250.00. It was rejected because the vendor is missing, line 1 (WidgetA) has a negative quantity of -5, the invoice total is negative ($-250.00), the lines sum to $-250.00 while the subtotal says $1,000.00, and subtotal plus tax plus shipping equals $1,000.00 while the total says $-250.00. A due date is also missing.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1010.txt",
       "invoice": "INV-1010",
       "vendor": "Consolidated Materials Group",
       "total_usd": 7185.0,
-      "risk": 28,
+      "risk": 22,
       "block_flags": [],
       "warn_flags": [
         "PAST_DUE",
@@ -228,18 +258,21 @@
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor Consolidated Materials Group is on file and the $7,185.00 total matches the invoice.",
+      "reason": "Vendor is on file, but history has no earlier invoices.",
       "conditions": [
-        "Confirm the rush surcharge is authorized on the PO before paying the $300.00 WidgetA line."
+        "Pay only after a buyer confirms the rush premium was authorized."
       ],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1010 from Consolidated Materials Group totals $7,185.00 and is pending a person, not approved for payment. The vendor is on file, but there are no earlier invoices, and the WidgetA rush line is priced at $300.00, which is 20% above the $250.00 catalog rate (PRICE_VARIANCE). That price-variance warning should be confirmed before payment.",
+      "memo_by": "grok",
+      "grok_calls": 6
     },
     {
       "file": "invoice_1011.pdf",
       "invoice": "INV-1011",
       "vendor": "Summit Manufacturing Co.",
       "total_usd": 3000.0,
-      "risk": 8,
+      "risk": 5,
       "block_flags": [],
       "warn_flags": [
         "PAST_DUE"
@@ -248,9 +281,12 @@
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "paid $3,000.00",
-      "reason": "Vendor Summit Manufacturing Co. is on file.",
+      "reason": "Vendor Summit Manufacturing Co. is on file",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1011 from Summit Manufacturing Co. is for $3,000.00, covering WidgetA and WidgetB, and is due 2026-02-20. It was approved by the VP. The vendor is on file, the line items sum to the $3,000 total with no flags, and the risk score of 5 is well below the high-risk threshold and under the approval limit. There are no flags or conditions on this invoice.",
+      "memo_by": "grok",
+      "grok_calls": 6
     },
     {
       "file": "invoice_1011.txt",
@@ -270,14 +306,17 @@
       "payment": "not_paid",
       "reason": "DUPLICATE_INVOICE: Same invoice already received as invoice_1011.pdf",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1011 from Summit Manufacturing Co. is a $3000.00 bill for WidgetA and WidgetB, due 2026-02-20. It was rejected under hard rules. The flag is block DUPLICATE_INVOICE: the same invoice was already received as invoice_1011.pdf.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1012.pdf",
       "invoice": "INV-1012",
       "vendor": "QuickShip Distributers",
       "total_usd": 9975.0,
-      "risk": 62,
+      "risk": 70,
       "block_flags": [],
       "warn_flags": [
         "PAST_DUE",
@@ -289,7 +328,10 @@
       "payment": "not_paid",
       "reason": "VENDOR_RENAMED: Vendor says it was formerly 'FastShip Ltd.' (on file); new name is not, so verify bank details; hold for human verification of the vendor and bank details",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1012 from QuickShip Distributers is for $9,975.00 and is on hold as PENDING_HUMAN. The main reason is the VENDOR_RENAMED flag: the vendor says it was formerly FastShip Ltd. (on file), but the new name is not, so bank details must be verified before payment. Other flags note SKU_NORMALIZED and OCR_CORRECTED readings, and NEAR_APPROVAL_THRESHOLD because $9,975.00 is just under the $10,000.00 limit.",
+      "memo_by": "grok",
+      "grok_calls": 5
     },
     {
       "file": "invoice_1012.txt",
@@ -310,7 +352,10 @@
       "payment": "not_paid",
       "reason": "DUPLICATE_INVOICE: Same invoice already received as invoice_1012.pdf",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1012 from QuickShip Distributers for $9,975.00 was rejected. The blocking reason is a duplicate invoice: the same bill was already received as invoice_1012.pdf. Other flags only note that item names were normalized, some OCR characters were corrected, $9,975.00 is just under the $10,000.00 limit, and the vendor says it was formerly FastShip Ltd., so bank details should be verified.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1013.json",
@@ -334,7 +379,10 @@
       "payment": "not_paid",
       "reason": "STOCK_EXCEEDED: WidgetA: requested 22 across lines [1, 4, 7], only 15 in stock",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1013 from Atlas Industrial Supply, totaling $22,562.80, was rejected. We cannot fill it because stock is short: WidgetA was requested for 22 across lines 1, 4, and 7 but only 15 are in stock; WidgetB was requested for 18 across lines 2 and 5 but only 10 are in stock; and GadgetX was requested for 9 across lines 3, 6, and 8 but only 5 are in stock. The total also does not add up: subtotal plus tax plus shipping is $22,512.80, but the invoice total says $22,562.80. Line 8 is marked Sample but is still charged $750.00.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1013.pdf",
@@ -359,14 +407,17 @@
       "payment": "not_paid",
       "reason": "STOCK_EXCEEDED: WidgetA: requested 22 across lines [1, 4, 7], only 15 in stock",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1013 from Atlas Industrial Supply, totaling $22,562.80, was rejected. It was blocked because stock was exceeded for WidgetA (22 requested across lines 1, 4, and 7, only 15 in stock), WidgetB (18 requested across lines 2 and 5, only 10 in stock), and GadgetX (9 requested across lines 3, 6, and 8, only 5 in stock); because subtotal + tax + shipping equals $22,512.80 but the total says $22,562.80; and because the same invoice was already received as invoice_1013.json. Line 8 is marked Sample but charged $750.00, and $22,562.80 is over the $10,000.00 threshold that needs extra scrutiny.",
+      "memo_by": "grok",
+      "grok_calls": 2
     },
     {
       "file": "invoice_1014.xml",
       "invoice": "INV-1014",
       "vendor": "TechParts International",
       "total_usd": 4455.0,
-      "risk": 15,
+      "risk": 18,
       "block_flags": [],
       "warn_flags": [
         "PAST_DUE",
@@ -376,19 +427,22 @@
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor is on file, but this is the first invoice with no prior history.",
+      "reason": "Vendor is on file, but this is the first payment and invoice history is empty.",
       "conditions": [
-        "Confirm prices against the PO or catalog before release.",
-        "Verify bank details on file for this first payment."
+        "Confirm EUR pricing against the purchase order or an updated catalog before release.",
+        "Verify bank details on file before the first payment."
       ],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1014 from TechParts International is billed in EUR for a total of 4455.0 USD. The decision is PENDING_HUMAN, so a person must review it before any payment. The vendor is on file, but this is the first payment and invoice history is empty; EUR line prices do not match the USD catalog (WidgetA 225.00 vs 250.0, WidgetB 475.00 vs 500.0); and the open flag is warn CURRENCY_CONVERTED: Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08. Risk score 18 is below 50 and total_usd 4455.0 is under the approval threshold, so it was not auto-approved.",
+      "memo_by": "grok",
+      "grok_calls": 6
     },
     {
       "file": "invoice_1015.csv",
       "invoice": "INV-1015",
       "vendor": "Reliable Components Inc.",
       "total_usd": 6500.0,
-      "risk": 5,
+      "risk": 8,
       "block_flags": [],
       "warn_flags": [
         "PAST_DUE"
@@ -397,9 +451,12 @@
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "paid $6,500.00",
-      "reason": "Vendor Reliable Components Inc. is on file.",
+      "reason": "Vendor Reliable Components Inc. is on file",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1015 from Reliable Components Inc. is for $6,500.00. It was approved by the VP because the vendor is on file, the line items sum to the $6,500 total with no flags, and the risk score of 8 is well below the high-risk threshold and under the approval limit. There are no flags on this invoice.",
+      "memo_by": "grok",
+      "grok_calls": 6
     },
     {
       "file": "invoice_1016.json",
@@ -419,7 +476,10 @@
       "payment": "not_paid",
       "reason": "UNKNOWN_ITEM: 'WidgetC' is not in inventory",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-1016 from Widgets Inc. for $3233.00 was rejected. The hard-rules check blocked it because line item WidgetC is not in inventory. The vendor address does match the vendor master at 100 Main St, Chicago, IL 60601, but that does not override the unknown-item block.",
+      "memo_by": "grok",
+      "grok_calls": 2
     }
   ]
 }
