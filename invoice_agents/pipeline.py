@@ -1,5 +1,4 @@
-"""Ingest + validate only (used by validation tests). The full pipeline is invoice_agents/graph.py.
-LangGraph wiring comes with the approval agent."""
+"""Ingest + validate only (used by validation tests). The full pipeline is invoice_agents/graph.py."""
 from __future__ import annotations
 
 from pathlib import Path
