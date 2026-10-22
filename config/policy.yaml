@@ -19,6 +19,7 @@ approval:
     vendor_renamed: true             # VENDOR_RENAMED flag ("formerly X")
     vendor_lookalike: true           # VENDOR_LOOKALIKE flag (name close to a vendor on file, see vendor_lookalike)
     llm_repaired: true               # decision 10: Grok rebuilt the invoice from raw text because the parser could not read it
+    model_mismatch: true             # live: the API reported a model other than the configured one (model pin, README Repeatability)
 
 # Decision 7: duplicates by content. An invoice with the same vendor (normalized name), line items,
 # quantities and total as an earlier one is a DUPLICATE_INVOICE (blocking) even under a new number.
@@ -70,7 +71,7 @@ risk:
     - '\bapprove\s+(this|the)\s+invoice\b[^.\n]{0,30}\b(without|no)\s+(review|checks?|verification|approval)\b|\b(auto-?approve|automatically\s+approve)\s+(this|the)\s+invoice\b'   # approve and skip the checks (3001)
     # Generic forms (reviewer pass). Every pattern is checked on all 30 test invoices and on harmless notes in
     # tests/test_approval.py; a plain 'approve this invoice' or 'automated system' no longer matches on its own.
-    - '\b(ignore|disregard|forget|override|bypass)\b[^.\n]{0,40}\b(instructions?|guidance|guidelines|rules|polic(y|ies)|prompts?)\b'   # override the rules
+    - '\b(ignore|disregard|forget|override|bypass)\s+(all\s+|any\s+)?(of\s+)?(your|the|these|those|its|my|our)?\s*(previous|prior|above|earlier|preceding|original|system|internal|standard|usual|existing)?\s*(instructions?|guidance|guidelines|rules|polic(y|ies)|prompts?)\b'   # override the rules; the rule word must follow directly, so "disregard the previous delivery instructions" does not match
     - '\b(to|for|dear|hey|hello|attention)\b[^.\n]{0,12}\b(ai|llm|assistant|bot)\b[\s-]{0,3}(reviewer|agent|system|assistant|model|checker)\b'   # addresses the AI (3002)
     - '\b(skip|bypass|without)\b[^.\n]{0,20}\b(human|manual)\s+(review|approval|check|verification)\b'                              # skip the human
     - '\bmark\s+(it|this(\s+invoice)?|the\s+invoice)\s+(as\s+)?(approved|paid|verified|low[\s-]risk)\b'                             # dictate the outcome

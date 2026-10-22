@@ -1,7 +1,7 @@
 """Acme invoice agents CLI.
 
   python main.py --invoice_path=data/invoices/invoice_1001.txt
-  python main.py --batch data/invoices [--offline] [--chaos 0.3] [--json]
+  python main.py --batch data/invoices [--offline] [--chaos 0.3] [--json] [--no-cache]
   python main.py review                       # list the human review queue
   python main.py review INV-1012 --approve    # or --reject, optional --note
   python main.py eval [--live]                # the four evals (same as python -m evals)
@@ -41,6 +41,7 @@ def run(
     seed: Optional[int] = typer.Option(None, "--seed", help="Seed for --chaos"),
     as_json: bool = typer.Option(False, "--json", help="Print full JSON states"),
     run_id: Optional[str] = typer.Option(None, "--run-id", help="Name of the runs/<run_id> folder"),
+    no_cache: bool = typer.Option(False, "--no-cache", help="Live: do not reuse or store Grok answers (decision cache)"),
     log: Optional[bool] = typer.Option(None, "--log/--no-log",
                                        help="Print each agent step as a JSON line (default: on for one file, off for --batch)"),
 ):
@@ -58,7 +59,7 @@ def run(
     except LLMUnavailable as e:
         console.print(f"[red]{e}.[/] Set it (see .env.example) or run offline with --offline.")
         raise typer.Exit(2)
-    rc = make_context(llm=llm, chaos=chaos, seed=seed, run_id=run_id)
+    rc = make_context(llm=llm, chaos=chaos, seed=seed, run_id=run_id, cache=not no_cache)
     model = getattr(llm, "model", None)
     if not as_json:
         console.print(f"[bold]Acme invoice agents[/]  mode=[cyan]{llm.name}[/]{' ' + model if model else ''}  "
@@ -75,6 +76,16 @@ def run(
             if msg:
                 print(f"mock_payment: {msg}")
         print_summary(states, console, llm.name, rc.run_dir)
+        info = getattr(rc.llm, "info", None)
+        if info is not None:
+            pinned = [st for st in states if any(f.code == "MODEL_MISMATCH" for f in st.flags)]
+            hits = sum(e.detail.get("hits", 0) for st in states for e in st.trace if e.step == "model_pin")
+            misses = sum(e.detail.get("misses", 0) for st in states for e in st.trace if e.step == "model_pin")
+            console.print(f"Decision cache: {'on' if not no_cache else 'off (--no-cache)'}; {hits} Grok answers reused, "
+                          f"{misses} new calls stored." if not no_cache else "Decision cache: off (--no-cache).")
+            if pinned:
+                console.print(f"[yellow]Model pin: {len(pinned)} invoice(s) got answers from a model other than "
+                              f"{model}; held for a human (MODEL_MISMATCH).[/]")
 
 
 def missing_path(target: Path) -> None:

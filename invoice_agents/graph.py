@@ -22,6 +22,7 @@ from .agents.payment import PaymentAgent, log_rejection
 from .config import load_policy
 from .db import Inventory, connect
 from .hitl import enqueue
+from .cache import CachedLLM
 from .llm import LLMClient, OfflineClient
 from .models import Decision, DecisionStatus, InvoiceState, TraceEvent
 from .parsers import parse_file
@@ -83,6 +84,8 @@ def _safe(name: str, fn: Callable[[InvoiceState], InvoiceState], llm: Any = None
 
 def build_graph(ctx: RunContext):
     def do_ingest(s: InvoiceState) -> InvoiceState:
+        if isinstance(ctx.llm, CachedLLM):
+            ctx.llm.start(s.source)   # per-invoice cache key and model record
         return ingest(s.source, ctx.inventory, ctx.llm)
 
     def route(g: GraphState) -> str:
@@ -140,8 +143,12 @@ def new_run_id() -> str:
 
 def make_context(llm: LLMClient | None = None, db: str | None = None, chaos: float = 0.0, seed: int | None = None,
                  runs_dir: Path | None = ROOT / "runs", run_id: str | None = None, base_delay: float = 0.2,
-                 sleep: Callable[[float], None] = time.sleep) -> RunContext:
+                 sleep: Callable[[float], None] = time.sleep, cache: bool = True) -> RunContext:
+    """cache: reuse stored Grok answers for a repeated invoice (live only; see invoice_agents/cache.py).
+    With cache=False the model pin still applies; nothing is read from or written to the cache."""
     conn = connect(db)
+    if llm is not None and llm.available and not isinstance(llm, CachedLLM):
+        llm = CachedLLM(llm, conn, enabled=cache)
     run_id = run_id or new_run_id()
     run_dir = None
     if runs_dir is not None:

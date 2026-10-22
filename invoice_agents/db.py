@@ -30,6 +30,47 @@ def migrate(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} {typ}")
     for st in INDEXES:
         conn.execute(st)
+    backfill(conn)
+
+
+def backfill(conn: sqlite3.Connection) -> int:
+    """Fill empty history keys on rows stored before those columns existed, so older databases get the
+    same cross-run duplicate checks. number_key and base_fp come from the stored columns; content_key
+    needs the line items, so the stored source file is ingested again offline (only if it still exists and still
+    has the same fingerprint). Rows with no run_id are marked 'legacy', meaning stored by an earlier run.
+    Returns the number of rows updated. Runs on every connect; it is a no-op once nothing is empty."""
+    rows = conn.execute("SELECT id, invoice_number, revision, vendor, total, source_file FROM invoices WHERE "
+                        "run_id IS NULL OR number_key IS NULL OR base_fp IS NULL OR content_key IS NULL").fetchall()
+    if not rows:
+        return 0
+    from .agents.ingestion import ingest
+    from .models import Invoice
+    from .validation import content_hash, fingerprint, number_key
+    prev, conn.row_factory = conn.row_factory, sqlite3.Row   # Inventory reads columns by name
+    try:
+        inventory = Inventory(conn)
+    finally:
+        conn.row_factory = prev
+    n = 0
+    for rid, number, revision, vendor, total, source in rows:
+        inv = Invoice(number=number, revision=revision, vendor=vendor, total=total)
+        ckey = None
+        src = Path(source) if source else None
+        if src is not None and not src.is_absolute() and not src.exists():
+            src = ROOT / src
+        if src is not None and src.exists():
+            try:
+                parsed = ingest(src, inventory).invoice   # same offline ingestion as a run, no LLM
+                if parsed is not None and fingerprint(parsed) == fingerprint(inv):
+                    ckey = content_hash(parsed)
+            except Exception:  # noqa: BLE001 - an unreadable old file keeps an empty content key
+                ckey = None
+        conn.execute("UPDATE invoices SET run_id=COALESCE(run_id, 'legacy'), number_key=COALESCE(number_key, ?), "
+                     "base_fp=COALESCE(base_fp, ?), content_key=COALESCE(content_key, ?) WHERE id=?",
+                     (number_key(inv), fingerprint(inv), ckey, rid))
+        n += 1
+    conn.commit()
+    return n
 
 
 def init_db(path: Path | str | None = None) -> Path:

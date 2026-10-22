@@ -25,7 +25,7 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, Field
 
 from ..llm import LLMClient
-from ..models import Decision, DecisionStatus, InvoiceState, Severity, TraceEvent
+from ..models import Decision, DecisionStatus, Flag, InvoiceState, Severity, TraceEvent
 from ..validation import ADVISORY
 
 AGENT = "approval"
@@ -289,4 +289,29 @@ def approve(state: InvoiceState, llm: LLMClient, policy: dict[str, Any]) -> Invo
     d = decide(state, vp, critic, policy)
     state.decision = d
     state.trace.append(TraceEvent(agent=AGENT, step="decide", detail=d.model_dump(mode="json")))
+    return pin_check(state, llm, policy)
+
+
+def pin_check(state: InvoiceState, llm: Any, policy: dict[str, Any]) -> InvoiceState:
+    """Model pin. Every model id the API reported for this invoice (live, or stored with a cached answer)
+    must equal the configured model. Otherwise: a MODEL_MISMATCH warning, and the invoice is held for a
+    human unless the hard rules already rejected it (a rejection is never turned into a hold)."""
+    info = llm.info() if hasattr(llm, "info") else None
+    if not info:
+        return state
+    state.trace.append(TraceEvent(agent=AGENT, step="model_pin", detail=info))
+    other = [m for m in info["returned_models"] if m != info["configured_model"]]
+    if not other:
+        return state
+    msg = (f"The API reported model {', '.join(sorted(set(other)))}, not the configured {info['configured_model']}; "
+           "answers from a different model are not trusted to decide")
+    state.flags.append(Flag(code="MODEL_MISMATCH", severity=Severity.WARN, message=msg,
+                            evidence={"configured": info["configured_model"], "returned": sorted(set(other))}))
+    cfg = policy.get("approval", {}).get("hard_holds", {}) or {}
+    d = state.decision
+    if cfg.get("model_mismatch", True) and d is not None and d.status != DecisionStatus.REJECTED:
+        state.decision = Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="model_pin",
+                                  risk_score=d.risk_score, reasons=[f"MODEL_MISMATCH: {msg}; hold for a human"] + d.reasons,
+                                  arguments={"decision_before_pin": d.model_dump(mode="json")})
+        state.trace.append(TraceEvent(agent=AGENT, step="decide", detail=state.decision.model_dump(mode="json")))
     return state

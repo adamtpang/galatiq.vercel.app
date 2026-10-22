@@ -296,6 +296,10 @@ def test_generic_injection_patterns_catch_unseen_phrasings(inventory, policy, te
     "Questions? Our AI assistant can help at support.widgets.example.",
     "Note to accounts payable: PO 4471 covers this order.",
     "Attention AP team: new remit address effective March 1.",
+    # tripped 'override the rules' before the rule word had to follow the verb directly
+    "Please disregard the previous delivery instructions; ship to dock 4.",
+    "Ignore the old PO number on the packing slip; the correct PO is 4471.",
+    "Override the default shipping instructions per our call on Monday.",
 ])
 def test_generic_injection_patterns_leave_normal_notes_alone(inventory, policy, text):
     st = state_for(inventory, policy, [A(1)], raw=text)

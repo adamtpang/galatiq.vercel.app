@@ -249,12 +249,14 @@ def agreement(offline: dict[str, dict], live: dict[str, dict], files: list[str],
 
 
 # --- (c2) the duplicate traps across separate runs -------------------------------------
-def separate_run_eval(expected: dict, db_dir: Path) -> dict:
+def separate_run_eval(expected: dict, db_dir: Path, llm=None) -> dict:
     """The adversarial set as its own later run, after the samples were processed in an earlier run on the
-    same database (what an AP team does day to day). Rules only: the duplicate checks run before any Grok call."""
+    same database (what an AP team does day to day). Offline by default; --separate-run-live runs it with Grok
+    (decision cache off, so every answer is a fresh call)."""
     db = str(db_dir / "separate.db")
-    run_batch(collect(SAMPLES), make_context(llm=OfflineClient(), db=db, runs_dir=None, run_id="separate-samples"))
-    states = run_batch(collect(ADV), make_context(llm=OfflineClient(), db=db, runs_dir=None, run_id="separate-adversarial"))
+    llm = llm or OfflineClient()
+    run_batch(collect(SAMPLES), make_context(llm=llm, db=db, runs_dir=None, run_id="separate-samples", cache=False))
+    states = run_batch(collect(ADV), make_context(llm=llm, db=db, runs_dir=None, run_id="separate-adversarial", cache=False))
     res = adversarial_eval(states, expected)
     dup = next(c for c in res["cases"] if c["file"] == "invoice_3006_duplicate_new_number.txt")
     return res | {"duplicate_3006": {k: dup[k] for k in ("decision", "decided_by", "caught", "flags")}
@@ -550,6 +552,43 @@ def web_summary(off: dict, live: dict | None) -> dict:
     }
 
 
+def separate_run_live(out: Path, write: bool = True) -> int:
+    """Live version of (c2): writes separate_run_live.json and .md."""
+    from invoice_agents.graph import llm_usage
+    expected, pricing = load_yaml("adversarial_expected.yaml"), load_yaml("pricing.yaml")
+    try:
+        client = GrokClient()
+    except LLMUnavailable as e:
+        print(f"{e}; --separate-run-live needs the xAI API.")
+        return 2
+    t0 = time.monotonic()
+    res = separate_run_eval(expected, Path(tempfile.mkdtemp(prefix="evals-sep-")), llm=client)
+    u = llm_usage(client.usage_log)
+    ticks = u.get("cost_in_usd_ticks")
+    res |= {"mode": "live", "model": client.model, "commit": git_commit(),
+            "generated_at": datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"), "wall_s": round(time.monotonic() - t0, 1),
+            "usage": {k: u[k] for k in ("calls", "prompt_tokens", "cached_prompt_tokens", "completion_tokens", "reasoning_tokens")},
+            "list_price_usd": round(price(u, pricing), 4),
+            "billed_usd": round(ticks / 1e10, 4) if ticks is not None else None,
+            "returned_models": sorted({r.get("model") for r in client.usage_log if r.get("model")})}
+    lines = [f"# Separate later run, live ({res['model']}, {res['generated_at']}, commit {res['commit']})", "",
+             "The 20 samples run first, then the 7 adversarial invoices as a new run on the same database.", "",
+             f"Caught {res['caught']}/{res['total']}. Missed: {', '.join(res['missed']) or 'none'}. "
+             f"Both runs: {u['calls']} Grok calls, {res['wall_s']} s, billed ${res['billed_usd']} "
+             f"(list price ${res['list_price_usd']}). Models the API reported: {', '.join(res['returned_models'])}.", "",
+             "| file | trap | decision | decided by | risk | caught |", "|---|---|---|---|---|---|"]
+    lines += [f"| {c['file']} | {c['trap']} | {c['decision']} | {c['decided_by']} | {c['risk_score']} | {c['caught']} |"
+              for c in res["cases"]]
+    lines += ["", "3006: " + res["duplicate_3006"]["reason"], ""]
+    md = "\n".join(lines)
+    if write:
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "separate_run_live.json").write_text(json.dumps(res, indent=1, default=str))
+        (out / "separate_run_live.md").write_text(md)
+    print(md)
+    return 0 if not res["missed"] else 1
+
+
 def latest_live(out: Path) -> dict | None:
     """The live results to compare against: this output dir's own live run if any, else the committed snapshot."""
     for d in (out, RESULTS):
@@ -566,8 +605,12 @@ def main(argv: list[str] | None = None) -> int:
                     help=f"write the committed snapshot instead: {rel(RESULTS)} and web/data/evals.json")
     ap.add_argument("--no-write", action="store_true", help="print the summary only, write no files")
     ap.add_argument("--report-only", action="store_true", help="re-render the .md files from the saved .json results")
+    ap.add_argument("--separate-run-live", action="store_true",
+                    help="only the separate-later-run eval, live: samples, then the adversarial set as a new run (needs XAI_API_KEY)")
     args = ap.parse_args(argv)
     out = RESULTS if args.write_snapshot else args.out
+    if args.separate_run_live:
+        return separate_run_live(out, write=not args.no_write)
 
     def finish(off: dict, live: dict | None) -> int:
         md = summary_md(off, live)

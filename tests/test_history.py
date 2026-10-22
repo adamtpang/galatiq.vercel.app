@@ -96,6 +96,23 @@ def test_old_database_is_migrated(tmp_path):
     assert {"run_id", "number_key", "base_fp", "content_key"} <= cols
 
 
+def test_old_database_rows_are_backfilled_and_catch_a_later_duplicate(tmp_path):
+    """An INV-1001 row stored before the history columns existed: on connect its keys are filled in,
+    so 3006 (same content, new number) is rejected in a later run, and the original re-run is not."""
+    p = tmp_path / "old.db"
+    run(p, [INVOICES / "invoice_1001.txt"], "old")
+    with sqlite3.connect(p) as c:   # make it look like a database from before the reviewer pass
+        c.execute("UPDATE invoices SET run_id=NULL, number_key=NULL, base_fp=NULL, content_key=NULL")
+    conn = connect(p)
+    row = conn.execute("SELECT run_id, number_key, base_fp, content_key FROM invoices").fetchone()
+    assert row["run_id"] == "legacy" and all(row[k] for k in ("number_key", "base_fp", "content_key"))
+    st = run(p, [ADV / "invoice_3006_duplicate_new_number.txt"], "new")["invoice_3006_duplicate_new_number.txt"]
+    dup = next(f for f in st.flags if f.code == "DUPLICATE_INVOICE")
+    assert st.decision.status == DecisionStatus.REJECTED and dup.evidence["match"] == "content"
+    again = run(p, [INVOICES / "invoice_1001.txt"], "again")["invoice_1001.txt"]
+    assert "DUPLICATE_INVOICE" not in codes(again) and again.payment["status"] == "already_paid"
+
+
 def test_review_approve_end_to_end_then_rerun(db):
     conn = connect(db)
     row = hitl.find(conn, "INV-1012")
