@@ -62,7 +62,7 @@
       "invoice": "INV-1004",
       "vendor": "Precision Parts Ltd.",
       "total_usd": 1890.0,
-      "risk": 0,
+      "risk": 30,
       "block_flags": [
         "SUPERSEDED_BY_REVISION"
       ],
@@ -80,14 +80,14 @@
       "invoice": "INV-1004 R1",
       "vendor": "Precision Parts Ltd.",
       "total_usd": 5940.0,
-      "risk": 0,
+      "risk": 30,
       "block_flags": [],
       "warn_flags": [],
-      "decision": "APPROVED",
+      "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
-      "payment": "paid $5,940.00",
-      "reason": "Vendor is on file",
+      "payment": "not_paid",
+      "reason": "Vendor address is on the watch list: 742 evergreen terrace",
       "conditions": [],
       "errors": []
     },

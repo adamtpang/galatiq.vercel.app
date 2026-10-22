@@ -1,141 +1,173 @@
-# Acme invoice agents (Galatiq case)
+# Acme invoice agents
 
+[![CI](https://github.com/adamtpang/galatiq.vercel.app/actions/workflows/ci.yml/badge.svg)](https://github.com/adamtpang/galatiq.vercel.app/actions/workflows/ci.yml)
 
-**Work in progress:** multi-agent invoice processing for the Galatiq case. Landing page: https://galatiq.vercel.app
+Four agents that read, check, approve and pay Acme Corp's invoices, with Grok (xAI) as the reasoning engine. Every decision comes with reasons and a full trace. Code does all the math; the model only extracts and argues.
 
-Acme Corp loses about $2M a year to manual invoice processing (30% error rate, 5-day delays).
-This repo is building a four-stage agent pipeline: **Ingest -> Validate -> Approve (VP + critic loop) -> Pay or reject**, with xAI's Grok as the LLM.
+**Live demo:** https://galatiq.vercel.app replays the two committed runs below, invoice by invoice, with every agent step, flag and VP/critic argument.
 
-## What exists today
+## The problem
 
-| Stage | Status |
-|---|---|
-| Ingestion agent (PDF, TXT/email, CSV, JSON, XML) | Built. Deterministic parsers read all 20 sample files. Grok repair runs only when the parser fails. |
-| Validation agent (inventory, math, dates, FX, prices, vendors, duplicates) | Built. Emits typed flags (info, warn, block) with evidence. |
-| Risk agent | Built. Deterministic signals (urgency wording, wire pressure, unknown vendor, watch-listed address, total just under the limit, vendor rename, math mismatch, price variance) with weights in `config/policy.yaml`, score 0 to 100. In live mode Grok may add reasons and raise the score, never lower it. |
-| Approval agent | Built to Adam's policy (see Decisions). Hard rules first, then a VP agent, then a critic loop when triggered, max 2 rounds, deadlock goes to a human. Grok in live mode; fixed offline rules otherwise. |
-| Payment agent | Built. Wraps the case's `mock_payment` unchanged, checks an idempotency key in SQLite before paying, retries 3 times with exponential backoff, `--chaos` fault injection, rejection log. |
-| Human review queue | Built. PENDING_HUMAN invoices go to a SQLite queue; `python main.py review INV-1012 --approve`. |
-| Orchestration | Built with LangGraph: ingest, validate, risk, approval, then pay, reject or hold, then report. JSONL trace per run in `runs/<run_id>/trace.jsonl`. |
-| Golden tests | `tests/golden.yaml` lists the expected offline decision and payment for all 20 files. All pass. |
-| Demo runs | `runs/demo/offline` and `runs/demo/live` (Grok) with full traces; compared in [docs/run_log.md](docs/run_log.md). |
+Acme Corp spends about $2M a year on manual invoice processing. Invoices arrive as PDFs, emails, CSVs, JSON and XML. Staff retype them, check them against a shaky inventory database and chase a VP for sign-off. 30% carry an error and payment takes 5 days. The 20 sample invoices in the case include the usual traps: an unknown vendor demanding a $100K wire, stock that does not exist, a revised invoice, duplicates across formats, a renamed vendor billing $25 under the approval limit, math that does not add up, a negative quantity, EUR billing and OCR noise.
 
-## CI
+## Quickstart (offline, about a minute)
 
-The GitHub Actions workflow is ready in `ci/github-actions-ci.yml` (offline suite on Python 3.11 and 3.12, plus an offline batch run). It is not active yet: it needs to be copied to `.github/workflows/ci.yml` by an account allowed to push workflow files. The badge goes here once it runs.
-
-## Quickstart
+Python 3.11 or newer. No API key needed.
 
 ```bash
+git clone https://github.com/adamtpang/galatiq.vercel.app galatiq && cd galatiq
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python main.py --invoice_path=data/invoices/invoice_1001.txt
-python main.py --batch data/invoices --offline          # all 20 samples
-python main.py --batch data/invoices --chaos 0.3        # bank fails 30% of calls; watch the retries
-python main.py review                                   # human review queue
-python main.py review INV-1012 --approve --note "called vendor"
-pytest                                                  # offline suite, a few seconds
+pip install -r requirements.txt && python main.py --batch data/invoices
 ```
 
-Without `XAI_API_KEY` everything runs offline. With a key, `--mode auto` (the default) uses Grok for the risk review, VP and critic, and to repair invoices the parser cannot read. Use `--offline` for the deterministic rules. `pytest -m live` runs one real call.
-The database (`inventory.db`) is created on first run. Payments are idempotent across runs, so a second batch run pays nothing new.
+That processes all 20 samples and prints a summary table plus the paths to `runs/<run_id>/trace.jsonl`, `summary.json` and `report.md`. Verified on a fresh clone and a new venv (see Testing for timing).
 
-## How it works
+More commands:
 
-- **Ingestion** (`invoice_agents/agents/ingestion.py`): reads the file (pdfplumber layout text, PyMuPDF fallback), routes to a format parser, fixes OCR look-alikes inside numbers (`2O26` -> `2026`, `$3,500.O0` -> `$3,500.00`), normalizes dates (ISO, `Jan 30 2026`, `26-Jan-2026`, `MM/DD/YYYY`; `yesterday` is kept as raw text and flagged) and maps item names to SKUs with a confidence score. SKU matching only accepts safe changes (case, spacing, a trailing note like `(rush order)`, OCR look-alikes). It never accepts a match by edit distance, so `WidgetC` stays unknown instead of becoming `WidgetA`.
-- **LLM repair** (`invoice_agents/llm.py`): `GrokClient` uses the OpenAI client against `https://api.x.ai/v1` with a JSON schema response. Pydantic validation errors are fed back to the model, up to 3 attempts, and every attempt is traced. Invoice text is treated as data, not instructions. `OfflineClient` makes no calls. Arithmetic is always checked by code, never by the model.
-- **Validation** (`invoice_agents/validation.py`): small pure functions (`check_inventory`, `check_math`, `check_dates`, `check_currency`, `check_prices`, `check_vendor`, ...) that each return flags.
+```bash
+python main.py --invoice_path=data/invoices/invoice_1012.pdf   # one invoice
+python main.py --batch data/invoices --chaos 0.3               # bank fails 30% of calls; watch the retries
+python main.py review                                          # human review queue
+python main.py review INV-1012 --approve --note "called vendor"
+python main.py --batch data/invoices --mode live               # Grok for risk review, VP and critic (needs XAI_API_KEY)
+pytest                                                         # offline suite, about 2 seconds
+```
 
-### Flag codes
+Without `XAI_API_KEY` everything runs offline on deterministic rules. With a key, the default `--mode auto` uses Grok (`grok-4.7`, override with `XAI_MODEL`). `--offline` forces the rules. The SQLite database (`inventory.db`) is created on first run. Payments are idempotent, so a second batch run pays nothing new.
 
-| Code | Severity | Meaning |
-|---|---|---|
-| UNKNOWN_ITEM | block | Item not in inventory |
-| ZERO_STOCK | block | Item exists but stock is 0 |
-| STOCK_EXCEEDED | block | Requested qty (summed over repeated lines) > stock. Evidence: item, requested, stock, lines |
-| LINES_AGGREGATED | info | SKU on several lines, total still within stock |
-| NEGATIVE_QTY, NEGATIVE_PRICE, NEGATIVE_TOTAL | block | Data integrity |
-| ZERO_QTY | warn | Line with quantity 0 |
-| MISSING_VENDOR, MISSING_ITEMS, MISSING_TOTAL | block | Required field absent |
-| MISSING_INVOICE_NUMBER, MISSING_DUE_DATE | warn | Field absent |
-| LINE_AMOUNT_MISMATCH, SUBTOTAL_MISMATCH, TOTAL_MISMATCH | block | Arithmetic off by more than $0.01 |
-| TAX_MISMATCH | warn | Tax amount does not match the printed rate |
-| INVALID_DUE_DATE | block | Due date is relative ("yesterday") or unreadable |
-| INVALID_DATE, DUE_BEFORE_ISSUE | warn | Date problems |
-| TERMS_MISMATCH | info | "Net N" does not match the due-date gap |
-| PRICE_VARIANCE | warn / info | Over 10% above catalog (warn) or over 10% below (info), compared in USD |
-| CURRENCY_CONVERTED | warn | Non-USD, converted with the mock FX table |
-| UNSUPPORTED_CURRENCY | block | No FX rate |
-| SAMPLE_CHARGED | warn | A line marked "Sample" still costs money |
-| UNKNOWN_VENDOR, VENDOR_RENAMED | warn | Vendor not on file, or "formerly X" rename |
-| VENDOR_NOT_APPROVED | block | Vendor on file but not approved |
-| VENDOR_NAME_LOOKALIKE | info | Vendor name contains the buyer's name (Acme) |
-| OVER_APPROVAL_THRESHOLD, NEAR_APPROVAL_THRESHOLD | info | Over $10,000, or at least $9,500 |
-| DUPLICATE_INVOICE | block | Same number, vendor and total already seen in this run |
-| REVISION_SUPERSEDES / SUPERSEDED_BY_REVISION | info / block | A revision (e.g. R1) replaces an earlier copy |
-| DUPLICATE_NUMBER_CONFLICT | block | Same number, different content, no revision marker |
-| OCR_CORRECTED, SKU_NORMALIZED | info | What the normalizers changed |
-| EXTRACTION_FAILED | block | Nothing could be extracted |
+## Results on the 20 samples
 
-## Decisions (Adam)
+From [docs/run_log.md](docs/run_log.md), two committed runs on fresh databases (`runs/demo/offline`, `runs/demo/live`):
 
-Source of truth for `config/policy.yaml`:
+| Run | Paid | Rejected | Held for a human | High-risk invoices rejected |
+|---|---|---|---|---|
+| Offline rules | 6 invoices, $28,890.00 | 12 | 2 | 2, $115,225.00 |
+| Live, grok-4.7 | 4 invoices, $18,955.00 | 12 | 4 | 2, $115,225.00 |
 
-1. Over-stock (after summing repeated lines): **REJECT**. Encoded as the blocking `STOCK_EXCEEDED` flag with item, requested qty and stock.
-2. VP and critic still disagree after 2 rounds: **PENDING_HUMAN**, with both arguments attached.
-3. The critic loop runs only for invoices over $10K, near the limit, or high risk. Other invoices are decided by the VP agent alone, after the hard rules.
-4. Thresholds: approval $10,000; near the limit means total >= $9,500; high risk means risk_score >= 50 out of 100.
+| File | Offline | Live | Why |
+|---|---|---|---|
+| 1001, 1011.pdf, 1014, 1015 | Paid | Paid | Known vendor, clean math. 1014 paid in USD at the mock EUR rate. |
+| 1006, 1010 | Paid | Held | Live VP wanted the due date (1006) and the $300 rush price (1010) confirmed first. |
+| 1004_revised | Held | Held | Vendor address 742 Evergreen Terrace is on the watch list. |
+| 1012.pdf | Held (VP/critic deadlock) | Held (VP) | Renamed vendor, total $9,975, $25 under the limit. |
+| 1002, 1005, 1007, 1013 (x2) | Rejected | Rejected | Quantity over stock (1013 after summing repeated lines). 1007 and 1013 totals are also wrong. |
+| 1003 | Rejected | Rejected | Fraudster LLC: zero-stock item, "due yesterday", unknown vendor, risk 60. |
+| 1008, 1016 | Rejected | Rejected | Items not in inventory (WidgetC is not fuzzy-matched to WidgetA). |
+| 1009 | Rejected | Rejected | Missing vendor, negative quantity and total. |
+| 1004 | Rejected | Rejected | Superseded by its revision R1. |
+| 1011.txt, 1012.txt | Rejected | Rejected | Duplicates of the PDF copies. |
 
-5. The VP and critic prompts are Adam's exact text (`invoice_agents/agents/approval.py`). The LLM never computes or changes amounts; code computes every number and the payment amount. Invoice text is passed inside `<invoice_document>` tags as data, not instructions.
+12 of 20 are decided by hard rules with no LLM call, so both runs agree on them by construction. Every live/offline difference goes the cautious way: Grok held invoices the rules would have paid, never the reverse.
 
-All values are in `config/policy.yaml` (`approval:` and `risk:`).
+"High-risk invoices rejected" is the sum of totals of rejected invoices with risk score at least 50. Both were also blocked by hard rules, so this is money that never reached a payment step, not a fraud-detection rate.
 
-### How a decision is made
+## Architecture
 
-1. **Hard rules**: any blocking flag means REJECTED, with the flag messages as reasons. No LLM call.
-2. **VP agent**: approve, reject or hold (hold means PENDING_HUMAN), 1 to 3 reasons, optional payment conditions.
-3. **Critic**, only if the total is over $10,000, at least $9,500, or risk is at least 50, and only if the VP approves. Each round the critic objects or signs off; after an objection the VP may revise. If the VP still approves after 2 objections, the invoice goes to PENDING_HUMAN with both arguments attached.
-4. Approved invoices are paid; rejections are logged; holds go to the review queue.
+```
+file ─▶ Ingest ─▶ Validate ─▶ Risk ─▶ Approve ─┬─▶ Pay (mock_payment, idempotent, retries)
+                                               ├─▶ Reject (logged with reasons)
+                                               └─▶ Hold (human review queue)
+```
 
-Offline, the VP approves only a known vendor with clean math, turning explainable warnings (price variance, FX, rename) into payment conditions, and holds anything else. The offline critic objects to a rename, a total just under the limit, a price more than 25% off catalog, or pushy wording. Conditions do not change those facts, so on 1012 the two disagree for 2 rounds and it goes to a human.
+A LangGraph `StateGraph` (`invoice_agents/graph.py`) passes one typed `InvoiceState` (Pydantic v2) through five nodes. Each node appends to a JSONL trace.
 
-## Assumptions
+- **Ingest** (`agents/ingestion.py`): pdfplumber layout text with a PyMuPDF fallback, then format parsers for text/email, CSV, JSON, XML and PDF. Fixes OCR look-alikes inside numbers (`2O26`, `$3,500.O0`), normalizes dates, maps item names to SKUs with a confidence score. Grok repair runs only when the parser cannot produce a valid invoice.
+- **Validate** (`validation.py`): small pure functions for inventory, arithmetic, dates, currency, prices, vendor and duplicates. Each returns flags with a code, a severity (info, warn, block) and evidence. A batch prescan finds revisions and duplicates before any decision.
+- **Risk** (`agents/risk.py`): weighted signals from `config/policy.yaml` (urgency wording, wire pressure, unknown vendor, watch-listed address, total just under the limit, vendor rename, math mismatch, price variance), score 0 to 100. In live mode Grok adds reasons and can raise the score, never lower it.
+- **Approve** (`agents/approval.py`): hard rules, then a VP agent, then a critic loop when triggered.
+- **Pay** (`agents/payment.py`): wraps the case's `mock_payment` unchanged. An idempotency key in SQLite stops double payment, 3 retries with exponential backoff, `--chaos` fault injection. Rejections go to an audit log; holds go to the `review_queue` table.
 
-- **Catalog prices** (`config/seed.sql`): WidgetA $250, WidgetB $500, GadgetX $750, the price each item has on most sample invoices. FakeItem has no price (NULL). Stock levels follow the case brief.
-- **Vendor master** is a mock. It lists the vendors on the samples that show no other red flags. Fraudster LLC, NoProd Industries and Global Supply Chain Partners are not on file. FastShip Ltd. is on file and its new name, QuickShip Distributers, is not.
-- **FX** is a fixed mock table (EUR 1.08 USD) so runs are deterministic.
-- **Duplicates and revisions**: a batch is prescanned before any decision, so an original that has a later revision is flagged SUPERSEDED_BY_REVISION and never paid. Across runs, the payment idempotency key prevents paying the same invoice twice.
-- **Batch order** is filename order, so `invoice_1011.pdf` counts as the first copy and `invoice_1011.txt` as the duplicate.
-- **Payment currency**: the mock bank is paid in USD, using the deterministic FX conversion (1014: EUR 4,125 is paid as $4,455).
-- Validation does not decrement stock.
+Design rules: the LLM never computes or changes an amount. Invoice text is passed inside `<invoice_document>` tags and treated as data, not instructions. Any blocking flag means REJECTED, whatever the model says.
+
+## The two loops
+
+**Self-correction (extraction).** When the deterministic parser fails, `GrokClient` asks for JSON matching the invoice schema. If Pydantic rejects the answer, the validation errors go back to the model, up to 3 attempts, and every attempt is traced. On the 20 samples the parsers read every file, so this loop did not fire in either committed run.
+
+**Critique (approval).** The critic runs only when the VP approves an invoice that is over $10,000, at least $9,500, or has a risk score of 50 or more. It objects with a specific reason or signs off; after an objection the VP may revise. If the VP still approves after 2 objections, the invoice goes to a human with both arguments attached. Real excerpt from `runs/demo/offline/trace.jsonl`, invoice_1012.pdf:
+
+```
+vp_propose      approve  "Vendor is on file; Math and stock checks are clean;
+                          Open points are covered by payment conditions"
+                condition "Verify the rename and bank details with the contact on file for the former name."
+critic round 1  object   "Vendor was renamed (formerly FastShip Ltd.); paying a new name before
+                          verifying bank details is a classic fraud pattern."
+vp_revise 1     approve  (adds the critic's concern as a payment condition)
+critic round 2  object   "Total $9,975.00 sits just under the $10,000 limit, which avoids the
+                          extra scrutiny above the limit."
+vp_revise 2     approve
+decide          PENDING_HUMAN, decided_by deadlock, critique_rounds 2
+                "VP and critic still disagree after 2 rounds"
+```
+
+In the live run Grok's VP held 1012 on its first pass (unverified rename, risk 64, near-limit total), so the critic had nothing to review.
+
+## Assumptions and decisions
+
+Adam's approval-policy decisions are in [docs/DECISIONS.md](docs/DECISIONS.md) and encoded in `config/policy.yaml`:
+
+1. Quantity over stock, after summing repeated lines: reject.
+2. VP and critic still disagree after 2 rounds: hold for a human, both arguments attached.
+3. The critic loop runs only for invoices over $10K, near the limit, or high risk.
+4. Approval threshold $10,000; near the limit is at least $9,500; high risk is a score of at least 50.
+5. The VP and critic prompts are Adam's exact text.
+
+Other assumptions:
+
+- **Catalog prices** (`config/seed.sql`): WidgetA $250, WidgetB $500, GadgetX $750, the price each has on most samples. Stock follows the case brief.
+- **Vendor master** is a mock: the sample vendors with no other red flags. Fraudster LLC, NoProd Industries and Global Supply Chain Partners are not on file. FastShip Ltd. is; its new name QuickShip Distributers is not.
+- **Address watch list**: `1600 pennsylvania ave` and `742 evergreen terrace`. The second was added after the first live run, where Grok pointed out it is a fictional address.
+- **FX** is a fixed mock table (EUR 1.08) so runs are reproducible. The bank is paid in USD.
+- **Batch order** is filename order, so `invoice_1011.pdf` is the original and `invoice_1011.txt` the duplicate.
+- **Terms mismatch** ("Net 15" with a 16 or 17 day due date) is info only offline. Grok sometimes holds on it.
+- Validation does not decrement stock across invoices in a batch.
+
+## What was cut, and a production plan
+
+Cut for the take-home: a real email or upload inbox, a review UI (the queue is CLI only), a real vendor master and ERP connection, live FX rates, stock reservation across a batch, auth, and any real bank call.
+
+A 3 to 6 week plan:
+
+- **Weeks 1 to 2:** connect to Acme's mailbox and ERP (vendor master, POs, inventory). Add PO matching (2 and 3 way) and vendor bank-detail change detection. Run in shadow mode next to the AP team on last quarter's invoices and measure agreement.
+- **Weeks 3 to 4:** a review UI for the hold queue with the trace and flags, SSO, role-based approval limits, an audit export, Postgres instead of SQLite, a job queue with retries and dead letters. Evaluation set built from the shadow run, run in CI against every prompt or policy change.
+- **Weeks 5 to 6:** go live for low-risk known vendors under $10K first, humans approve everything else. Monitoring on hold rate, override rate, latency and model cost. Widen auto-approval only where the override rate stays low.
+
+## Business impact
+
+The case gives the inputs: about $2M a year in manual processing, a 30% error rate and 5-day delays. What the samples show directly: offline the system decided 18 of 20 invoices without a person (live, 16 of 20). The offline batch takes seconds; the live batch took about 5 minutes, and every rejection names the failing check.
+
+A rough estimate, with assumptions stated so they can be replaced with Acme's real numbers:
+
+- Assume 70% of the $2M is people touching invoices (entry, checking, chasing approvals).
+- Assume a human still handles the held share, 10% to 20% of invoices as on the samples, plus spot checks.
+- Then touch work falls by roughly 80% to 90%, about $1.1M to $1.25M a year (80% to 90% of $1.4M), before the cost of running the system and the review team.
+
+Not estimated: losses from paying wrong or fraudulent invoices, early-payment discounts from paying in hours instead of 5 days. Both need Acme's data.
+
+## Testing
+
+- `pytest`: 140 offline tests in about 2 seconds, no network. Parsers on all 20 files, every validation check, payment idempotency, retries and chaos, the HITL queue, approval rules and the critic loop, and a golden test (`tests/golden.yaml`) that pins the expected offline decision and paid amount for every sample.
+- `pytest -m live`: one real Grok extraction of invoice 1001 (needs `XAI_API_KEY`).
+- CI runs the offline suite on Python 3.11 and 3.12 plus an offline batch run. The workflow source is in `ci/github-actions-ci.yml`; the active copy is `.github/workflows/ci.yml`.
 
 ## Project layout
 
 ```
-main.py                     CLI: single, --batch, review, --offline, --chaos
-config/policy.yaml          thresholds, FX table, Adam's decisions
-config/seed.sql             schema + seed (inventory, vendors, invoices, payments, audit_log)
-scripts/init_db.py          idempotent DB setup
+main.py                     CLI: single file, --batch, review, --offline, --mode, --chaos
+config/policy.yaml          thresholds, risk weights, watch list, FX table
+config/seed.sql             schema and seed data
 invoice_agents/
-  models.py                 LineItem, Invoice, Flag, Decision, InvoiceState (Pydantic v2)
-  normalize.py              OCR, money, dates, invoice numbers, SKUs
-  parsers/                  text/email, csv (key-value and table), json, xml, pdf
-  agents/ingestion.py       parse + optional Grok repair loop
-  agents/risk.py            risk signals and score
-  agents/approval.py        hard rules, VP agent, critic loop (Adam's prompts)
-  agents/payment.py         mock_payment wrapper, idempotency, retries, chaos, rejection log
+  models.py                 Invoice, Flag, Decision, InvoiceState (Pydantic v2)
+  normalize.py, parsers/    OCR fixes, money, dates, SKUs; one parser per format
+  validation.py             validation checks and flags
+  agents/                   ingestion, risk, approval (VP and critic), payment
   graph.py                  LangGraph StateGraph
-  hitl.py                   human review queue
-  reporter.py               summary table, summary.json, report.md
-  validation.py             validation tools and flags
   llm.py                    GrokClient, OfflineClient
-tests/                      parsers, validation, llm, payment, approval, golden (golden.yaml)
+  hitl.py, reporter.py      review queue; summary table, summary.json, report.md
+tests/                      unit and golden tests
 runs/demo/                  committed offline and live runs
-docs/run_log.md             offline vs live comparison
-web/                        landing page (Vercel)
+scripts/                    DB setup, run_log and web data exporters
+docs/                       run_log.md, DECISIONS.md
+web/                        static trace-replay demo (Vercel), data in web/data/demo.json
 ```
 
-## Data
-
-`data/invoices/` and `data/generate_pdfs.py` are copied unchanged from the case repository
-[galatiq-ai/galatiq-case-invoices](https://github.com/galatiq-ai/galatiq-case-invoices).
+`data/invoices/` and `data/generate_pdfs.py` are copied unchanged from [galatiq-ai/galatiq-case-invoices](https://github.com/galatiq-ai/galatiq-case-invoices).

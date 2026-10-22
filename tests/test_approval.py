@@ -177,3 +177,10 @@ def test_risk_llm_never_lowers_score(inventory, policy):
     det = st.risk["score"]
     st = assess(st, policy, FakeGrok())
     assert st.risk["score"] == det and "(Grok) looked fine" in st.risk["reasons"]
+
+
+def test_watch_listed_address_is_held_offline(inventory, policy):
+    st = state_for(inventory, policy, [A(1)], raw="742 Evergreen Terrace, Springfield, IL 62704")
+    assert st.risk["score"] == 30
+    d = decide(st, ap.OfflineVP(), ap.OfflineCritic(), policy)
+    assert d.status == DecisionStatus.PENDING_HUMAN and "watch list" in d.reasons[0]

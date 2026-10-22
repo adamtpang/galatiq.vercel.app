@@ -127,5 +127,7 @@ def ingest(path: str | Path, inventory: Inventory, llm: LLMClient | None = None)
 
     if inv is not None:
         resolve_skus(inv, inventory)
+        state.trace.append(TraceEvent(agent=AGENT, step="extracted", detail={
+            "mode": state.extraction_mode, "invoice": inv.model_dump(mode="json", exclude={"field_confidence"})}))
     state.invoice = inv
     return state

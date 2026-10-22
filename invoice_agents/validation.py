@@ -324,5 +324,6 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
     state.flags.extend(flags)
     state.total_usd = total_usd
     state.trace.append(TraceEvent(agent="validation", step="validate", detail={
-        "flags": [f.code for f in flags], "blocking": [f.code for f in flags if f.severity == B]}))
+        "flags": [f.model_dump(mode="json") for f in flags], "blocking": [f.code for f in flags if f.severity == B],
+        "total_usd": total_usd}))
     return state

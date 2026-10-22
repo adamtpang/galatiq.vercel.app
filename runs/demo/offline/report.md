@@ -5,8 +5,8 @@
 | invoice_1001.txt | INV-1001 | Widgets Inc. | $5,000.00 | 0 | - | APPROVED | vp | 0 | paid $5,000.00 | Vendor is on file |
 | invoice_1002.txt | INV-1002 | Gadgets Co. | $15,000.00 | 0 | STOCK_EXCEEDED | REJECTED | hard_rules | 0 | not_paid | STOCK_EXCEEDED: GadgetX: requested 20, only 5 in stock |
 | invoice_1003.txt | INV-1003 | Fraudster LLC | $100,000.00 | 60 | ZERO_STOCK, INVALID_DUE_DATE | REJECTED | hard_rules | 0 | not_paid | ZERO_STOCK: FakeItem has zero stock (requested 100) |
-| invoice_1004.json | INV-1004 | Precision Parts Ltd. | $1,890.00 | 0 | SUPERSEDED_BY_REVISION | REJECTED | hard_rules | 0 | not_paid | SUPERSEDED_BY_REVISION: Replaced by revision R1 in data/invoices/invoice_1004_revised.json |
-| invoice_1004_revised.json | INV-1004 R1 | Precision Parts Ltd. | $5,940.00 | 0 | - | APPROVED | vp | 0 | paid $5,940.00 | Vendor is on file |
+| invoice_1004.json | INV-1004 | Precision Parts Ltd. | $1,890.00 | 30 | SUPERSEDED_BY_REVISION | REJECTED | hard_rules | 0 | not_paid | SUPERSEDED_BY_REVISION: Replaced by revision R1 in data/invoices/invoice_1004_revised.json |
+| invoice_1004_revised.json | INV-1004 R1 | Precision Parts Ltd. | $5,940.00 | 30 | - | PENDING_HUMAN | vp | 0 | not_paid | Vendor address is on the watch list: 742 evergreen terrace |
 | invoice_1005.json | INV-1005 | Global Supply Chain Partners | $15,225.00 | 50 | STOCK_EXCEEDED | REJECTED | hard_rules | 0 | not_paid | STOCK_EXCEEDED: GadgetX: requested 8, only 5 in stock |
 | invoice_1006.csv | INV-1006 | Acme Industrial Supplies | $2,750.00 | 0 | - | APPROVED | vp | 0 | paid $2,750.00 | Vendor is on file |
 | invoice_1007.csv | INV-1007 | MegaWidgets Corp | $15,525.00 | 25 | STOCK_EXCEEDED, STOCK_EXCEEDED, TOTAL_MISMATCH | REJECTED | hard_rules | 0 | not_paid | STOCK_EXCEEDED: WidgetA: requested 20, only 15 in stock |

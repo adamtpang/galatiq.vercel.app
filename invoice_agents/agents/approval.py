@@ -142,6 +142,9 @@ class OfflineVP:
     def propose(self, state, f):
         if not f["vendor_on_file"]:
             return VPOpinion(decision="hold", reasons=["Vendor is not on file"])
+        watch = [s for s in (state.risk or {}).get("signals", []) if s["signal"] == "suspicious_address"]
+        if watch:
+            return VPOpinion(decision="hold", reasons=[f"Vendor address is on the watch list: {', '.join(watch[0]['evidence'])}"])
         if (f["risk_score"] or 0) >= f["policy"]["high_risk_score"]:
             return VPOpinion(decision="hold", reasons=[f"Risk score {f['risk_score']} is high: " + "; ".join(f["risk_reasons"][:2])])
         warns = [fl for fl in state.flags if fl.severity == Severity.WARN]
