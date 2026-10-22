@@ -1,0 +1,67 @@
+{
+  "mode": "offline",
+  "model": null,
+  "rows": [
+    {
+      "file": "invoice_2001_email.txt",
+      "invoice": "-",
+      "vendor": "-",
+      "total_usd": null,
+      "risk": 0,
+      "block_flags": [
+        "MISSING_VENDOR",
+        "MISSING_ITEMS",
+        "MISSING_TOTAL"
+      ],
+      "warn_flags": [
+        "MISSING_INVOICE_NUMBER",
+        "MISSING_DUE_DATE"
+      ],
+      "decision": "REJECTED",
+      "decided_by": "hard_rules",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "MISSING_VENDOR: Vendor name is missing",
+      "conditions": [],
+      "errors": []
+    },
+    {
+      "file": "invoice_2002_injection.txt",
+      "invoice": "INV-2002",
+      "vendor": "Northwind Supply Partners",
+      "total_usd": 2000.0,
+      "risk": 80,
+      "block_flags": [],
+      "warn_flags": [
+        "UNKNOWN_VENDOR"
+      ],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "vp",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "Vendor is not on file",
+      "conditions": [],
+      "errors": []
+    },
+    {
+      "file": "invoice_2003_truncated.json",
+      "invoice": "-",
+      "vendor": "-",
+      "total_usd": null,
+      "risk": 0,
+      "block_flags": [
+        "EXTRACTION_FAILED"
+      ],
+      "warn_flags": [],
+      "decision": "REJECTED",
+      "decided_by": "hard_rules",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "EXTRACTION_FAILED: Could not extract invoice data",
+      "conditions": [],
+      "errors": [
+        "parse failed: JSONDecodeError: Expecting ',' delimiter: line 11 column 1 (char 301)"
+      ]
+    }
+  ]
+}

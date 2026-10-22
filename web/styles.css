@@ -154,7 +154,7 @@ h3{margin:6px 0 6px;font-size:18px;letter-spacing:-.01em}
 .step{position:relative;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:14px}
 .step::before{content:"";position:absolute;left:-21px;top:15px;width:10px;height:10px;border-radius:50%;background:#cbd5e1;border:2px solid var(--bg)}
 .step.good::before{background:#10b981}.step.bad::before{background:#ef4444}.step.warn::before{background:#f59e0b}
-.step.vp{border-color:#c7d2fe;background:#fafbff}.step.critic{border-style:dashed}
+.step.vp{border-color:#c7d2fe;background:#fafbff}.step.crit{border-style:dashed}
 .step-head{display:grid;grid-template-columns:1fr auto;grid-template-areas:"agent ms" "title title";gap:4px 10px;align-items:center}
 .step-head .agent{grid-area:agent;justify-self:start}
 .step-head .ms{grid-area:ms;white-space:nowrap}

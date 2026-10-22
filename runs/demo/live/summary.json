@@ -16,7 +16,7 @@
       "payment": "paid $5,000.00",
       "reason": "Vendor Widgets Inc. is on file.",
       "conditions": [
-        "Pay on Net 15 from the invoice date unless AP confirms the stated due date (17 days, not 15)."
+        "Resolve the Net 15 vs due-date mismatch (info) before release; pay on Net 15 unless AP confirms the later due date."
       ],
       "errors": []
     },
@@ -82,16 +82,16 @@
       "invoice": "INV-1004 R1",
       "vendor": "Precision Parts Ltd.",
       "total_usd": 5940.0,
-      "risk": 72,
+      "risk": 60,
       "block_flags": [],
       "warn_flags": [],
       "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Risk score 72 exceeds the high-risk threshold of 50.",
+      "reason": "Vendor is on file, but the address is on the watch list and the risk score is 60, above the high-risk threshold.",
       "conditions": [
-        "Do not pay until a human confirms the watch-list address and the PO amendment that supports the added lines."
+        "Do not pay until procurement confirms the PO amendment and clears the watch-list address."
       ],
       "errors": []
     },
@@ -120,16 +120,18 @@
       "invoice": "INV-1006",
       "vendor": "Acme Industrial Supplies",
       "total_usd": 2750.0,
-      "risk": 32,
+      "risk": 20,
       "block_flags": [],
       "warn_flags": [],
       "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor is on file and line math matches the invoice total.",
+      "reason": "Vendor is approved and on file, and line math matches the $2750.00 total.",
       "conditions": [
-        "Confirm the correct due date against Net 15 before releasing payment."
+        "Pay only to the bank already on file.",
+        "Confirm a remit address before release.",
+        "Human to clear the first-payment and name-similarity checks."
       ],
       "errors": []
     },
@@ -203,7 +205,7 @@
       "invoice": "INV-1010",
       "vendor": "Consolidated Materials Group",
       "total_usd": 7185.0,
-      "risk": 36,
+      "risk": 35,
       "block_flags": [],
       "warn_flags": [
         "PRICE_VARIANCE"
@@ -212,10 +214,10 @@
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor Consolidated Materials Group is on file and the invoice total of 7185.00 USD is under the 10000 approval threshold.",
+      "reason": "Vendor is on file and the total is under the approval threshold.",
       "conditions": [
-        "Do not pay the WidgetA premium until a PO or written rush authorization for the 300.00 rate is on file.",
-        "If authorization is not produced, pay WidgetA at the catalog rate of 250.00 and short-pay the premium."
+        "Obtain written rush authorization or a catalog exception before payment.",
+        "Pay only the catalog rate for WidgetA unless the premium is approved."
       ],
       "errors": []
     },
@@ -224,14 +226,14 @@
       "invoice": "INV-1011",
       "vendor": "Summit Manufacturing Co.",
       "total_usd": 3000.0,
-      "risk": 8,
+      "risk": 5,
       "block_flags": [],
       "warn_flags": [],
       "decision": "APPROVED",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "paid $3,000.00",
-      "reason": "Vendor Summit Manufacturing Co. is on file.",
+      "reason": "Vendor Summit Manufacturing Co. is on file",
       "conditions": [],
       "errors": []
     },
@@ -258,7 +260,7 @@
       "invoice": "INV-1012",
       "vendor": "QuickShip Distributers",
       "total_usd": 9975.0,
-      "risk": 64,
+      "risk": 74,
       "block_flags": [],
       "warn_flags": [
         "VENDOR_RENAMED"
@@ -267,10 +269,10 @@
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor renamed from FastShip Ltd.; new name is not on file, so bank details are unverified.",
+      "reason": "New payee QuickShip Distributers is not a registered alias of FastShip Ltd.; bank details must be verified before payment.",
       "conditions": [
-        "Confirm bank details against the on-file FastShip Ltd. record before any payment.",
-        "Human review of the near-limit total and remaining invoice anomalies before release."
+        "Pay only after bank details are confirmed against the FastShip Ltd. record via a known contact, not the invoice.",
+        "Record an approved legal-name alias before treating QuickShip Distributers as a known vendor."
       ],
       "errors": []
     },
@@ -346,18 +348,19 @@
       "invoice": "INV-1014",
       "vendor": "TechParts International",
       "total_usd": 4455.0,
-      "risk": 15,
+      "risk": 18,
       "block_flags": [],
       "warn_flags": [
         "CURRENCY_CONVERTED"
       ],
-      "decision": "APPROVED",
+      "decision": "PENDING_HUMAN",
       "decided_by": "vp",
       "critique_rounds": 0,
-      "payment": "paid $4,455.00",
-      "reason": "Vendor TechParts International is on file.",
+      "payment": "not_paid",
+      "reason": "Vendor is on file, but this is the first observed invoice.",
       "conditions": [
-        "Settle the billed EUR total using the treasury FX rate at payment."
+        "Confirm catalog price agreement before payment.",
+        "Pay only after a human reviews the first-invoice and currency mismatch."
       ],
       "errors": []
     },
@@ -366,14 +369,14 @@
       "invoice": "INV-1015",
       "vendor": "Reliable Components Inc.",
       "total_usd": 6500.0,
-      "risk": 5,
+      "risk": 8,
       "block_flags": [],
       "warn_flags": [],
       "decision": "APPROVED",
       "decided_by": "vp",
       "critique_rounds": 0,
       "payment": "paid $6,500.00",
-      "reason": "Vendor Reliable Components Inc. is on file",
+      "reason": "Vendor is on file.",
       "conditions": [],
       "errors": []
     },

@@ -51,10 +51,10 @@
       if (isFraudBlocked(i)) { fraud += i.total_usd || 0; fraudN++; }
     });
     $("summary").innerHTML =
-      card(money(paid), nPaid + " invoices paid") +
+      card(money(paid), nPaid + (nPaid === 1 ? " invoice paid" : " invoices paid")) +
       card(String(rej), "rejected, with reasons logged") +
       card(String(held), "sent to a human") +
-      card(money(fraud), fraudN + " high-risk invoices blocked", "Rejected invoices with risk score " + DATA.policy.high_risk_score + " or more");
+      card(money(fraud), fraudN + (fraudN === 1 ? " high-risk invoice blocked" : " high-risk invoices blocked"), "Rejected invoices with risk score " + DATA.policy.high_risk_score + " or more");
     var r = run();
     $("run-meta").textContent = r.mode === "offline" ? "Deterministic VP and critic rules, no API calls" : "Risk review (with tool calls), VP and critic by " + (r.model || "Grok");
     var o = other(), diff = [];
@@ -107,7 +107,7 @@
       case "risk.assess": title = "Risk score " + esc(d.score) + (d.llm && d.llm.score != null && d.score !== d.deterministic_score ? " (rules " + esc(d.deterministic_score) + ", Grok raised it to " + esc(d.score) + ")" : "");
         body = (d.reasons || []).map(esc).join("<br>") || "No risk signals"; break;
       case "approval.vp_propose": title = "VP proposes: " + esc(d.decision); body = list(d.reasons) + cond(d.conditions); cls = "vp"; break;
-      case "approval.critic_review": title = "Critic, round " + esc(d.round) + ": " + (d.verdict === "object" ? "objects" : "signs off"); body = esc(d.reason); cls = "critic " + (d.verdict === "object" ? "bad" : "good"); break;
+      case "approval.critic_review": title = "Critic, round " + esc(d.round) + ": " + (d.verdict === "object" ? "objects" : "signs off"); body = esc(d.reason); cls = "crit " + (d.verdict === "object" ? "bad" : "good"); break;
       case "approval.vp_revise": title = "VP revises, round " + esc(d.round) + ": " + esc(d.decision); body = list(d.reasons) + cond(d.conditions); cls = "vp"; break;
       case "approval.decide": title = "Decision: " + (PILL[d.status] || [0, d.status])[1] + " by " + esc({ hard_rules: "hard rules", vp: "the VP", "vp+critic": "the VP after critic review", deadlock: "deadlock (VP and critic disagree)", error: "error fallback" }[d.decided_by] || d.decided_by) + (d.critique_rounds ? ", " + d.critique_rounds + " critic rounds" : "");
         body = list(d.reasons); cls = d.status === "APPROVED" ? "good" : d.status === "REJECTED" ? "bad" : "warn"; break;
@@ -190,9 +190,10 @@
   fetch("/data/demo.json").then(function (r) { return r.json(); }).then(function (d) {
     DATA = d;
     var q = new URLSearchParams(location.search);
-    SELECTED = q.get("inv");
+    var want = q.get("inv");
     setRun("offline", "case");
     setRun(q.get("run") || "offline", q.get("set") || "case");
+    if (want && run().invoices.some(function (i) { return i.file === want; })) SELECTED = want;
     renderHero(); renderAll();
   }).catch(function () { $("detail").textContent = "Could not load run data."; });
 })();

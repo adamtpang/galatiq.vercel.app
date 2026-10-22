@@ -53,12 +53,12 @@ From [docs/run_log.md](docs/run_log.md), two committed runs on fresh databases (
 | Run | Paid | Rejected | Held for a human | High-risk invoices rejected |
 |---|---|---|---|---|
 | Offline rules | 6 invoices, $28,890.00 | 12 | 2 | 2, $115,225.00 |
-| Live, grok-4.7 | 4 invoices, $18,955.00 | 12 | 4 | 2, $115,225.00 |
+| Live, grok-4.7 | 3 invoices, $14,500.00 | 12 | 5 | 2, $115,225.00 |
 
 | File | Offline | Live | Why |
 |---|---|---|---|
-| 1001, 1011.pdf, 1014, 1015 | Paid | Paid | Known vendor, clean math. 1014 paid in USD at the mock EUR rate. |
-| 1006, 1010 | Paid | Held | Live VP wanted the due date (1006) and the $300 rush price (1010) confirmed first. |
+| 1001, 1011.pdf, 1015 | Paid | Paid | Known vendor, clean math. |
+| 1006, 1010, 1014 | Paid | Held | Live VP wanted a remit address (1006), the $300 rush price (1010) and a first EUR invoice (1014) confirmed first. Offline pays 1014 in USD at the mock rate. |
 | 1004_revised | Held | Held | Vendor address 742 Evergreen Terrace is on the watch list. |
 | 1012.pdf | Held (VP/critic deadlock) | Held (VP) | Renamed vendor, total $9,975, $25 under the limit. |
 | 1002, 1005, 1007, 1013 (x2) | Rejected | Rejected | Quantity over stock (1013 after summing repeated lines). 1007 and 1013 totals are also wrong. |
@@ -94,7 +94,7 @@ Design rules: the LLM never computes or changes an amount. Invoice text is passe
 
 **Self-correction (extraction).** When the deterministic parser fails, `GrokClient` asks for JSON matching the invoice schema. If Pydantic rejects the answer, the validation errors go back to the model, up to 3 attempts, and every attempt is traced. The same loop wraps every structured call (risk, VP, critic).
 
-The 20 samples never need it, because the parsers read every file. So there are three extra invoices in `data/invoices_extra/`: a free-form email with quantities in words, a truncated JSON file and a prompt-injection invoice. EXTRA_LIVE_SENTENCE The retry itself is proven by `tests/test_agentic.py`: a scripted client returns `"qty": "six"` first, and the test checks that the exact Pydantic error went back to the model and the second answer was used.
+The 20 samples never need it, because the parsers read every file. So there are three extra invoices in `data/invoices_extra/`: a free-form email with quantities in words, a truncated JSON file and a prompt-injection invoice. In the committed live run (`runs/demo/extra_live`) Grok extracted the email and the broken JSON on its first attempt. The email was then held until a formal invoice arrives, the repaired JSON invoice was paid ($2,000), and the injection invoice was rejected (risk 92, vendor not on file). Offline, the two unreadable files are rejected with blocking flags and nothing is paid. Because Grok's first answer passed validation each time, the retry is proven by `tests/test_agentic.py`: a scripted client returns `"qty": "six"` first, and the test checks that the exact Pydantic error went back to the model and the second answer was used.
 
 **Critique (approval).** The critic runs only when the VP approves an invoice that is over $10,000, at least $9,500, or has a risk score of 50 or more. It objects with a specific reason or signs off; after an objection the VP may revise. If the VP still approves after 2 objections, the invoice goes to a human with both arguments attached. Real excerpt from `runs/demo/offline/trace.jsonl`, invoice_1012.pdf:
 
@@ -112,7 +112,7 @@ decide          PENDING_HUMAN, decided_by deadlock, critique_rounds 2
                 "VP and critic still disagree after 2 rounds"
 ```
 
-In the live run Grok's VP held 1012 on its first pass (unverified rename, risk 64, near-limit total), so the critic had nothing to review.
+In the live run the risk agent called `lookup_vendor` for both names, found that QuickShip Distributers is not a recorded alias of FastShip Ltd. and raised the risk to 74. The VP then held 1012 on its first pass, so the critic had nothing to review.
 
 ## Assumptions and decisions
 
@@ -148,7 +148,7 @@ A 3 to 6 week plan:
 
 ## Business impact
 
-The case gives the inputs: about $2M a year in manual processing, a 30% error rate and 5-day delays. What the samples show directly: offline the system decided 18 of 20 invoices without a person (live, 16 of 20). The offline batch takes seconds; the live batch took about 5 minutes, and every rejection names the failing check.
+The case gives the inputs: about $2M a year in manual processing, a 30% error rate and 5-day delays. What the samples show directly: offline the system decided 18 of 20 invoices without a person (live, 15 of 20). The offline batch takes seconds; the live batch took about 6 minutes, and every rejection names the failing check.
 
 A rough estimate, with assumptions stated so they can be replaced with Acme's real numbers:
 

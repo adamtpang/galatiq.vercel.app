@@ -36,14 +36,15 @@ def dec(r: dict) -> str:
 DIFFS = """\
 ## Where live and offline disagree
 
-Both runs use the same policy, including the address watch list (`742 evergreen terrace` was added after the first live run flagged it). Every difference goes the cautious way: Grok sent an invoice to a human where the offline rules paid it. Neither run paid anything the other refused on hard rules.
+Both runs use the same policy, including the address watch list (`742 evergreen terrace` was added after an earlier live run flagged it). In live mode the risk agent also calls three read-only tools (`lookup_vendor`, `query_inventory`, `vendor_history`) before it scores; the calls are in the trace as `tool_call` events. Every difference goes the cautious way: Grok sent an invoice to a human where the offline rules paid it. Neither run paid anything the other refused.
 
-- **invoice_1006.csv**: the live VP held it because the due date (16 days) does not match Net 15. Offline treats TERMS_MISMATCH as info only and pays.
+- **invoice_1006.csv**: the live VP held it to confirm a remit address and to pay only to the bank on file. Offline sees a known vendor with clean math and pays.
 - **invoice_1010.txt**: the live VP held it until a PO or written rush authorization backs the $300 WidgetA rate ($250 catalog). Offline approves with that check as a payment condition.
-- **invoice_1012.pdf**: both runs end PENDING_HUMAN, by different paths. Offline: the VP approves with conditions, the critic objects twice (the rename, then the total just under $10K) and the loop deadlocks after 2 rounds. Live: the VP held it straight away (unverified rename, risk 64 above the threshold of 50, total just under $10K). The critic only reviews approvals, so it never ran.
-- **invoice_1004_revised.json**: same decision (PENDING_HUMAN) in both runs now. Offline holds it on the watch-list hit; live holds it because the risk score (72) is above the high-risk threshold of 50.
+- **invoice_1014.xml**: the live VP held it as the vendor's first observed invoice, billed in EUR below catalog price. Offline pays the USD amount at the mock FX rate with a treasury condition. In an earlier live run, before the risk agent had tools, Grok paid it; live results vary between runs.
+- **invoice_1012.pdf**: both runs end PENDING_HUMAN, by different paths. Offline: the VP approves with conditions, the critic objects twice (the rename, then the total just under $10K) and the loop deadlocks after 2 rounds. Live: the risk agent looked up both vendor names, found that QuickShip Distributers is not a recorded alias of FastShip Ltd. and raised the risk to 74, and the VP held it straight away. The critic only reviews approvals, so it never ran.
+- **invoice_1004_revised.json**: PENDING_HUMAN in both runs. Offline holds it on the watch-list hit; live holds it on the watch-list address and a risk score of 60, above the high-risk threshold of 50.
 
-Risk scores differ on most clean invoices because the live risk agent can add points on top of the rule score (it can never lower it). None of those increases crossed a threshold except the ones above.
+Risk scores differ on most clean invoices because the live risk agent can add points on top of the rule score (it can never lower it). None of those increases crossed a threshold except where noted above.
 """
 
 
