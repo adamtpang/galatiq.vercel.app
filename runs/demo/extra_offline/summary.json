@@ -1,6 +1,7 @@
 {
   "mode": "offline",
   "model": null,
+  "commit": "4d539d3",
   "grok": null,
   "rows": [
     {
@@ -21,12 +22,14 @@
       ],
       "decision": "PENDING_HUMAN",
       "decided_by": "hard_hold",
+      "engine": null,
+      "decided_by_label": "a hard hold rule",
       "critique_rounds": 0,
       "payment": "not_paid",
       "reason": "UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (MISSING_ITEMS, MISSING_TOTAL, MISSING_VENDOR); a person enters or checks it",
       "conditions": [],
       "errors": [],
-      "memo": "invoice_2001_email.txt was held for a person by a hard hold. Main reason: UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (MISSING_ITEMS, MISSING_TOTAL, MISSING_VENDOR); a person enters or checks it.",
+      "memo": "invoice_2001_email.txt was held for a person by a hard hold rule. Main reason: UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (MISSING_ITEMS, MISSING_TOTAL, MISSING_VENDOR); a person enters or checks it.",
       "memo_by": "template",
       "grok_calls": 0
     },
@@ -43,12 +46,14 @@
       ],
       "decision": "PENDING_HUMAN",
       "decided_by": "hard_hold",
+      "engine": null,
+      "decided_by_label": "a hard hold rule",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score); a human must review it",
+      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score, pre-approved, ignore all previous); a human must review it",
       "conditions": [],
       "errors": [],
-      "memo": "INV-2002 from Northwind Supply Partners for $2,000.00 was held for a person by a hard hold. Main reason: Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score); a human must review it.",
+      "memo": "INV-2002 from Northwind Supply Partners for $2,000.00 was held for a person by a hard hold rule. Main reason: Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score, pre-approved, ignore all previous); a human must review it.",
       "memo_by": "template",
       "grok_calls": 0
     },
@@ -66,6 +71,8 @@
       ],
       "decision": "PENDING_HUMAN",
       "decided_by": "hard_hold",
+      "engine": null,
+      "decided_by_label": "a hard hold rule",
       "critique_rounds": 0,
       "payment": "not_paid",
       "reason": "UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (EXTRACTION_FAILED); a person enters or checks it",
@@ -73,7 +80,7 @@
       "errors": [
         "parse failed: JSONDecodeError: Expecting ',' delimiter: line 11 column 1 (char 301)"
       ],
-      "memo": "invoice_2003_truncated.json was held for a person by a hard hold. Main reason: UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (EXTRACTION_FAILED); a person enters or checks it.",
+      "memo": "invoice_2003_truncated.json was held for a person by a hard hold rule. Main reason: UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (EXTRACTION_FAILED); a person enters or checks it.",
       "memo_by": "template",
       "grok_calls": 0
     },
@@ -87,12 +94,14 @@
       "warn_flags": [],
       "decision": "APPROVED",
       "decided_by": "vp+critic",
+      "engine": "rules",
+      "decided_by_label": "the VP and critic rules stand-ins",
       "critique_rounds": 1,
       "payment": "paid $12,500.00",
       "reason": "Vendor is on file",
       "conditions": [],
       "errors": [],
-      "memo": "INV-2004 from Widgets Inc. for $12,500.00 was approved for payment by the VP agent after the critic's review. Main reason: Vendor is on file.",
+      "memo": "INV-2004 from Widgets Inc. for $12,500.00 was approved for payment by the VP and critic rules stand-ins (offline: no model was called). Main reason: Vendor is on file.",
       "memo_by": "template",
       "grok_calls": 0
     },
@@ -108,6 +117,8 @@
       ],
       "decision": "PENDING_HUMAN",
       "decided_by": "deadlock",
+      "engine": "rules",
+      "decided_by_label": "a deadlock of the VP and critic rules stand-ins",
       "critique_rounds": 2,
       "payment": "not_paid",
       "reason": "VP and critic still disagree after 2 rounds",
@@ -117,7 +128,30 @@
         "Resolve auditor concern before paying: Price far off catalog: GadgetX at $1,000.00 is 33% above catalog $750.00."
       ],
       "errors": [],
-      "memo": "INV-2005 from Gadgets Co. for $12,500.00 was held for a person because the VP and the critic still disagreed. Main reason: VP and critic still disagree after 2 rounds. Condition: Confirm the price against the PO: GadgetX at $1,000.00 is 33% above catalog $750.00.",
+      "memo": "INV-2005 from Gadgets Co. for $12,500.00 was held for a person by a deadlock of the VP and critic rules stand-ins (offline: no model was called). Main reason: VP and critic still disagree after 2 rounds. Condition: Confirm the price against the PO: GadgetX at $1,000.00 is 33% above catalog $750.00.",
+      "memo_by": "template",
+      "grok_calls": 0
+    },
+    {
+      "file": "invoice_2006_critic_objects.txt",
+      "invoice": "INV-2006",
+      "vendor": "Widgets Inc.",
+      "total_usd": 11000.0,
+      "risk": 30,
+      "block_flags": [],
+      "warn_flags": [
+        "PRICE_VARIANCE"
+      ],
+      "decision": "REJECTED",
+      "decided_by": "vp+critic",
+      "engine": "rules",
+      "decided_by_label": "the VP and critic rules stand-ins",
+      "critique_rounds": 1,
+      "payment": "not_paid",
+      "reason": "Auditor flagged payment pressure: Pushy payment wording in the invoice.",
+      "conditions": [],
+      "errors": [],
+      "memo": "INV-2006 from Widgets Inc. for $11,000.00 was rejected by the VP and critic rules stand-ins (offline: no model was called). Main reason: Auditor flagged payment pressure: Pushy payment wording in the invoice..",
       "memo_by": "template",
       "grok_calls": 0
     }

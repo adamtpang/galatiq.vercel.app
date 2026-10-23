@@ -1,6 +1,7 @@
 {
   "mode": "offline",
   "model": null,
+  "commit": "4d539d3",
   "grok": null,
   "rows": [
     {
@@ -13,12 +14,14 @@
       "warn_flags": [],
       "decision": "APPROVED",
       "decided_by": "vp+critic",
+      "engine": "rules",
+      "decided_by_label": "the VP and critic rules stand-ins",
       "critique_rounds": 1,
       "payment": "paid $12,500.00",
       "reason": "Vendor is on file",
       "conditions": [],
       "errors": [],
-      "memo": "INV-2004 from Widgets Inc. for $12,500.00 was approved for payment by the VP agent after the critic's review. Main reason: Vendor is on file.",
+      "memo": "INV-2004 from Widgets Inc. for $12,500.00 was approved for payment by the VP and critic rules stand-ins (offline: no model was called). Main reason: Vendor is on file.",
       "memo_by": "template",
       "grok_calls": 0
     }

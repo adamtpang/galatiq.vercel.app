@@ -1,8 +1,8 @@
 # Run log: all 20 sample invoices
 
-Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026:
+Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026. The offline run was regenerated at commit 4d539d3 after independent review 2; the live run is from the earlier checkpoint 982b14f (branch `live-eval-checkpoints`) and could not be re-run because the xAI account is out of credits, so it predates the review 2 changes (for example the rejection review).
 
-- **Offline** (`--offline`, deterministic VP and critic rules): `runs/demo/offline/`
+- **Offline** (`--offline`): no model is called; the risk review, VP, critic and rejection review are rules stand-ins (fixed rules written from the agents' prompts), and a template writes the memo: `runs/demo/offline/`
 - **Live** (`--mode live`, grok-4.7 via the xAI API for the cross-check, risk review, VP, critic and memo): `runs/demo/live/`
 
 Each folder has `trace.jsonl` (every agent step), `summary.json` and `report.md`. Hard rules (any blocking flag) reject 12 of 20 before any Grok opinion, so both runs agree on those by construction (live, Grok still cross-checks and writes their memo); a hard hold rule holds 1012.pdf (renamed vendor) before the VP. Regenerate this file with `python scripts/make_run_log.py`.
@@ -11,25 +11,25 @@ Each folder has `trace.jsonl` (every agent step), `summary.json` and `report.md`
 
 | File | Total USD | Risk off / live | Offline decision | Live decision | Paid off / live |
 |---|---|---|---|---|---|
-| invoice_1001.txt | $5,000.00 | 0 / 10 | APPROVED (vp) | APPROVED (vp) | paid $5,000.00 / paid $5,000.00 |
+| invoice_1001.txt | $5,000.00 | 0 / 10 | APPROVED (vp, rules stand-in) | APPROVED (vp, Grok) | paid $5,000.00 / paid $5,000.00 |
 | invoice_1002.txt | $15,000.00 | 0 / 0 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1003.txt | $100,000.00 | 60 / 60 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1004.json | $1,890.00 | 0 / 0 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
-| invoice_1004_revised.json | $5,940.00 | 0 / 38 | APPROVED (vp) | PENDING_HUMAN (vp) **differs** | paid $5,940.00 / not_paid |
+| invoice_1004_revised.json | $5,940.00 | 0 / 38 | APPROVED (vp, rules stand-in) | PENDING_HUMAN (vp, Grok) **differs** | paid $5,940.00 / not_paid |
 | invoice_1005.json | $15,225.00 | 50 / 50 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
-| invoice_1006.csv | $2,750.00 | 0 / 20 | APPROVED (vp) | PENDING_HUMAN (vp) **differs** | paid $2,750.00 / not_paid |
+| invoice_1006.csv | $2,750.00 | 0 / 20 | APPROVED (vp, rules stand-in) | PENDING_HUMAN (vp, Grok) **differs** | paid $2,750.00 / not_paid |
 | invoice_1007.csv | $15,525.00 | 25 / 25 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1008.txt | $9,900.00 | 45 / 45 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1009.json | $-250.00 | 25 / 25 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
-| invoice_1010.txt | $7,185.00 | 10 / 22 | APPROVED (vp) | PENDING_HUMAN (vp) **differs** | paid $7,185.00 / not_paid |
-| invoice_1011.pdf | $3,000.00 | 0 / 5 | APPROVED (vp) | APPROVED (vp) | paid $3,000.00 / paid $3,000.00 |
+| invoice_1010.txt | $7,185.00 | 10 / 22 | APPROVED (vp, rules stand-in) | PENDING_HUMAN (vp, Grok) **differs** | paid $7,185.00 / not_paid |
+| invoice_1011.pdf | $3,000.00 | 0 / 5 | APPROVED (vp, rules stand-in) | APPROVED (vp, Grok) | paid $3,000.00 / paid $3,000.00 |
 | invoice_1011.txt | $3,000.00 | 0 / 0 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1012.pdf | $9,975.00 | 45 / 70 | PENDING_HUMAN (hard_hold) | PENDING_HUMAN (hard_hold) | not_paid / not_paid |
 | invoice_1012.txt | $9,975.00 | 45 / 45 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1013.json | $22,562.80 | 25 / 25 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1013.pdf | $22,562.80 | 25 / 25 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
-| invoice_1014.xml | $4,455.00 | 0 / 18 | APPROVED (vp) | PENDING_HUMAN (vp) **differs** | paid $4,455.00 / not_paid |
-| invoice_1015.csv | $6,500.00 | 0 / 8 | APPROVED (vp) | APPROVED (vp) | paid $6,500.00 / paid $6,500.00 |
+| invoice_1014.xml | $4,455.00 | 0 / 18 | APPROVED (vp, rules stand-in) | PENDING_HUMAN (vp, Grok) **differs** | paid $4,455.00 / not_paid |
+| invoice_1015.csv | $6,500.00 | 0 / 8 | APPROVED (vp, rules stand-in) | APPROVED (vp, Grok) | paid $6,500.00 / paid $6,500.00 |
 | invoice_1016.json | $3,233.00 | 0 / 0 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 
 Offline: 7 paid ($34,830.00), 12 rejected, 1 held for a human.
