@@ -13,6 +13,7 @@ Deterministic code is the source of truth for arithmetic. The LLM only extracts 
 from __future__ import annotations
 
 import json
+import re
 import os
 import time
 from dataclasses import dataclass, field
@@ -64,6 +65,22 @@ class LLMClient(Protocol):
     available: bool
 
     def complete_structured(self, schema: type[T], messages: list[dict], max_attempts: int = 3) -> LLMResult: ...
+
+
+# Tags that open or close a prompt section or a chat role. Vendor text must never be able to close the
+# <invoice_document> fence or open a fake section, so any such tag in untrusted text is neutralized ("<" -> "&lt;").
+_FENCE_TAG = re.compile(r"<(?=\s*/?\s*(?:invoice_document|facts|decision|system|assistant|user|developer|tool|"
+                        r"instructions?|im_start|im_end)\b)", re.I)
+
+
+def neutralize(text: str | None) -> str:
+    """Untrusted invoice text with every fence or role tag defused, so it stays data inside the prompt."""
+    return _FENCE_TAG.sub("&lt;", text or "")
+
+
+def quote_document(text: str | None, limit: int = 12000) -> str:
+    """The invoice text inside the <invoice_document> fence, neutralized first (review 2, prompt-injection defense)."""
+    return "<invoice_document>\n" + neutralize((text or "")[:limit]) + "\n</invoice_document>"
 
 
 class OfflineClient:

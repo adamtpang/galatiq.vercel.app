@@ -5,6 +5,32 @@ from ..models import Invoice, LineItem
 from ..normalize import normalize_invoice_number, parse_date, parse_money
 
 
+def free_text(value) -> str | None:
+    """Notes, terms and addresses as text whatever JSON type they arrive in: a list is joined, an object is
+    written as "key: value" pairs, a number is written out. None and empty stay None."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        parts = [f"{k}: {free_text(v) or ''}".strip() for k, v in value.items()]
+    elif isinstance(value, (list, tuple, set)):
+        parts = [free_text(v) or "" for v in value]
+    else:
+        parts = [str(value)]
+    out = " ".join(p for p in parts if p).strip()
+    return out or None
+
+
+def scalar(value, field: str, errors: list[str]):
+    """A field that must be one number or one name (invoice number, vendor, date, quantity, price, total).
+    A list, an object or true/false is recorded in `errors` (a blocking INVALID_FIELD_TYPE flag) and read as None."""
+    if value is None or (isinstance(value, (str, int, float)) and not isinstance(value, bool)):
+        return value
+    errors.append(f"{field}: expected a number or text, got {type(value).__name__} {str(value)[:60]!r}")
+    return None
+
+
 def finish(inv: Invoice, *, number=None, date_raw=None, due_raw=None) -> Invoice:
     """Normalize number and dates, fill line amounts. Never invents totals."""
     if number is not None:

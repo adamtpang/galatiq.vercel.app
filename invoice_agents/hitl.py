@@ -7,7 +7,7 @@ from .agents.payment import PaymentAgent, log_rejection
 from .db import log_audit
 from .models import Decision, DecisionStatus, InvoiceState, TraceEvent
 from .normalize import normalize_invoice_number
-from .validation import document_id, fingerprint
+from .validation import document_id, fingerprint, local_stamp
 
 HUMAN = {"approved": DecisionStatus.APPROVED, "rejected": DecisionStatus.REJECTED}
 
@@ -17,13 +17,13 @@ def enqueue(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState:
     run, that decision stands (re-running a file is idempotent): nothing is queued again."""
     inv, d = state.invoice, state.decision
     fp = fingerprint(inv) if inv else state.source
-    prev = conn.execute("SELECT status, reviewer_note, decided_at FROM review_queue WHERE fingerprint=?",
-                        (fp,)).fetchone()
+    prev = conn.execute("SELECT status, reviewer_note, datetime(decided_at, 'localtime') FROM review_queue "
+                        "WHERE fingerprint=?", (fp,)).fetchone()
     if prev is not None and prev[0] in HUMAN:
         status, note, at = prev[0], prev[1], prev[2]
         state.decision = Decision(
             status=HUMAN[status], decided_by="human", risk_score=d.risk_score if d else None,
-            reasons=[f"Already {status} by a human reviewer on {at} UTC" + (f": {note}" if note else "")],
+            reasons=[f"Already {status} by a human reviewer on {local_stamp(at)}" + (f": {note}" if note else "")],
             arguments={"agents_decision": d.model_dump(mode="json") if d else None})
         paid = status == "approved" and conn.execute(
             "SELECT 1 FROM payments WHERE invoice_number IS ? AND vendor IS ? AND status='paid'",
@@ -46,6 +46,34 @@ def enqueue(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState:
     state.payment = {"status": "not_paid", "reason": "pending human review"}
     state.trace.append(TraceEvent(agent="hitl", step="queued", detail={"fingerprint": fp}))
     return state
+
+
+def enqueue_failed_payment(conn: sqlite3.Connection, state: InvoiceState) -> None:
+    """An approved invoice whose payment failed after every retry goes to the review queue (PAYMENT_FAILED), so a
+    person sees it; approving it there retries the payment (idempotent). A later successful run clears it."""
+    inv, p = state.invoice, state.payment or {}
+    fp = fingerprint(inv) if inv else state.source
+    reason = (f"PAYMENT_FAILED: approved, but the bank call failed after {p.get('attempts')} attempts "
+              f"({'; '.join(p.get('errors', [])[-1:])}); approve to retry the payment, or reject")
+    conn.execute(
+        "INSERT INTO review_queue (invoice_number, vendor, source_file, fingerprint, reason, state_json) "
+        "VALUES (?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET state_json=excluded.state_json, "
+        "reason=excluded.reason, source_file=excluded.source_file, status='pending', decided_at=NULL",
+        (inv.number if inv else None, inv.vendor if inv else None, state.source, fp, reason,
+         state.model_dump_json(exclude={"raw_text"})))
+    conn.commit()
+    state.trace.append(TraceEvent(agent="hitl", step="queued_payment_failed", detail={"fingerprint": fp}))
+
+
+def clear_failed_payment(conn: sqlite3.Connection, state: InvoiceState) -> None:
+    """A paid invoice no longer needs its PAYMENT_FAILED queue entry."""
+    if state.invoice is None:
+        return
+    cur = conn.execute("UPDATE review_queue SET status='paid_on_retry', decided_at=datetime('now') "
+                       "WHERE fingerprint=? AND status='pending' AND reason LIKE 'PAYMENT_FAILED:%'",
+                       (fingerprint(state.invoice),))
+    if cur.rowcount:
+        conn.commit()
 
 
 def pending(conn: sqlite3.Connection) -> list[sqlite3.Row]:
@@ -101,6 +129,10 @@ def decide(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str 
         if st.invoice is None or not st.invoice.items or not amt or amt <= 0:
             raise ValueError("No payable amount was read from this file, so it cannot be approved and paid as read; "
                              "reject it, or enter the invoice by hand")
+        errs = st.pipeline_errors()
+        if errs:
+            raise ValueError(f"A step failed on this invoice ({errs[0]}), so its checks are incomplete; it cannot be "
+                             "approved and paid. Re-run the file after the fix, or reject it")
     state = resolve(conn, row, approve, note)
     if state.decision.status == DecisionStatus.APPROVED:
         return (payments or PaymentAgent(conn, chaos=chaos)).pay(state)

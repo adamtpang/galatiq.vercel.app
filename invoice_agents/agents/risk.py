@@ -14,8 +14,8 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from ..db import Inventory
-from ..llm import LLMClient, LLMOutputError, LLMUnavailable, Tool
-from ..models import InvoiceState, Severity, TraceEvent
+from ..llm import LLMClient, LLMOutputError, LLMUnavailable, Tool, quote_document
+from ..models import Flag, InvoiceState, Severity, TraceEvent
 from ..validation import ADVISORY
 
 AGENT = "risk"
@@ -79,7 +79,10 @@ def signals(state: InvoiceState, policy: dict[str, Any]) -> list[dict]:
     w = cfg.get("weights", {})
     inv = state.invoice
     codes = {f.code for f in state.flags}
-    text = " ".join(filter(None, [state.raw_text or "", inv.notes if inv else "", inv.terms if inv else ""])).lower()
+    # one field per line, so a pattern anchored at a line start also sees the start of the notes or terms field
+    fields = [state.raw_text, inv.notes if inv else None, inv.terms if inv else None,
+              *((li.note for li in inv.items) if inv else ())]
+    text = "\n".join(str(x) for x in fields if x).lower()
     out: list[dict] = []
 
     def add(name: str, reason: str, evidence: Any = None):
@@ -135,7 +138,7 @@ def assess(state: InvoiceState, policy: dict[str, Any], llm: LLMClient | None = 
                  "flags": [f"{f.severity.value} {f.code}: {f.message}" for f in state.flags if f.code not in ADVISORY], "rule_signals": risk["reasons"]}
         msgs = [{"role": "system", "content": RISK_PROMPT},
                 {"role": "user", "content": "FACTS (computed by code, authoritative):\n" + json.dumps(facts, default=str)
-                 + "\n\n<invoice_document>\n" + (state.raw_text or "")[:12000] + "\n</invoice_document>"}]
+                 + "\n\n" + quote_document(state.raw_text, 12000)}]
         calls: list[dict] = []
         try:
             if tools and hasattr(llm, "run_tools"):
@@ -151,6 +154,10 @@ def assess(state: InvoiceState, policy: dict[str, Any], llm: LLMClient | None = 
             risk["reasons"] += [f"(Grok) {r}" for r in rv.extra_reasons]
         except (LLMUnavailable, LLMOutputError) as e:
             risk["llm"] = {"error": str(e)}
+            # decision 16: the live risk review (and its prompt_injection check) did not happen; a person looks
+            state.flags.append(Flag(code="GROK_CHECK_FAILED", severity=Severity.WARN, evidence={"step": "risk_review"},
+                                    message=f"Grok's risk review failed ({str(e)[:120]}); the injection and fraud "
+                                            "review did not run"))
     state.risk = risk
     state.trace.append(TraceEvent(agent=AGENT, step="assess", detail=risk))
     return state

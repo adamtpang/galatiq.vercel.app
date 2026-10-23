@@ -23,6 +23,10 @@ approval:
     model_mismatch: true             # live: the API reported a model other than the configured one (model pin, README Repeatability)
     bank_details_changed: true       # decision 11: the invoice asks to pay a new or changed account (bank_details below)
     extraction_disagreement: true    # decision 12: live, Grok's independent reading differs from the parser's
+    grok_check_failed: true          # decision 16: live, Grok's cross-check or risk review failed (GROK_CHECK_FAILED)
+  # Decision 16: after a hard-rule rejection, one review (Grok live; a rules stand-in offline) may escalate the
+  # rejection to a person. It can never approve or pay; if it fails, the rejection stands.
+  rejection_review: true
 
 # Decision 11: payment-detail changes. Any match gives a BANK_DETAILS_CHANGED warning and a hard hold, so
 # a person confirms the account with the vendor contact on file before anything is paid. A plain
@@ -38,6 +42,15 @@ bank_details:
     - '\bbank(ing)?\s+(details|information|info|instructions)\b'
     - '\b(updated?|changed?|new)\s+(bank|banking|payment|remittance)\s+(account|details|information|info|instructions)\b'
     - '\b(updated?|changed?|new)\s+bank\b|\bchange\s+of\s+bank\b'
+    # Review 2 (decision 11 wording gaps): short forms, moved banks, wire changes, digit runs near account words
+    - '\bacct\b|\ba/c\s*(no\.?|number|#|:)'
+    - '\baba\b'
+    - '\b(routing|transit)\s*(number|no\.?|#|code)?\s*:?\s*\d{6,}'
+    - '\b(moved|switched|changed|new)\s+(our\s+)?banks?\b'
+    - '\bwire\s+(instructions?|details|info|information)\b|\b(new|updated?|changed?|different)\s+wire\b'
+    - '\b(pay|send|wire|remit|transfer)\s+(it\s+|payment\s+|funds\s+|the\s+balance\s+)?(to|into)\b[^.\n]{0,30}\d{6,}'
+    - '\b(account|acct|a/c|routing|aba|iban|sort\s+code|beneficiary)\b\s*(number|no\.?|num|#)?\s*[:#]?\s*\d(?:[\s-]?\d){7,}'
+    - '\d(?:[\s-]?\d){7,}\s*\(?\s*(account|acct|routing|aba)\b'
 
 # Decision 7: duplicates by content. An invoice with the same vendor (normalized name), line items,
 # quantities and total as an earlier one is a DUPLICATE_INVOICE (blocking) even under a new number.
@@ -94,6 +107,14 @@ risk:
     - '\b(skip|bypass|without)\b[^.\n]{0,20}\b(human|manual)\s+(review|approval|check|verification)\b'                              # skip the human
     - '\bmark\s+(it|this(\s+invoice)?|the\s+invoice)\s+(as\s+)?(approved|paid|verified|low[\s-]risk)\b'                             # dictate the outcome
     - '\b(report|set|assign|give|rate)\b[^.\n]{0,20}\b(a\s+)?(low|zero)\s+risk\b'                                                    # dictate the score
+    # Review 2: chat-role prefixes at the start of a line or field, "pre-cleared", "treat as verified", "ignore
+    # previous", a scripted "final answer", and any prompt fence or role tag in the vendor's text.
+    - '(?m)^\s*(notes?\s*:\s*|"?notes"?\s*:\s*"?)?(system|assistant|developer)\s*:'
+    - '\[(system|assistant|developer)\]|<\s*/?\s*(system|assistant|developer|invoice_document|facts|im_start|im_end)\b'
+    - '\bpre-?\s?(cleared|verified|authori[sz]ed|approved)\b'
+    - '\btreat\s+(it\s+|this\s+(invoice\s+)?|the\s+invoice\s+)?as\s+(already\s+)?(verified|approved|cleared|trusted|legitimate|safe)\b'
+    - '\bignore\s+(all\s+|any\s+)?(the\s+|your\s+)?(previous|prior|above|earlier)\b(?!\s+(invoice|bill|statement|version|revision|copy|order|shipment|delivery|po)\b)'
+    - '\bfinal\s+answer\s*:'
   # White House; the Simpsons' fictional address (found by Grok on 1004_revised). Decision 13: an entry does not
   # fire on the address the vendor master has on file for that vendor (Precision Parts Ltd. is on file at
   # 742 Evergreen Terrace in this mock data), only on another vendor using it (data/invoices_adversarial 3007).

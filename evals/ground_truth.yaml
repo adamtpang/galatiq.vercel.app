@@ -197,3 +197,10 @@ data/invoices_extra/invoice_2005_over_limit_price.txt:   # added after the indep
   total: 12500.00
   due_date: 2026-11-12
   line_items: [[GadgetX, 5], [WidgetB, 10], [WidgetA, 10]]
+
+data/invoices_extra/invoice_2006_critic_objects.txt:   # added after review 2 (critic objects, VP revises)
+  vendor: Widgets Inc.
+  invoice_number: INV-2006
+  total: 11000.00
+  due_date: 2026-11-18
+  line_items: [[WidgetA, 12], [WidgetB, 9], [GadgetX, 4]]

@@ -2,11 +2,18 @@
   "use strict";
   var DATA = null, SRC = {}, MODE = "live", SET = "case", FILTER = "all", SELECTED = null, REPORT = "live", P = null;
   var PILL = { APPROVED: ["approve", "Approved"], REJECTED: ["reject", "Rejected"], PENDING_HUMAN: ["review", "Held for a human"] };
-  var BY = { hard_rules: "hard rules", hard_hold: "a hard hold rule", vp: "the VP agent", "vp+critic": "the VP after critic review", deadlock: "deadlock, VP and critic disagree", error: "error fallback" };
+  var BY = { hard_rules: "hard rules", hard_hold: "a hard hold rule", error: "the fail-closed error rule", payment_guard: "the payment guard", human: "a person", model_pin: "the model pin" };
+  // Offline, the VP, critic and rejection review are fixed rules written from the agents' prompts: never call them agents.
+  var BY_ENGINE = { vp: ["the VP agent (Grok)", "the VP rules stand-in"], "vp+critic": ["the VP and critic agents (Grok)", "the VP and critic rules stand-ins"],
+    deadlock: ["deadlock, Grok VP and critic disagree", "deadlock of the VP and critic rules stand-ins"], rejection_review: ["the Grok rejection review", "the rejection review rules stand-in"] };
+  function byLabel(d, r) {
+    if (BY_ENGINE[d.decided_by]) { var eng = d.engine || (isLive(r) ? "grok" : "rules"); return BY_ENGINE[d.decided_by][eng === "grok" ? 0 : 1]; }
+    return BY[d.decided_by] || d.decided_by;
+  }
   var TRIG = { over_threshold: "over the limit", near_limit: "near the limit", high_risk: "high risk" };
   var SEV = { block: "Blocking: rules out payment", warn: "Warning: does not block on its own", info: "Info: noted for the record" };
-  var AGENT = { ingestion: "Ingest", validation: "Validate", risk: "Risk", approval: "Approval", memo: "Memo", payment: "Payment", hitl: "Review" };
-  var STAGES = [["ingestion", "Ingest", "Read the file"], ["validation", "Validate", "Stock, math, dates, duplicates"], ["risk", "Risk", "Fraud score; Grok checks claims with read-only tools"], ["vp", "VP", "Proposes approve, hold or reject"], ["critic", "Critic", "Second agent that challenges VP approvals"], ["outcome", "Outcome", "Pay, reject, or hold for a person"]];
+  var AGENT = { ingestion: "Ingest", validation: "Validate", risk: "Risk", approval: "Approval", memo: "Memo", payment: "Payment", hitl: "Review", guard: "Guard" };
+  var STAGES = [["ingestion", "Ingest", "Read the file"], ["validation", "Validate", "Stock, math, dates, duplicates"], ["risk", "Risk", "Fraud score; Grok checks claims with read-only tools"], ["vp", "VP", "Proposes approve, hold or reject"], ["critic", "Critic", "Challenges VP approvals (a rules stand-in offline)"], ["outcome", "Outcome", "Pay, reject, or hold for a person"]];
   var README = "https://github.com/adamtpang/galatiq.vercel.app#quickstart-offline-about-a-minute";
   var SCALE = 25, MIN_STEP = 130, INTRO = 280, OUTRO = 170;
   var $ = function (id) { return document.getElementById(id); };
@@ -158,7 +165,15 @@
       case "memo.memo":
         o.title = "Decision memo" + (d.by === "grok" ? " by Grok" : " (template, offline)"); o.what = esc(d.text);
         o.body = d.next_step ? '<p class="small muted">Next step: ' + esc(d.next_step) + "</p>" : ""; break;
-      case "payment.guard_refused": o.title = "Payment refused by the last guard"; o.what = "Amount " + esc(d.amount) + " is not a finite number above zero"; o.cls = "bad"; break;
+      case "payment.guard_refused": o.title = "Payment refused by the last guard"; o.what = d.reason ? esc(d.reason) : "Amount " + esc(d.amount) + " is not a finite number above zero"; o.cls = "bad"; break;
+      case "approval.rejection_review":
+        var rg = d.engine === "grok" || (!d.engine && isLive(r));
+        o.title = (rg ? "Grok rejection review: " : "Rejection review rules stand-in: ") + (d.ok === false ? "failed, rejection stands" : d.verdict === "escalate" ? "escalates to a person" : "agrees");
+        o.what = esc(d.reason || d.error || ""); o.body = '<p class="small muted">It can only keep the rejection or send it to a person; it can never approve or pay.</p>';
+        o.cls = d.verdict === "escalate" ? "warn" : ""; break;
+      case "guard.decide":
+        o.title = statusName(d.status) + " <span class='by'>by the fail-closed guard</span>"; o.what = list(d.reasons); o.cls = "decide warn"; break;
+      case "hitl.queued_payment_failed": o.title = "Queued for a person: payment failed"; o.what = "Approve in the review queue to retry, or reject"; o.cls = "warn"; break;
       case "ingestion.extracted":
         o.title = "Extracted " + esc(invNumber(inv.number));
         o.what = plural(inv.items.length, "line") + " · " + money(inv.total_usd) + (inv.currency && inv.currency !== "USD" ? " (" + esc(inv.currency) + " " + esc(inv.total) + ")" : "");
@@ -182,17 +197,17 @@
           (sig.length || rr.length ? more("Rule signals (" + sig.length + ")", sig.length ? list(sig.map(function (s) { return s.reason + " (+" + s.weight + ")"; })) : list(rr)) : "");
         o.cls = d.score >= hr() ? "warn" : ""; break;
       case "approval.vp_propose":
-        o.title = "VP proposes: " + esc(d.decision); o.what = isLive(r) ? "Grok as the VP" : "Rules version of the VP";
+        o.title = "VP proposes: " + esc(d.decision); o.what = isLive(r) ? "Grok as the VP" : "VP rules stand-in (offline, no model called)";
         o.body = more("VP's argument", list(d.reasons) + (d.conditions && d.conditions.length ? "<div class='sub-h'>Conditions</div>" + list(d.conditions) : "")); o.cls = "vp"; break;
       case "approval.critic_review":
-        o.title = "Critic, round " + esc(d.round) + ": " + (d.verdict === "object" ? "objects" : "signs off"); o.what = esc(d.reason);
+        o.title = (isLive(r) ? "Critic" : "Critic rules stand-in") + ", round " + esc(d.round) + ": " + (d.verdict === "object" ? "objects" : "signs off"); o.what = esc(d.reason);
         o.cls = "crit " + (d.verdict === "object" ? "bad" : "good"); break;
       case "approval.vp_revise":
-        o.title = "VP revises, round " + esc(d.round) + ": " + esc(d.decision);
+        o.title = (isLive(r) ? "VP" : "VP rules stand-in") + " revises, round " + esc(d.round) + ": " + esc(d.decision);
         o.body = more("VP's argument", list(d.reasons) + (d.conditions && d.conditions.length ? "<div class='sub-h'>Conditions</div>" + list(d.conditions) : "")); o.cls = "vp"; break;
       case "approval.decide":
         var trig = (inv.decision.arguments && inv.decision.arguments.critic_triggers) || [];
-        o.title = statusName(d.status) + " <span class='by'>by " + esc(BY[d.decided_by] || d.decided_by) + (d.critique_rounds ? ", " + plural(d.critique_rounds, "critic round") : "") + "</span>";
+        o.title = statusName(d.status) + " <span class='by'>by " + esc(byLabel(d, r)) + (d.critique_rounds ? ", " + plural(d.critique_rounds, "critic round") : "") + "</span>";
         o.what = list(d.reasons);
         var notes = [];
         if (d.decided_by === "hard_rules") notes.push("Blocking flags decide on their own.");
@@ -258,7 +273,7 @@
     $("summary").innerHTML = card(money(paid), "paid · " + nPaid) + card(String(rej), "rejected") + card(String(held), "held") + card(money(fraud), "high-risk blocked · " + fraudN, "Rejected with risk score " + hr() + " or more");
     var o = DATA.runs[key(MODE === "offline" ? "live" : "offline", SET)], diff = [];
     if (o) r.invoices.forEach(function (i) { var j = o.invoices.find(function (x) { return x.file === i.file; }); if (j && j.decision.status !== i.decision.status) diff.push(invNumber(i.number)); });
-    $("run-note").textContent = (MODE === "offline" ? "Offline: VP and critic are fixed rules, no API calls." : "Live: Grok reads every invoice (a cross-check against the parser), does the risk review, the VP and the critic, and writes every decision memo. The critic only reviews approvals over $10,000, near the limit or high risk. Live decisions can differ run to run even at temperature 0; hard rules run first, and Grok can only raise risk or hold, never pay what the rules block.") +
+    $("run-note").textContent = (MODE === "offline" ? "Offline: no model is called. The risk review, VP, critic and rejection review are rules stand-ins (fixed rules written from the agents' prompts), not agents; the memo is a template." : "Live: Grok reads every invoice (a cross-check against the parser), does the risk review, the VP and the critic, and writes every decision memo. The critic only reviews approvals over $10,000, near the limit or high risk. Live decisions can differ run to run even at temperature 0; hard rules run first, and Grok can only raise risk or hold, never pay what the rules block.") +
       (diff.length ? " Differs from the other run on " + diff.join(", ") + "." : o ? " Same outcomes as the other run." : "");
   }
   function card(big, cap, title) { return '<div class="sum"' + (title ? ' title="' + esc(title) + '"' : "") + '><div class="sum-big">' + esc(big) + '</div><div class="small muted">' + esc(cap) + "</div></div>"; }
@@ -314,8 +329,8 @@
     return { evs: evs, total: at };
   }
   function stageOf(ev) {
-    if (ev.agent === "approval") return ev.step === "critic_review" ? "critic" : ev.step === "decide" ? "outcome" : "vp";
-    if (ev.agent === "payment" || ev.agent === "hitl") return "outcome";
+    if (ev.agent === "approval") return ev.step === "critic_review" ? "critic" : ev.step === "decide" || ev.step === "rejection_review" ? "outcome" : "vp";
+    if (ev.agent === "payment" || ev.agent === "hitl" || ev.agent === "guard") return "outcome";
     return ev.agent;
   }
   function startRun(name) {
@@ -472,7 +487,7 @@
     ["item", "items not in inventory", function (i) { return blocks(i).indexOf("UNKNOWN_ITEM") >= 0; }],
     ["data", "missing or invalid data", function (i) { return blocks(i).some(function (c) { return /^MISSING_|^NEGATIVE_|^INVALID_|UNREADABLE|PARSE/.test(c); }); }],
     ["math", "math does not add up", function (i) { return blocks(i).some(function (c) { return /MISMATCH/.test(c); }); }],
-    ["vp", "rejected by the VP agent", function (i) { return !hasBlock(i); }],
+    ["vp", "rejected by the VP", function (i) { return !hasBlock(i); }],
     ["other", "other blocking flags", function () { return true; }]
   ];
   function catOf(i) { for (var c = 0; c < CAT.length; c++) if (CAT[c][2](i)) return CAT[c]; }
@@ -501,7 +516,7 @@
     h.push('<p class="memo-note small muted">' + esc(runName(REPORT)) + " · recorded " + esc(w.full) + " · assembled from the trace; only the linking words are a template.</p>");
     h.push('<div class="st-cards"><div class="st approve"><b>' + appr.length + '</b><span>paid</span></div><div class="st reject"><b>' + rej.length + '</b><span>rejected</span></div><div class="st review"><b>' + held.length + '</b><span>need you</span></div><div class="st"><b>' + whole(paidSum) + "</b><span>paid out</span></div></div>");
     h.push('<section class="m-sec"><h3>What I did</h3><p>Read all ' + n + " files in " + fmtDur(r.duration_ms) + ". " + (isLive(r) ? (function () { var cc = r.invoices.filter(function (i) { return i.cross_check && i.cross_check.ok; }), ag = cc.filter(function (i) { return i.cross_check.agree; }).length, rb = r.invoices.filter(function (i) { return i.timeline.some(function (e) { return e.step === "llm_repair"; }); }).length;
-        return "Grok checked the parser's reading of " + cc.length + " (" + (ag === cc.length ? "all agreed" : ag + " agreed") + ")" + (rb ? ", rebuilt " + rb + " the parser could not read," : "") + " and wrote all " + n + " memos. "; })() : "") + hard + " were settled by hard rules. " + (hh ? hh + " held by a hard hold rule, before the VP. " : "") + (isLive(r) ? (n - hard) + " got a Grok risk review (" + plural(tools, "tool call") + ") and " + (n - hard - hh) + " a VP decision." : (n - hard - hh) + " went through the rules VP" + (invs.some(function (i) { return i.decision.critique_rounds; }) ? " and critic" : "") + ".") + "</p></section>");
+        return "Grok checked the parser's reading of " + cc.length + " (" + (ag === cc.length ? "all agreed" : ag + " agreed") + ")" + (rb ? ", rebuilt " + rb + " the parser could not read," : "") + " and wrote all " + n + " memos. "; })() : "") + hard + " were settled by hard rules. " + (hh ? hh + " held by a hard hold rule, before the VP. " : "") + (isLive(r) ? (n - hard) + " got a Grok risk review (" + plural(tools, "tool call") + ") and " + (n - hard - hh) + " a VP decision." : (n - hard - hh) + " went through the VP rules stand-in" + (invs.some(function (i) { return i.decision.critique_rounds; }) ? " and the critic rules stand-in" : "") + ".") + "</p></section>");
 
     var groups = {}, order = [];
     rej.forEach(function (i) { var c = catOf(i); if (!groups[c[0]]) { groups[c[0]] = { c: c, items: [] }; order.push(c[0]); } groups[c[0]].items.push(i); });

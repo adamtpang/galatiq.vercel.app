@@ -3,6 +3,7 @@ import json
 import math
 
 import pytest
+from pydantic import ValidationError
 
 from invoice_agents.agents.ingestion import ingest
 from invoice_agents.agents.payment import PaymentAgent
@@ -49,7 +50,9 @@ def test_models_refuse_nan_and_infinity():
 
 def test_non_finite_value_set_after_parsing_is_blocked(inventory, policy):
     inv = mk()
-    inv.total = float("inf")          # bypasses construction-time validation
+    with pytest.raises(ValidationError):   # review 2: validate_assignment refuses it on assignment too
+        inv.total = float("inf")
+    object.__setattr__(inv, "total", float("inf"))   # force it past the model: validation still blocks it
     flags, st = run(inv, inventory, policy)
     assert flags["NON_FINITE_NUMBER"].severity.value == "block" and st.total_usd is None
 

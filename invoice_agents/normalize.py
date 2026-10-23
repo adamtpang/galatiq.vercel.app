@@ -35,8 +35,8 @@ _MONEY = re.compile(r"-?\$?\s*-?[\d,]*\.?\d+")
 
 
 def parse_money(value) -> float | None:
-    if value is None:
-        return None
+    if value is None or isinstance(value, (bool, list, tuple, dict, set)):
+        return None   # true is not 1 and ["8"] is not 8: only numbers and strings are amounts
     if isinstance(value, (int, float)):
         return float(value)
     s, _ = fix_ocr_digits(str(value).strip())

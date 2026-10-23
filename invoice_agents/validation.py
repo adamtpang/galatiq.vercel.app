@@ -31,11 +31,35 @@ def _f(code: str, sev: Severity, msg: str, **ev: Any) -> Flag:
     return Flag(code=code, severity=sev, message=msg, evidence=ev)
 
 
+def local_stamp(local_sql: str | None) -> str:
+    """A SQLite 'YYYY-MM-DD HH:MM:SS' already converted with datetime(x, 'localtime'), shown with its zone,
+    e.g. '2026-10-22 7:17 PM CDT'."""
+    if not local_sql:
+        return "an unknown time"
+    from datetime import datetime as _dt
+    try:
+        t = _dt.strptime(str(local_sql)[:19], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return str(local_sql)
+    import time as _time
+    zone = _time.strftime("%Z", _time.localtime(t.timestamp()))
+    return t.strftime("%Y-%m-%d ") + t.strftime("%I:%M %p").lstrip("0") + f" {zone}"
+
+
 def _money(x: float) -> str:
     return f"${x:,.2f}"
 
 
 # --- required fields ----------------------------------------------------------------
+def check_field_types(inv: Invoice) -> list[Flag]:
+    """A list, object or true/false where the file should have a number or a name: the parser read that field
+    as missing, so the invoice cannot be paid as read."""
+    if not inv.type_errors:
+        return []
+    return [_f("INVALID_FIELD_TYPE", B, "Wrong value type in the file: " + "; ".join(inv.type_errors[:4])
+               + (f" (+{len(inv.type_errors) - 4} more)" if len(inv.type_errors) > 4 else ""), fields=inv.type_errors)]
+
+
 def check_required_fields(inv: Invoice) -> list[Flag]:
     out = []
     if not inv.vendor:
@@ -107,7 +131,8 @@ def check_inventory(inv: Invoice, inventory: Inventory, policy: dict) -> list[Fl
             lines[li.sku].append(n)
     for sku, qty in requested.items():
         row = inventory.query_inventory(sku)
-        if row is None:
+        if row is None:   # matched a catalog name but has no stock row: unknown, never "fine"
+            out.append(_f("UNKNOWN_ITEM", B, f"'{sku}' has no stock record in inventory", item=sku))
             continue
         if row.stock == 0:
             out.append(_f("ZERO_STOCK", B, f"{sku} has zero stock (requested {qty:g})",
@@ -272,8 +297,7 @@ def check_bank_details(raw: str | None, inv: Invoice, policy: dict) -> list[Flag
     """An invoice that carries or changes payment details (IBAN, SWIFT, routing or account number, remit-to,
     updated bank details). The classic vendor-impersonation fraud: hold it for a person to confirm."""
     pats = ((policy.get("bank_details") or {}).get("change_patterns")) or []
-    text = " ".join(filter(None, [raw or "", inv.notes or "", inv.terms or ""]
-                           + [li.note or "" for li in inv.items])).lower()
+    text = " ".join(str(x) for x in [raw, inv.notes, inv.terms, *(li.note for li in inv.items)] if x).lower()
     hits = list(dict.fromkeys(m.group(0).strip() for m in (re.search(p, text) for p in pats) if m))
     if not hits:
         return []
@@ -399,9 +423,11 @@ class DuplicateRegistry:
     def _paid(self, r: sqlite3.Row) -> str:
         if self.conn is None:
             return ""
-        p = self.conn.execute("SELECT amount, created_at FROM payments WHERE invoice_number IS ? AND vendor IS ? "
-                              "AND status = 'paid' ORDER BY id LIMIT 1", (r["invoice_number"], r["vendor"])).fetchone()
-        return f", paid {_money(p[0])} on {str(p[1])[:10]}" if p else ""
+        # created_at is stored in UTC (SQLite datetime('now')); people read it in the machine's local time
+        p = self.conn.execute("SELECT amount, datetime(created_at, 'localtime') FROM payments WHERE invoice_number IS ? "
+                              "AND vendor IS ? AND status = 'paid' ORDER BY id LIMIT 1",
+                              (r["invoice_number"], r["vendor"])).fetchone()
+        return f", paid {_money(p[0])} on {local_stamp(p[1])}" if p else ""
 
     STATUS_WORDS = {"APPROVED": "approved", "REJECTED": "rejected", "PENDING_HUMAN": "held for a person"}
 
@@ -543,6 +569,7 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
             state.flags.append(_f("EXTRACTION_FAILED", B, "Could not extract invoice data", errors=state.errors))
         return state
     flags: list[Flag] = []
+    flags += check_field_types(inv)
     flags += check_required_fields(inv)
     flags += check_quantities(inv)
     flags += check_inventory(inv, inventory, policy)

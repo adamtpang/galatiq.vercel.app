@@ -17,7 +17,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..db import Inventory
-from ..llm import LLMClient, LLMOutputError, LLMUnavailable, OfflineClient
+from ..llm import LLMClient, LLMOutputError, LLMUnavailable, OfflineClient, neutralize
 from ..models import Flag, Invoice, InvoiceState, Severity, TraceEvent
 from ..normalize import normalize_sku
 from ..parsers import PdfTextError, parse_raw, read_source
@@ -82,7 +82,7 @@ def llm_extract(raw: str, source: str, fmt: str, llm: LLMClient, problem: str | 
     head = f"Deterministic parser problem: {problem}\n\n" if problem else ""
     res = llm.complete_structured(ExtractedInvoice, [
         {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": f"{head}Invoice text:\n{raw[:20000]}"},
+        {"role": "user", "content": f"{head}Invoice text:\n{neutralize(raw[:20000])}"},
     ])
     return _from_llm(res.value, source, fmt), res
 
@@ -161,6 +161,9 @@ def cross_check(state: InvoiceState, raw: str, path: str, fmt: str, inventory: I
     except (LLMUnavailable, LLMOutputError) as e:
         state.cross_check = {"ok": False, "error": str(e)}
         state.trace.append(TraceEvent(agent=AGENT, step="grok_cross_check", detail=state.cross_check))
+        # decision 16: the independent reading did not happen, so nothing confirms the parser; a person looks
+        state.flags.append(Flag(code="GROK_CHECK_FAILED", severity=Severity.WARN, evidence={"step": "cross_check"},
+                                message=f"Grok's independent reading failed ({str(e)[:120]}); nothing confirms the parser's reading"))
         return
     resolve_skus(g, inventory)
     diffs = compare_readings(state.invoice, g)

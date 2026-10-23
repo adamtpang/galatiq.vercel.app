@@ -1,7 +1,9 @@
 """Approval agent: hard rules, then a VP agent, then (when triggered) a critic loop.
 
 Policy (Adam, DECISIONS.md; values in config/policy.yaml `approval:`):
-  1. Any blocking flag => REJECTED by hard rules. No LLM call.
+  0. A step that crashed or recorded an error (INTERNAL_ERROR) => PENDING_HUMAN before any VP call (fail closed).
+  1. Any blocking flag => REJECTED by hard rules. One rejection review follows (Grok live, a rules stand-in
+     offline) that can only escalate the rejection to a person (PENDING_HUMAN), never approve or pay.
   1b. Hard holds (decisions 8, 9, 10): prompt injection (rule signal, or Grok's risk review sets
       prompt_injection), vendor rename or lookalike, or an invoice Grok rebuilt from raw text because
       the parser could not read it => PENDING_HUMAN. No VP or critic call.
@@ -14,8 +16,9 @@ Policy (Adam, DECISIONS.md; values in config/policy.yaml `approval:`):
      text is passed as quoted data. Payment uses the deterministic amount only.
 
 With an LLM (GrokClient) the VP and critic are Grok calls with JSON-schema output.
-Without one, OfflineVP and OfflineCritic apply the same prompts as fixed rules, so
-the offline suite and golden tests are deterministic.
+Without one, OfflineVP, OfflineCritic and OfflineRejectionReviewer apply the same prompts as fixed rules
+(labelled "rules stand-in" everywhere a person sees them; they are not agents), so the offline suite and
+golden tests are deterministic.
 """
 from __future__ import annotations
 
@@ -25,7 +28,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
-from ..llm import LLMClient
+from ..llm import LLMClient, quote_document
 from ..models import Decision, DecisionStatus, Flag, InvoiceState, Severity, TraceEvent
 from ..validation import ADVISORY
 
@@ -79,7 +82,7 @@ def facts(state: InvoiceState, policy: dict[str, Any]) -> dict[str, Any]:
 
 def _user_message(state: InvoiceState, f: dict, extra: str = "") -> str:
     return ("FACTS (computed by code, authoritative):\n" + json.dumps(f, default=str, indent=1) + "\n\n"
-            + extra + "<invoice_document>\n" + (state.raw_text or "")[:12000] + "\n</invoice_document>")
+            + extra + quote_document(state.raw_text, 12000))
 
 
 def critic_needed(total_usd: float | None, risk_score: int | None, policy: dict[str, Any]) -> list[str]:
@@ -106,6 +109,8 @@ class Critic(Protocol):
 
 
 class LLMVP:
+    engine = "grok"
+
     def __init__(self, llm: LLMClient):
         self.llm = llm
 
@@ -123,6 +128,8 @@ class LLMVP:
 
 
 class LLMCritic:
+    engine = "grok"
+
     def __init__(self, llm: LLMClient):
         self.llm = llm
 
@@ -144,6 +151,9 @@ CONDITIONS = {
 
 
 class OfflineVP:
+    """VP rules stand-in (offline): Adam's VP prompt written as fixed rules. Not an agent; no model is called."""
+    engine = "rules"
+
     def propose(self, state, f):
         if not f["vendor_on_file"]:
             return VPOpinion(decision="hold", reasons=["Vendor is not on file"])
@@ -170,8 +180,9 @@ class OfflineVP:
 
 
 class OfflineCritic:
-    """Objects with the next unresolved concern each round. Conditions do not change facts,
+    """Critic rules stand-in (offline). Objects with the next unresolved concern each round. Conditions do not change facts,
     so a concern grounded in the invoice stays open until a human resolves it."""
+    engine = "rules"
 
     def concerns(self, state, f) -> list[str]:
         codes = {fl.code: fl for fl in state.flags}
@@ -198,6 +209,90 @@ class OfflineCritic:
         return CriticOpinion(verdict="object", reason=c[min(round_no, len(c)) - 1])
 
 
+# --- rejection review (review 2): a second look at hard-rule rejections that can only escalate -------------
+REJECTION_REVIEW_PROMPT = (
+    "You are Acme's AP controller. Deterministic hard rules rejected this invoice; the blocking flags are in FACTS. "
+    "Look for a false positive: a flag that contradicts the invoice text, a reading or rounding error, or a "
+    "rejection a person should see before the vendor is turned away. You have exactly two choices: agree (the "
+    "invoice stays rejected) or escalate (a person reviews it). You can never approve or pay anything, and you "
+    "must not escalate a rejection that is clearly right. Cite the flag and the invoice text."
+)
+
+
+class RejectionReview(BaseModel):
+    verdict: Literal["agree", "escalate"] = Field(description="agree = stays rejected; escalate = a person reviews it")
+    reason: str
+
+
+class LLMRejectionReviewer:
+    engine = "grok"
+
+    def __init__(self, llm: LLMClient):
+        self.llm = llm
+
+    def review(self, state: InvoiceState, f: dict, rejection: Decision) -> RejectionReview:
+        return self.llm.complete_structured(RejectionReview, [
+            {"role": "system", "content": REJECTION_REVIEW_PROMPT}, {"role": "system", "content": GUARDRAILS},
+            {"role": "user", "content": _user_message(state, f, "HARD-RULE REJECTION:\n"
+                                                      + json.dumps(rejection.reasons) + "\n\n")}]).value
+
+
+ARITHMETIC_CODES = {"TOTAL_MISMATCH", "SUBTOTAL_MISMATCH", "LINE_AMOUNT_MISMATCH"}
+
+
+class OfflineRejectionReviewer:
+    """Rejection review rules stand-in (offline). Not an agent; no model is called. It escalates only a rejection
+    that rests on arithmetic alone (every blocking flag is a total, subtotal or line-amount mismatch) from a vendor
+    on file with a risk score under the high-risk mark: likely a typo a person can fix with one call to the
+    vendor. Everything else stays rejected."""
+    engine = "rules"
+
+    def review(self, state, f, rejection):
+        blocks = {fl.code for fl in state.flags if fl.severity == Severity.BLOCK}
+        risk = f.get("risk_score") or 0
+        if blocks and blocks <= ARITHMETIC_CODES and f.get("vendor_on_file") and risk < f["policy"]["high_risk_score"]:
+            return RejectionReview(verdict="escalate", reason="Rules stand-in: the only blocking problem is arithmetic "
+                                   f"({', '.join(sorted(blocks))}) on an invoice from a vendor on file with low risk; "
+                                   "a person can confirm the right amount with the vendor")
+        return RejectionReview(verdict="agree", reason="Rules stand-in: the blocking flags are not arithmetic-only on a "
+                               "low-risk invoice from a vendor on file, so the rejection stands")
+
+
+def review_rejection(state: InvoiceState, rejection: Decision, reviewer: Any, policy: dict[str, Any]) -> Decision:
+    """A hard-rule rejection gets one review that can only escalate it to a person (PENDING_HUMAN), never approve
+    or pay. If the review fails or is switched off, the rejection stands (fail closed)."""
+    if reviewer is None or not policy.get("approval", {}).get("rejection_review", True) or state.invoice is None:
+        return rejection
+    engine = getattr(reviewer, "engine", None)
+    label = "Grok rejection review" if engine == "grok" else "Rejection review rules stand-in"
+    try:
+        rv = reviewer.review(state, facts(state, policy), rejection)
+    except Exception as e:  # noqa: BLE001 - a failed review never weakens a rejection
+        state.trace.append(TraceEvent(agent=AGENT, step="rejection_review", detail={"ok": False, "error": str(e),
+                                                                                    "engine": engine}))
+        return rejection
+    state.trace.append(TraceEvent(agent=AGENT, step="rejection_review", detail={**rv.model_dump(), "engine": engine}))
+    rejection.arguments = rejection.arguments | {"rejection_review": rv.model_dump() | {"engine": engine}}
+    if rv.verdict != "escalate":
+        return rejection
+    return Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="rejection_review", engine=engine,
+                    risk_score=rejection.risk_score,
+                    reasons=[f"{label} escalated the hard-rule rejection to a person: {rv.reason}"] + rejection.reasons,
+                    arguments={"hard_rule_rejection": rejection.model_dump(mode="json"), "rejection_review": rv.model_dump()})
+
+
+def error_hold(state: InvoiceState) -> Decision | None:
+    """Fail closed: a step crashed (INTERNAL_ERROR) or recorded an error, so the checks may be incomplete. Hold for a
+    person before any VP call. (A blocking flag found before the crash has already rejected the invoice.)"""
+    errs = state.pipeline_errors()
+    crashed = [f for f in state.flags if f.code == "INTERNAL_ERROR"]
+    if not errs and not crashed:
+        return None
+    why = crashed[0].message if crashed else errs[0]
+    return Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="error", risk_score=(state.risk or {}).get("score"),
+                    reasons=[f"INTERNAL_ERROR: {why}"], arguments={"errors": errs})
+
+
 # --- decision flow -------------------------------------------------------------------
 def hard_rules(state: InvoiceState) -> Decision | None:
     blocks = [f for f in state.flags if f.severity == Severity.BLOCK]
@@ -209,7 +304,8 @@ def hard_rules(state: InvoiceState) -> Decision | None:
 
 HOLD_FLAGS = {"vendor_renamed": "VENDOR_RENAMED", "vendor_lookalike": "VENDOR_LOOKALIKE",
               "bank_details_changed": "BANK_DETAILS_CHANGED",   # decision 11
-              "extraction_disagreement": "EXTRACTION_DISAGREEMENT"}   # decision 12
+              "extraction_disagreement": "EXTRACTION_DISAGREEMENT",   # decision 12
+              "grok_check_failed": "GROK_CHECK_FAILED"}   # decision 16: live, a Grok check that should have run failed
 
 
 def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
@@ -293,10 +389,17 @@ def unreadable_hold(state: InvoiceState, policy: dict[str, Any]) -> Decision | N
 STATUS = {"approve": DecisionStatus.APPROVED, "reject": DecisionStatus.REJECTED, "hold": DecisionStatus.PENDING_HUMAN}
 
 
-def decide(state: InvoiceState, vp: VP, critic: Critic, policy: dict[str, Any]) -> Decision:
-    hard = unreadable_hold(state, policy) or hard_rules(state) or hard_holds(state, policy)
+def decide(state: InvoiceState, vp: VP, critic: Critic, policy: dict[str, Any], reviewer: Any = None) -> Decision:
+    hold = unreadable_hold(state, policy)
+    if hold:
+        return hold
+    rejection = hard_rules(state)
+    if rejection:
+        return review_rejection(state, rejection, reviewer, policy)
+    hard = error_hold(state) or hard_holds(state, policy)
     if hard:
         return hard
+    engine = getattr(vp, "engine", None)
     f = facts(state, policy)
     risk_score = (state.risk or {}).get("score")
     max_rounds = policy.get("approval", {}).get("critic_max_rounds", 2)
@@ -325,20 +428,20 @@ def decide(state: InvoiceState, vp: VP, critic: Critic, policy: dict[str, Any]) 
     args = {"critic_triggers": triggers, "history": history}
     if objection is not None and opinion.decision == "approve":
         return Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="deadlock", critique_rounds=rounds,
-                        risk_score=risk_score, conditions=opinion.conditions,
+                        risk_score=risk_score, conditions=opinion.conditions, engine=engine,
                         reasons=[f"VP and critic still disagree after {rounds} rounds",
                                  "VP: " + "; ".join(opinion.reasons), "Critic: " + objection.reason],
                         arguments=args | {"vp": opinion.model_dump(), "critic": objection.model_dump()})
     return Decision(status=STATUS[opinion.decision], reasons=opinion.reasons, conditions=opinion.conditions,
-                    critique_rounds=rounds, risk_score=risk_score, decided_by=by, arguments=args)
+                    critique_rounds=rounds, risk_score=risk_score, decided_by=by, arguments=args, engine=engine)
 
 
 def approve(state: InvoiceState, llm: LLMClient, policy: dict[str, Any]) -> InvoiceState:
     if llm is not None and llm.available:
-        vp, critic = LLMVP(llm), LLMCritic(llm)
+        vp, critic, reviewer = LLMVP(llm), LLMCritic(llm), LLMRejectionReviewer(llm)
     else:
-        vp, critic = OfflineVP(), OfflineCritic()
-    d = decide(state, vp, critic, policy)
+        vp, critic, reviewer = OfflineVP(), OfflineCritic(), OfflineRejectionReviewer()
+    d = decide(state, vp, critic, policy, reviewer)
     state.decision = d
     state.trace.append(TraceEvent(agent=AGENT, step="decide", detail=d.model_dump(mode="json")))
     return pin_check(state, llm, policy)

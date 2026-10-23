@@ -38,7 +38,8 @@ def export_run(name: str) -> dict:
         inv = next((e["detail"]["invoice"] for e in events if e["step"] == "extracted"), None)
         val = next((e["detail"] for e in events if e["agent"] == "validation" and e["step"] == "validate"), {})
         risk = next((e["detail"] for e in events if e["agent"] == "risk" and e["step"] == "assess"), {})
-        decision = next((e["detail"] for e in events if e["agent"] == "approval" and e["step"] == "decide"), {})
+        # the final decision: the last "decide" step (the approval agent, or the fail-closed guard after it)
+        decision = next((e["detail"] for e in reversed(events) if e["step"] == "decide"), {})
         pay = next((e["detail"] for e in events if e["agent"] == "payment" and e["step"] in ("paid", "failed",
                                                                                           "idempotency_skip")), None)
         memo = next((e["detail"] for e in events if e["agent"] == "memo" and e["step"] == "memo"), None)
@@ -66,7 +67,7 @@ def export_run(name: str) -> dict:
                 det = {"score": det.get("score"), "deterministic_score": det.get("deterministic_score"),
                        "reasons": det.get("reasons", []), "llm": det.get("llm")}
             if e["step"] == "decide":
-                det = {k: det.get(k) for k in ("status", "decided_by", "critique_rounds", "reasons", "conditions")}
+                det = {k: det.get(k) for k in ("status", "decided_by", "engine", "critique_rounds", "reasons", "conditions")}
             timeline.append({"agent": e["agent"], "step": e["step"], "ms": round((e["ts"] - t0) * 1000), "detail": det})
         invoices.append({
             "file": file, "number": r["invoice"], "vendor": None if r["vendor"] in (None, "", "-") else r["vendor"], "total_usd": r["total_usd"],
@@ -75,7 +76,7 @@ def export_run(name: str) -> dict:
             "flags": flags, "memo": memo and {k: memo.get(k) for k in ("text", "next_step", "by", "model")},
             "cross_check": cc and {k: cc.get(k) for k in ("ok", "agree", "differences", "model", "error")}, "risk": {"score": risk.get("score"), "deterministic_score": risk.get("deterministic_score"), "reasons": risk.get("reasons", []),
                                                     "signals": risk.get("signals", []), "llm": risk.get("llm")},
-            "decision": {k: decision.get(k) for k in ("status", "decided_by", "critique_rounds", "reasons",
+            "decision": {k: decision.get(k) for k in ("status", "decided_by", "engine", "critique_rounds", "reasons",
                                                        "conditions", "arguments")},
             "payment": pay or {"status": r["payment"].split(" ")[0]},
             "timeline": timeline,

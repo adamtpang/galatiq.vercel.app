@@ -8,7 +8,7 @@ from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
-from .models import InvoiceState, Severity
+from .models import InvoiceState, Severity, decided_by_label
 
 STATUS_STYLE = {"APPROVED": "bold green", "REJECTED": "bold red", "PENDING_HUMAN": "bold yellow"}
 
@@ -31,6 +31,8 @@ def row(s: InvoiceState) -> dict:
         "warn_flags": warns,
         "decision": d.status.value if d else "-",
         "decided_by": d.decided_by if d else "-",
+        "engine": d.engine if d else None,
+        "decided_by_label": decided_by_label(d),
         "critique_rounds": d.critique_rounds if d else 0,
         "payment": p.get("status", "-") + (f" {money(p['amount'])}" if p.get("status") in ("paid", "already_paid") else ""),
         "reason": (d.reasons[0] if d and d.reasons else ""),
@@ -56,8 +58,8 @@ def grok_ratio(states: list[InvoiceState]) -> str | None:
     hard = sum(1 for s in states if s.decision and s.decision.decided_by == "hard_rules")
     calls = sum(grok_calls(s) for s in states)
     return (f"Grok worked on {len(used)} of {len(states)} invoices ({calls} API calls this run; reused cached answers "
-            f"are not counted as calls). Hard rules rejected {hard} of them; Grok cannot override those, it only "
-            f"cross-checked the reading and wrote the memo.")
+            f"are not counted as calls). Hard rules rejected {hard} of them; Grok cannot turn those into a payment: it "
+            f"cross-checked the reading, reviewed each rejection (it can only escalate one to a person) and wrote the memo.")
 
 
 WIDE = 140   # below this terminal width the table drops the Vendor, Risk, Flags and By columns
@@ -72,6 +74,8 @@ def print_summary(states: list[InvoiceState], console: Console, mode: str, run_d
     for c in cols:
         if c == "Reason":
             t.add_column(c, overflow="fold", ratio=1)
+        elif c == "Decision" and not wide:   # status, then the payment on its own lines: wrapped, never cut
+            t.add_column(c, no_wrap=False, overflow="fold", min_width=12, max_width=14)
         else:
             t.add_column(c, no_wrap=True, overflow="ellipsis", max_width=None if wide else 17)
     for s in states:
@@ -79,20 +83,19 @@ def print_summary(states: list[InvoiceState], console: Console, mode: str, run_d
         flags = ", ".join(r["block_flags"][:3]) or (", ".join(r["warn_flags"][:2]) and "warn: " + ", ".join(r["warn_flags"][:2])) or "-"
         decision = f"[{STATUS_STYLE.get(r['decision'], '')}]{r['decision'].replace('PENDING_HUMAN', 'HELD')}[/]"
         if not wide:
-            pay = r["payment"] if r["payment"].startswith(("paid", "already")) else money(r["total_usd"])
-            decision += f"\n{pay}"
+            decision += "\n" + payment_cell(r)
         cells = {"File": r["file"].removeprefix("invoice_"), "Invoice": r["invoice"], "Vendor": r["vendor"],
                  "Total USD": money(r["total_usd"]), "Risk": "-" if r["risk"] is None else str(r["risk"]),
-                 "Flags": flags, "Decision": decision, "By": r["decided_by"], "Payment": r["payment"],
+                 "Flags": flags, "Decision": decision, "By": short_by(r), "Payment": r["payment"],
                  "Reason": textwrap.shorten(r["reason"], width=160 if wide else 100, placeholder=" ...")}
         t.add_row(*(cells[c] for c in cols))
     console.print(t)
     if not wide:
         console.print(f"[dim]Narrow terminal ({console.width} columns): full table in report.md and summary.json.[/]")
-    counts = {k: sum(row(s)["decision"] == k for s in states) for k in STATUS_STYLE}
-    paid = sum((s.payment or {}).get("amount", 0) for s in states if (s.payment or {}).get("status") == "paid")
-    console.print(f"{len(states)} invoice{'' if len(states) == 1 else 's'}: {counts['APPROVED']} approved, {counts['REJECTED']} rejected, "
-                  f"{counts['PENDING_HUMAN']} pending human review. Paid this run: {money(paid)}.")
+    console.print(summary_line(states))
+    if mode == "offline":
+        console.print("[dim]Offline: no model was called. The risk review, VP, critic and rejection review are rules "
+                      "stand-ins (fixed rules written from the agents' prompts), not agents; the memo is a template.[/]")
     late = [Path(s.source).name.removeprefix("invoice_") for s in states if any(f.code == "PAST_DUE" for f in s.flags)]
     if late:
         console.print(f"[yellow]Past due[/] when processed (warning only, changes no decision): {len(late)} of "
@@ -104,19 +107,59 @@ def print_summary(states: list[InvoiceState], console: Console, mode: str, run_d
         console.print(f"Trace: {run_dir / 'trace.jsonl'}")
 
 
+def payment_cell(r: dict) -> str:
+    """Narrow table: payment status, then the amount on its own line, e.g. 'already paid' / '$5,000.00'."""
+    p = r["payment"]
+    if p.startswith(("paid", "already_paid")):
+        status, _, amt = p.partition(" ")
+        return status.replace("_", " ") + ("\n" + amt if amt else "")
+    if p.startswith("failed"):
+        return "PAYMENT\nFAILED\n" + money(r["total_usd"])
+    return money(r["total_usd"])
+
+
+def short_by(r: dict) -> str:
+    return r["decided_by"] + (f" ({r['engine']})" if r.get("engine") else "")
+
+
+def summary_line(states: list[InvoiceState]) -> str:
+    """One line: counts, money paid, and failed payments (queued for a person, PAYMENT_FAILED)."""
+    counts = {k: sum(row(s)["decision"] == k for s in states) for k in STATUS_STYLE}
+    paid = sum((s.payment or {}).get("amount", 0) for s in states if (s.payment or {}).get("status") == "paid")
+    failed = [s for s in states if (s.payment or {}).get("status") == "failed"]
+    line = (f"{len(states)} invoice{'' if len(states) == 1 else 's'}: {counts['APPROVED']} approved, "
+            f"{counts['REJECTED']} rejected, {counts['PENDING_HUMAN']} pending human review. Paid this run: {money(paid)}.")
+    if failed:
+        amt = sum((s.payment or {}).get("amount", 0) for s in failed)
+        line += (f" {len(failed)} payment{'' if len(failed) == 1 else 's'} FAILED after retries ({money(amt)} not paid); "
+                 "queued for review as PAYMENT_FAILED, rerun or approve in the review queue to retry.")
+    return line
+
+
+def git_commit() -> str | None:
+    """Short commit of the code that made this run (None outside a git checkout)."""
+    import subprocess
+    try:
+        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=Path(__file__).resolve().parent.parent,
+                             capture_output=True, text=True, timeout=5)
+        return out.stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 def write_artifacts(states: list[InvoiceState], run_dir: Path | None, mode: str, model: str | None = None) -> None:
     if not run_dir:
         return
     rows = [row(s) for s in states]
-    (run_dir / "summary.json").write_text(json.dumps({"mode": mode, "model": model, "grok": grok_ratio(states),
-                                                      "rows": rows}, indent=2, default=str))
+    (run_dir / "summary.json").write_text(json.dumps({"mode": mode, "model": model, "commit": git_commit(),
+                                                      "grok": grok_ratio(states), "rows": rows}, indent=2, default=str))
     lines = [f"# Run {run_dir.name} ({mode}{', ' + model if model else ''})", "",
              "| File | Invoice | Vendor | Total USD | Risk | Blocking flags | Decision | By | Rounds | Payment | Reason |",
              "|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
         reason = r["reason"].replace("|", "/")
         lines.append(f"| {r['file']} | {r['invoice']} | {r['vendor']} | {money(r['total_usd'])} | {r['risk']} | "
-                     f"{', '.join(r['block_flags']) or '-'} | {r['decision']} | {r['decided_by']} | "
+                     f"{', '.join(r['block_flags']) or '-'} | {r['decision']} | {r['decided_by_label']} | "
                      f"{r['critique_rounds']} | {r['payment']} | {reason} |")
     lines += ["", "## Decision memos", ""] + [f"- **{r['file']}** ({r['memo_by']}): {r['memo']}" for r in rows if r["memo"]]
     (run_dir / "report.md").write_text("\n".join(lines) + "\n")

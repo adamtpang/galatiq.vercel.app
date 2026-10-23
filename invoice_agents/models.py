@@ -16,7 +16,9 @@ class Severity(str, Enum):
 
 
 class LineItem(BaseModel):
-    model_config = ConfigDict(allow_inf_nan=False)   # NaN or infinity is never a valid quantity or price
+    # NaN or infinity is never a valid quantity or price. validate_assignment: a value set after construction
+    # (parsers fill fields one by one) is type-checked too, so a list or dict can never reach the checks as "text".
+    model_config = ConfigDict(allow_inf_nan=False, validate_assignment=True)
     sku_raw: str = Field(description="Item name exactly as printed on the invoice")
     sku: str | None = Field(default=None, description="Normalized inventory SKU, None if unknown")
     sku_confidence: float = 0.0
@@ -27,7 +29,7 @@ class LineItem(BaseModel):
 
 
 class Invoice(BaseModel):
-    model_config = ConfigDict(allow_inf_nan=False)
+    model_config = ConfigDict(allow_inf_nan=False, validate_assignment=True)
     number: str | None = None
     revision: str | None = None
     vendor: str | None = None
@@ -50,6 +52,8 @@ class Invoice(BaseModel):
     source_file: str | None = None
     source_format: str | None = None
     corrections: list[str] = Field(default_factory=list, description="Normalizations applied while parsing")
+    type_errors: list[str] = Field(default_factory=list, description="Fields whose value had the wrong type "
+                                   "(a list, object or true/false where a number or name belongs); blocking")
 
 
 class Flag(BaseModel):
@@ -71,7 +75,10 @@ class Decision(BaseModel):
     conditions: list[str] = Field(default_factory=list)
     risk_score: int | None = Field(default=None, ge=0, le=100)
     critique_rounds: int = 0
-    decided_by: str = "unknown"   # hard_rules | vp | vp+critic | deadlock | human | error
+    decided_by: str = "unknown"   # hard_rules | hard_hold | rejection_review | vp | vp+critic | deadlock | human | error | payment_guard
+    # who stood behind the VP, critic and rejection review: "grok" (live) or "rules" (offline stand-ins written as
+    # fixed rules). None when no agent was involved (hard rules, hard holds, a person).
+    engine: Literal["grok", "rules"] | None = None
     arguments: dict[str, Any] = Field(default_factory=dict)  # e.g. VP and critic positions on deadlock
 
 
@@ -101,3 +108,30 @@ class InvoiceState(BaseModel):
 
     def has_blocking(self) -> bool:
         return any(f.severity == Severity.BLOCK for f in self.flags)
+
+    def pipeline_errors(self) -> list[str]:
+        """Errors recorded before payment (a step that failed or crashed). Any of them blocks payment:
+        the checks may not have run, so "no flags" does not mean "nothing wrong"."""
+        return [e for e in self.errors if not e.startswith(("payment failed", "payment:"))]
+
+
+_BY = {"hard_rules": "the hard rules", "hard_hold": "a hard hold rule", "error": "the fail-closed error rule",
+       "payment_guard": "the payment guard", "human": "a person", "model_pin": "the model pin"}
+_BY_ENGINE = {
+    "vp": ("the VP agent (Grok)", "the VP rules stand-in"),
+    "vp+critic": ("the VP and critic agents (Grok)", "the VP and critic rules stand-ins"),
+    "deadlock": ("a VP/critic deadlock (Grok agents)", "a deadlock of the VP and critic rules stand-ins"),
+    "rejection_review": ("the Grok rejection review", "the rejection review rules stand-in"),
+}
+
+
+def decided_by_label(d: "Decision | None", live: bool | None = None) -> str:
+    """Who decided, in words a person reads. Offline stand-ins are written as fixed rules and are labelled as such,
+    never as agents. `live` is only used for old records without an engine field."""
+    if d is None:
+        return "-"
+    if d.decided_by in _BY_ENGINE:
+        engine = d.engine or ("grok" if live else "rules" if live is not None else None)
+        grok, rules = _BY_ENGINE[d.decided_by]
+        return grok if engine == "grok" else rules if engine == "rules" else d.decided_by
+    return _BY.get(d.decided_by, d.decided_by)

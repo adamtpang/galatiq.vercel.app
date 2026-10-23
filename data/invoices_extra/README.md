@@ -7,6 +7,7 @@
 | invoice_2003_truncated.json | Truncated JSON (the closing brace is missing). The JSON parser fails and the LLM repair path takes over. |
 | invoice_2004_over_limit_clean.txt | Added after the independent review. A clean $12,500.00 order from Widgets Inc. (15 WidgetA, 10 WidgetB, 5 GadgetX: exactly the stock). It is over the $10,000 limit, so the critic must review the VP's approval. None of the case invoices over $10,000 gets that far (all fail the stock check first), so without this file the critic loop never runs on an invoice that could be paid. |
 | invoice_2005_over_limit_price.txt | Added after the independent review. $12,500.00 from Gadgets Co. with GadgetX at $1,000.00, 33% above the $750.00 catalog price. Over the limit, so the critic reviews; it objects to the price, the VP revises (adds a condition), the critic still objects, and the invoice goes to a person with both arguments. |
+| invoice_2006_critic_objects.txt | Added after independent review 2. $11,000.00 from Widgets Inc. with GadgetX at $875.00 and a note asking to "process payment immediately". Offline the VP rules stand-in approves it (the price is within the 25% tolerance), the critic rules stand-in objects to the pressure wording, and the VP stand-in revises to a rejection, so the critic changes the outcome. |
 
 Offline (decision 14), a file that looks like an invoice but that the parser cannot read (2001, 2003) is held for a
 person, not rejected; nothing is paid. Live, Grok reads it, and it goes on to normal review only when every number

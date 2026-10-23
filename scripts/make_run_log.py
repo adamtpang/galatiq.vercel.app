@@ -26,8 +26,9 @@ def counts(rows: list[dict]) -> tuple[int, float, int, int]:
     return len(paid), sum(r["total_usd"] for r in paid), rej, held
 
 
-def dec(r: dict) -> str:
-    s = f"{r['decision']} ({r['decided_by']}"
+def dec(r: dict, live: bool = False) -> str:
+    engine = r.get("engine") or ("grok" if live and r["decided_by"] in ("vp", "vp+critic", "deadlock") else None)
+    s = f"{r['decision']} ({r['decided_by']}" + (", rules stand-in" if engine == "rules" else ", Grok" if engine == "grok" else "")
     if r["critique_rounds"]:
         s += f", {r['critique_rounds']} rounds"
     return s + ")"
@@ -59,9 +60,13 @@ def main() -> None:
     out = [
         "# Run log: all 20 sample invoices",
         "",
-        "Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026:",
+        "Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026. The offline run "
+        f"was regenerated at commit {off.get('commit') or 'see summary.json'} after independent review 2; the live run is "
+        "from the earlier checkpoint 982b14f (branch `live-eval-checkpoints`) and could not be re-run because the xAI "
+        "account is out of credits, so it predates the review 2 changes (for example the rejection review).",
         "",
-        "- **Offline** (`--offline`, deterministic VP and critic rules): `runs/demo/offline/`",
+        "- **Offline** (`--offline`): no model is called; the risk review, VP, critic and rejection review are rules stand-ins "
+        "(fixed rules written from the agents' prompts), and a template writes the memo: `runs/demo/offline/`",
         f"- **Live** (`--mode live`, {live.get('model')} via the xAI API for the cross-check, risk review, VP, critic and memo): `runs/demo/live/`",
         "",
         "Each folder has `trace.jsonl` (every agent step), `summary.json` and `report.md`. "
@@ -77,7 +82,7 @@ def main() -> None:
         l = lo[r["file"]]
         differs = " **differs**" if r["decision"] != l["decision"] else ""
         out.append(
-            f"| {r['file']} | {money(r['total_usd'])} | {r['risk']} / {l['risk']} | {dec(r)} | {dec(l)}{differs} | {r['payment']} / {l['payment']} |"
+            f"| {r['file']} | {money(r['total_usd'])} | {r['risk']} / {l['risk']} | {dec(r)} | {dec(l, live=True)}{differs} | {r['payment']} / {l['payment']} |"
         )
     for name, s in (("Offline", off), ("Live", live)):
         n, amt, rej, held = counts(s["rows"])

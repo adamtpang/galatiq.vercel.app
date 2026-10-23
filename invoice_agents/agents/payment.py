@@ -19,7 +19,7 @@ import sqlite3
 import time
 from typing import Callable
 
-from ..models import DecisionStatus, InvoiceState, TraceEvent
+from ..models import Decision, DecisionStatus, InvoiceState, Severity, TraceEvent
 
 AGENT = "payment"
 
@@ -63,11 +63,33 @@ class PaymentAgent:
         state.trace.append(TraceEvent(agent=AGENT, step="guard_refused", detail={"amount": repr(amount)}))
         return log_rejection(self.conn, state)
 
+    def _hold(self, state: InvoiceState, why: str) -> InvoiceState:
+        """Refuse to pay and send the invoice to a person instead (fail closed)."""
+        from ..hitl import enqueue   # local import: hitl imports this module
+        d = state.decision
+        state.decision = Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="payment_guard",
+                                  risk_score=d.risk_score if d else None,
+                                  reasons=[f"PAYMENT_GUARD: {why}; nothing was paid"] + (d.reasons if d else []),
+                                  arguments={"decision_before_guard": d.model_dump(mode="json") if d else None})
+        state.trace.append(TraceEvent(agent=AGENT, step="guard_refused", detail={"reason": why}))
+        return enqueue(self.conn, state)
+
     def pay(self, state: InvoiceState) -> InvoiceState:
         d, inv = state.decision, state.invoice
         if d is None or d.status != DecisionStatus.APPROVED or inv is None:
             raise ValueError("pay() called for an invoice that is not APPROVED")
-        raw_amount = state.total_usd if state.total_usd is not None else inv.total
+        errs = state.pipeline_errors()
+        if errs:   # a step failed, so the checks may not have run: never pay
+            return self._hold(state, f"the invoice has a recorded error ({errs[0]})")
+        blocks = [f.code for f in state.flags if f.severity == Severity.BLOCK]
+        if blocks and d.decided_by != "human":   # only a person may approve past a blocking flag (escalated rejection)
+            return self._hold(state, f"the invoice has blocking flags ({', '.join(blocks)})")
+        if state.total_usd is not None:
+            raw_amount = state.total_usd
+        elif (inv.currency or "USD") == "USD":
+            raw_amount = inv.total
+        else:   # never pay a foreign-currency amount as if it were dollars
+            return self._refuse(state, f"{inv.total} {inv.currency} (no USD amount)")
         if not isinstance(raw_amount, (int, float)) or not math.isfinite(raw_amount) or raw_amount <= 0:
             return self._refuse(state, raw_amount)   # last guard: validation should have stopped this already
         amount = round(raw_amount, 2)
@@ -77,6 +99,11 @@ class PaymentAgent:
             state.payment = {"status": "already_paid", "amount": amount, "idempotency_key": key, "attempts": 0}
             state.trace.append(TraceEvent(agent=AGENT, step="idempotency_skip", detail=state.payment))
             return state
+        if row and row[0] == "in_progress":
+            # an earlier run stopped between calling the bank and recording the result: the bank may have paid.
+            # Paying again could pay twice, so a person checks the bank first (fail closed).
+            return self._hold(state, "an earlier payment attempt for this invoice never recorded its result "
+                                     "(status in_progress); check with the bank before paying again")
         self.conn.execute(
             "INSERT OR IGNORE INTO payments (invoice_number, vendor, amount, currency, idempotency_key, status) "
             "VALUES (?,?,?,?,?, 'in_progress')", (inv.number, inv.vendor, amount, "USD", key))

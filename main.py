@@ -119,14 +119,61 @@ def missing_path(target: Path) -> None:
     raise typer.Exit(2)
 
 
+LOG_LINE_MAX = 400   # characters per structured log line on the console (the trace file keeps everything)
+
+
+def compact(value, max_str: int = 100, max_items: int = 4, depth: int = 0):
+    """Shorten a log value INSIDE the structure, so the printed line is still valid JSON: long strings get a
+    "..." suffix, long lists keep their first items plus a count, deep objects are summarized."""
+    if isinstance(value, str):
+        return value if len(value) <= max_str else value[:max_str - 3] + "..."
+    if isinstance(value, dict):
+        if depth >= 3:
+            return {"_keys": list(value)[:max_items]}
+        return {str(k): compact(v, max_str, max_items, depth + 1) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        out = [compact(v, max_str, max_items, depth + 1) for v in list(value)[:max_items]]
+        if len(value) > max_items:
+            out.append(f"... {len(value) - max_items} more")
+        return out
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    return compact(str(value), max_str, max_items, depth)
+
+
+def step_log_line(ev) -> str:
+    """One agent step as a single line of valid JSON, at most LOG_LINE_MAX characters."""
+    detail = ev.detail
+    if ev.step == "extracted" and isinstance(detail.get("invoice"), dict):
+        inv = detail["invoice"]
+        detail = {**detail, "invoice": {"number": inv.get("number"), "vendor": inv.get("vendor"),
+                                        "total": inv.get("total"), "currency": inv.get("currency"),
+                                        "items": len(inv.get("items") or [])}}
+    for max_str, max_items in ((100, 4), (60, 3), (30, 2)):
+        line = json.dumps({"agent": ev.agent, "step": ev.step, "detail": compact(detail, max_str, max_items)},
+                          default=str)
+        if len(line) <= LOG_LINE_MAX:
+            return line
+    d = compact(detail, 30, 2) if isinstance(detail, dict) else {"value": compact(detail, 30, 2)}
+    omitted = []
+    while d:   # drop the largest fields, named in "_omitted", until the line fits
+        big = max(d, key=lambda k: len(json.dumps(d[k], default=str)))
+        omitted.append(big)
+        d.pop(big)
+        line = json.dumps({"agent": ev.agent, "step": ev.step, "detail": {**d, "_omitted": omitted}}, default=str)
+        if len(line) <= LOG_LINE_MAX:
+            return line
+    return json.dumps({"agent": ev.agent, "step": ev.step, "detail": {"_omitted": omitted[:12]}}, default=str)
+
+
 def print_step_log(states) -> None:
-    """One JSON line per agent step (the structured log), long lines shortened for the terminal."""
+    """One JSON line per agent step (the structured log). Every line is valid JSON: long values are shortened
+    inside the object, never by cutting the printed string. The full detail is in runs/<run_id>/trace.jsonl."""
     for st in states:
         for ev in st.trace:
             if ev.step == "node_done":
                 continue
-            line = json.dumps({"agent": ev.agent, "step": ev.step, "detail": ev.detail}, default=str)
-            print(line if len(line) <= 220 else line[:217] + "...")
+            print(step_log_line(ev))
 
 
 @app.command()

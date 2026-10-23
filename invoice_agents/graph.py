@@ -1,7 +1,14 @@
 """LangGraph orchestration: ingest -> validate -> risk -> approval -> memo -> pay | reject | hold -> report.
 
-Each node catches its own exceptions, records them on the state and lets the invoice
-continue to a safe outcome (never a payment), so one bad file never crashes a batch.
+Each node catches its own exceptions and records them on the state, so one bad file never crashes a batch.
+Error handling fails closed (review 2):
+- an exception in ingest, validate or risk adds an INTERNAL_ERROR flag; the approval agent then holds the
+  invoice for a person before any VP call (or the hard rules reject it, if a blocking flag was already found);
+- an exception in the approval agent leaves no decision or an unusable one: the invoice is held;
+- the `guard` node, after the memo, turns any APPROVED invoice that has a recorded error into a hold (and one
+  with a blocking flag into a rejection) before the route to payment; the route itself only sends a clean
+  APPROVED invoice to `pay`; and the payment agent refuses again on any error or blocking flag.
+So a crash can never pay an invoice.
 """
 from __future__ import annotations
 
@@ -21,10 +28,10 @@ from .agents.ingestion import ingest
 from .agents.payment import PaymentAgent, log_rejection
 from .config import load_policy
 from .db import Inventory, connect
-from .hitl import enqueue
+from .hitl import clear_failed_payment, enqueue, enqueue_failed_payment
 from .cache import CachedLLM
 from .llm import LLMClient, OfflineClient
-from .models import Decision, DecisionStatus, InvoiceState, TraceEvent
+from .models import Decision, DecisionStatus, Flag, InvoiceState, Severity, TraceEvent
 from .parsers import parse_file
 from .validation import DuplicateRegistry, content_hash, document_id, fingerprint, number_key, validate
 
@@ -60,6 +67,9 @@ def llm_usage(records: list[dict]) -> dict:
     return out
 
 
+CHECK_STAGES = ("ingestion", "validation", "risk")   # a crash here means the checks did not (all) run
+
+
 def _safe(name: str, fn: Callable[[InvoiceState], InvoiceState], llm: Any = None):
     def node(g: GraphState) -> GraphState:
         s = g["s"]
@@ -69,17 +79,48 @@ def _safe(name: str, fn: Callable[[InvoiceState], InvoiceState], llm: Any = None
         try:
             s = fn(s)
         except Exception as e:  # noqa: BLE001 - keep the batch alive, record the error
-            s.errors.append(f"{name}: {type(e).__name__}: {e}")
-            s.trace.append(TraceEvent(agent=name, step="error", detail={"error": str(e)}))
-            if name in ("risk", "approval") and s.decision is None:
+            msg = f"{name}: {type(e).__name__}: {e}"
+            s.errors.append(msg)
+            s.trace.append(TraceEvent(agent=name, step="error", detail={"error": msg}))
+            if name in CHECK_STAGES:   # fail closed: the approval agent holds on this flag before the VP
+                s.flags.append(Flag(code="INTERNAL_ERROR", severity=Severity.WARN, evidence={"stage": name},
+                                    message=f"The {name} step failed ({type(e).__name__}: {str(e)[:160]}), so its "
+                                            "checks did not run; a person must review this invoice"))
+            if name == "approval" and s.decision is None:
                 s.decision = Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="error",
-                                      reasons=[f"{name} failed: {e}"])
+                                      reasons=[f"INTERNAL_ERROR: approval failed: {e}"])
         detail: dict[str, Any] = {"ms": round((time.monotonic() - t0) * 1000, 1)}
         if log is not None and len(log) > n0:
             detail["llm"] = llm_usage(log[n0:])
         s.trace.append(TraceEvent(agent=name, step="node_done", detail=detail))
         return {"s": s}
     return node
+
+
+def fail_closed(s: InvoiceState) -> InvoiceState:
+    """Last check before the route to payment. APPROVED with a recorded error -> PENDING_HUMAN; APPROVED with a
+    blocking flag -> REJECTED (blocking always means rejected). No decision -> PENDING_HUMAN."""
+    d = s.decision
+    errs = s.pipeline_errors()
+    blocks = [f for f in s.flags if f.severity == Severity.BLOCK]
+    if d is None:
+        s.decision = Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="error",
+                              reasons=["INTERNAL_ERROR: no decision was recorded" + (f" ({errs[0]})" if errs else "")])
+    elif d.status == DecisionStatus.APPROVED and d.decided_by != "human" and (errs or blocks):
+        before = d.model_dump(mode="json")
+        if blocks:
+            s.decision = Decision(status=DecisionStatus.REJECTED, decided_by="hard_rules", risk_score=d.risk_score,
+                                  reasons=[f"{f.code}: {f.message}" for f in blocks],
+                                  arguments={"decision_before_guard": before})
+        else:
+            s.decision = Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="error", risk_score=d.risk_score,
+                                  reasons=[f"INTERNAL_ERROR: {errs[0]}; nothing is paid while a step has failed"],
+                                  arguments={"decision_before_guard": before})
+    else:
+        return s
+    s.trace.append(TraceEvent(agent="guard", step="decide", detail=s.decision.model_dump(mode="json")))
+    s.memo = None
+    return memo.write_memo(s, None)   # the memo written before the guard described the old decision
 
 
 def build_graph(ctx: RunContext):
@@ -89,10 +130,22 @@ def build_graph(ctx: RunContext):
         return ingest(s.source, ctx.inventory, ctx.llm)
 
     def route(g: GraphState) -> str:
-        d = g["s"].decision
+        s = g["s"]
+        d = s.decision
         if d is None:
             return "hold"
-        return {DecisionStatus.APPROVED: "pay", DecisionStatus.REJECTED: "reject"}.get(d.status, "hold")
+        if d.status == DecisionStatus.APPROVED:
+            # only a clean approval reaches the bank (guard has normally converted anything else already)
+            return "pay" if not s.pipeline_errors() and not s.has_blocking() else "hold"
+        return "reject" if d.status == DecisionStatus.REJECTED else "hold"
+
+    def pay(s: InvoiceState) -> InvoiceState:
+        s = ctx.payments.pay(s)
+        if (s.payment or {}).get("status") == "failed":
+            enqueue_failed_payment(ctx.conn, s)   # review 2: a failed payment is visible and queued for a person
+        elif (s.payment or {}).get("status") in ("paid", "already_paid"):
+            clear_failed_payment(ctx.conn, s)
+        return s
 
     def report(s: InvoiceState) -> InvoiceState:
         inv = s.invoice
@@ -123,7 +176,8 @@ def build_graph(ctx: RunContext):
     g.add_node("risk", _safe("risk", lambda s: risk.assess(s, ctx.policy, ctx.llm, risk.risk_tools(ctx.inventory, ctx.conn)), ctx.llm))
     g.add_node("approve", _safe("approval", lambda s: approval.approve(s, ctx.llm, ctx.policy), ctx.llm))
     g.add_node("memo", _safe("memo", lambda s: memo.write_memo(s, ctx.llm), ctx.llm))
-    g.add_node("pay", _safe("payment", ctx.payments.pay))
+    g.add_node("guard", _safe("guard", fail_closed))
+    g.add_node("pay", _safe("payment", pay))
     g.add_node("reject", _safe("payment", lambda s: log_rejection(ctx.conn, s)))
     g.add_node("hold", _safe("hitl", lambda s: enqueue(ctx.conn, s)))
     g.add_node("report", _safe("reporter", report))
@@ -132,7 +186,8 @@ def build_graph(ctx: RunContext):
     g.add_edge("validate", "risk")
     g.add_edge("risk", "approve")
     g.add_edge("approve", "memo")   # decision 12: the memo is written after the decision and cannot change it
-    g.add_conditional_edges("memo", route, {"pay": "pay", "reject": "reject", "hold": "hold"})
+    g.add_edge("memo", "guard")
+    g.add_conditional_edges("guard", route, {"pay": "pay", "reject": "reject", "hold": "hold"})
     for n in ("pay", "reject", "hold"):
         g.add_edge(n, "report")
     g.add_edge("report", END)
@@ -171,4 +226,14 @@ def run_batch(paths: list[Path], ctx: RunContext) -> list[InvoiceState]:
             pass
     ctx.registry.prescan(parsed)
     graph = build_graph(ctx)
-    return [graph.invoke({"s": InvoiceState(source=str(p))})["s"] for p in paths]
+    out = []
+    for p in paths:
+        try:
+            out.append(graph.invoke({"s": InvoiceState(source=str(p))})["s"])
+        except Exception as e:  # noqa: BLE001 - the graph itself failed: record it, never pay, keep the batch going
+            st = InvoiceState(source=str(p), errors=[f"graph: {type(e).__name__}: {e}"])
+            st.decision = Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="error",
+                                   reasons=[f"INTERNAL_ERROR: the pipeline failed: {e}"])
+            st.payment = {"status": "not_paid", "reason": "pipeline error"}
+            out.append(st)
+    return out

@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 
 from ..models import Invoice
 from ..normalize import parse_money
-from .common import finish, item
+from .common import finish, free_text, item, scalar
 
 
 def _first(d: dict, *keys):
@@ -19,31 +19,55 @@ def _first(d: dict, *keys):
 
 
 def parse_json(text: str, source: str | None = None) -> Invoice:
+    """JSON invoice. Every value is type-checked before it is used: notes, terms and addresses become text
+    whatever their JSON type; a list, object or true/false where a number or name belongs is a type error
+    (blocking INVALID_FIELD_TYPE in validation), never silently read as something else."""
     d = json.loads(text)
-    vendor = d.get("vendor")
+    if not isinstance(d, dict):
+        raise ValueError(f"expected a JSON object, got {type(d).__name__}")
+    errs: list[str] = []
     inv = Invoice(source_file=source, source_format="json")
+    vendor = d.get("vendor")
     if isinstance(vendor, dict):
-        inv.vendor, inv.vendor_address = vendor.get("name"), vendor.get("address")
+        inv.vendor = _name(scalar(vendor.get("name"), "vendor.name", errs))
+        inv.vendor_address = free_text(vendor.get("address"))
     else:
-        inv.vendor = vendor
-    inv.revision = d.get("revision")
-    inv.currency = (d.get("currency") or "USD").upper()
-    for li in d.get("line_items") or d.get("items") or []:
-        inv.items.append(item(_first(li, "item", "name", "sku", "description") or "",
-                              _first(li, "quantity", "qty"), _first(li, "unit_price", "price", "rate"),
-                              li.get("amount"), li.get("note")))
-    inv.subtotal = parse_money(d.get("subtotal"))
-    inv.tax = parse_money(_first(d, "tax_amount", "tax"))
-    inv.tax_rate = parse_money(d.get("tax_rate"))
-    inv.shipping = parse_money(d.get("shipping"))
-    inv.total = parse_money(d.get("total"))
-    inv.terms = d.get("payment_terms") or d.get("terms")
-    inv.notes = d.get("notes")
-    for k, v in {"vendor": inv.vendor, "number": d.get("invoice_number"), "due": d.get("due_date"),
-                 "total": d.get("total")}.items():
+        inv.vendor = _name(scalar(vendor, "vendor", errs))
+    inv.revision = _name(scalar(d.get("revision"), "revision", errs))
+    inv.currency = (_name(scalar(d.get("currency"), "currency", errs)) or "USD").upper()
+    lines = d.get("line_items") or d.get("items") or []
+    if not isinstance(lines, list):
+        errs.append(f"line_items: expected a list, got {type(lines).__name__}")
+        lines = []
+    for n, li in enumerate(lines, 1):
+        if not isinstance(li, dict):
+            errs.append(f"line {n}: expected an object, got {type(li).__name__}")
+            continue
+        name = _first(li, "item", "name", "sku", "description")
+        inv.items.append(item(_name(scalar(name, f"line {n} item", errs)) or "",
+                              scalar(_first(li, "quantity", "qty"), f"line {n} quantity", errs),
+                              scalar(_first(li, "unit_price", "price", "rate"), f"line {n} unit_price", errs),
+                              scalar(li.get("amount"), f"line {n} amount", errs), free_text(li.get("note"))))
+    inv.subtotal = parse_money(scalar(d.get("subtotal"), "subtotal", errs))
+    inv.tax = parse_money(scalar(_first(d, "tax_amount", "tax"), "tax", errs))
+    inv.tax_rate = parse_money(scalar(d.get("tax_rate"), "tax_rate", errs))
+    inv.shipping = parse_money(scalar(d.get("shipping"), "shipping", errs))
+    total = scalar(d.get("total"), "total", errs)
+    inv.total = parse_money(total)
+    inv.terms = free_text(d.get("payment_terms") or d.get("terms"))
+    inv.notes = free_text(d.get("notes"))
+    number = scalar(_first(d, "invoice_number", "number", "id"), "invoice_number", errs)
+    date_raw = _name(scalar(d.get("date"), "date", errs))
+    due_raw = _name(scalar(d.get("due_date"), "due_date", errs))
+    for k, v in {"vendor": inv.vendor, "number": number, "due": due_raw, "total": total}.items():
         inv.field_confidence[k] = 1.0 if v not in (None, "") else 0.0
-    return finish(inv, number=_first(d, "invoice_number", "number", "id"),
-                  date_raw=d.get("date"), due_raw=d.get("due_date"))
+    inv.type_errors = errs
+    return finish(inv, number=number, date_raw=date_raw, due_raw=due_raw)
+
+
+def _name(v) -> str | None:
+    """A scalar that passed `scalar` as text (an invoice number or vendor printed as a bare number is fine)."""
+    return None if v is None else str(v)
 
 
 def parse_csv(text: str, source: str | None = None) -> Invoice:

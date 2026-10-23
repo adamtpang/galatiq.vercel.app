@@ -1,0 +1,36 @@
+{
+  "invoice_number": "INV-3013",
+  "vendor": {
+    "name": "Global Supply Chain Partners",
+    "address": "1600 Pennsylvania Ave, Washington, DC 20500"
+  },
+  "date": "2026-01-18",
+  "due_date": "2026-03-18",
+  "line_items": [
+    {
+      "item": "WidgetA",
+      "quantity": 14,
+      "unit_price": 250.0
+    },
+    {
+      "item": "GadgetX",
+      "quantity": 8,
+      "unit_price": 750.0
+    },
+    {
+      "item": "WidgetB",
+      "quantity": 10,
+      "unit_price": 500.0
+    }
+  ],
+  "subtotal": 14500.0,
+  "tax_rate": 0.05,
+  "tax_amount": 725.0,
+  "total": 15225.0,
+  "currency": "USD",
+  "payment_terms": 30,
+  "notes": [
+    "Deliver to dock B",
+    "PO 123"
+  ]
+}

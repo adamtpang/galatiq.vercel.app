@@ -21,7 +21,7 @@ def offline(tmp_path_factory):
 def test_ground_truth_covers_every_sample_and_extra():
     gt = runner.load_yaml("ground_truth.yaml")
     files = [runner.rel(p) for d in (runner.SAMPLES, runner.EXTRA) for p in collect(d)]
-    assert sorted(gt) == sorted(files) and len(files) == 25
+    assert sorted(gt) == sorted(files) and len(files) == 26
     for name, g in gt.items():
         assert set(runner.FIELDS) <= set(g), name
 
@@ -49,18 +49,18 @@ def test_scorer_rules():
 
 def test_offline_extraction_numbers(offline):
     ex = offline["extraction"]["pipeline"]
-    assert ex["files"] == 25
-    # The parsers read all 20 samples and extras 2002, 2004 and 2005 exactly; 2001 and 2003 cannot be parsed offline and are held by the unreadable-layout hold.
+    assert ex["files"] == 26
+    # The parsers read all 20 samples and extras 2002, 2004, 2005 and 2006 exactly; 2001 and 2003 cannot be parsed offline and are held by the unreadable-layout hold.
     sample_misses = [m for m in ex["misses"] if m["file"].startswith("data/invoices/")]
     assert sample_misses == []
-    assert ex["overall"] == {"correct": 114, "scored": 122, "accuracy": 0.9344}
+    assert ex["overall"] == {"correct": 119, "scored": 127, "accuracy": 0.937}
     assert {m["file"] for m in ex["misses"]} == {"data/invoices_extra/invoice_2001_email.txt",
                                                   "data/invoices_extra/invoice_2003_truncated.json"}
 
 
 def test_offline_adversarial_numbers(offline):
     adv = offline["adversarial"]
-    assert adv["total"] == 8 and adv["caught"] == 8 and adv["missed"] == []
+    assert adv["total"] == 15 and adv["caught"] == 15 and adv["missed"] == []
     by = {c["file"]: c for c in adv["cases"]}
     assert by["invoice_3006_duplicate_new_number.txt"]["decision"] == "REJECTED"
     # 3002 (reworded injection) is caught by the generic injection patterns added in the reviewer pass
@@ -80,7 +80,7 @@ def test_committed_demo_agreement(offline):
 
 def test_adversarial_as_a_separate_later_run(offline):
     sr = offline["adversarial_separate_run"]
-    assert (sr["caught"], sr["total"], sr["missed"]) == (8, 8, [])
+    assert (sr["caught"], sr["total"], sr["missed"]) == (15, 15, [])
     d = sr["duplicate_3006"]
     assert d["decision"] == "REJECTED" and d["decided_by"] == "hard_rules" and "DUPLICATE_INVOICE" in d["flags"]
     assert "INV-1001" in d["reason"] and "earlier run" in d["reason"]
@@ -119,7 +119,7 @@ def test_grok_client_logs_usage_for_tool_rounds_and_structured_calls():
 
 
 def test_report_renders(offline):
-    assert "Extraction" in runner.detail_md(offline) and "| (c) Adversarial catch rate | 8/8" in runner.summary_md(offline, None)
+    assert "Extraction" in runner.detail_md(offline) and "| (c) Adversarial catch rate | 15/15" in runner.summary_md(offline, None)
 
 
 def test_default_run_modifies_no_tracked_files(tmp_path):

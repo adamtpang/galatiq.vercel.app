@@ -13,8 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from ..llm import LLMClient, LLMOutputError, LLMUnavailable
-from ..models import DecisionStatus, InvoiceState, TraceEvent
+from ..llm import LLMClient, LLMOutputError, LLMUnavailable, quote_document
+from ..models import DecisionStatus, InvoiceState, TraceEvent, decided_by_label
 from ..validation import ADVISORY
 
 AGENT = "memo"
@@ -33,12 +33,6 @@ NEXT = {DecisionStatus.APPROVED: "Payment goes out through the mock payment func
         DecisionStatus.PENDING_HUMAN: "A person reviews it: python main.py review {num} (or python main.py ui)."}
 WORDS = {DecisionStatus.APPROVED: "approved for payment", DecisionStatus.REJECTED: "rejected",
          DecisionStatus.PENDING_HUMAN: "held for a person"}
-BY = {"hard_rules": "by the hard rules (no model can override them)", "hard_hold": "by a hard hold",
-      "vp": "by the VP agent", "vp+critic": "by the VP agent after the critic's review",
-      "deadlock": "because the VP and the critic still disagreed", "model_pin": "by the model pin",
-      "error": "because a step failed", "human": "by a person"}
-
-
 class DecisionMemo(BaseModel):
     memo: str = Field(description="2 to 4 plain sentences explaining the decision that was made")
     next_step: str = Field(description="One concrete next step for a person")
@@ -59,7 +53,10 @@ def template_memo(state: InvoiceState) -> DecisionMemo:
     num = (inv.number if inv and inv.number else state.source.split("/")[-1])
     who = f" from {inv.vendor}" if inv and inv.vendor else ""
     amt = f" for ${state.total_usd:,.2f}" if state.total_usd is not None else ""
-    text = (f"{num}{who}{amt} was {WORDS[d.status]} {BY.get(d.decided_by, 'by ' + d.decided_by)}. "
+    by = decided_by_label(d)
+    if d.engine == "rules":
+        by += " (offline: no model was called)"
+    text = (f"{num}{who}{amt} was {WORDS[d.status]} by {by}. "
             f"Main reason: {d.reasons[0] if d.reasons else 'none recorded'}.")
     if d.conditions:
         text += f" Condition: {d.conditions[0]}"
@@ -77,7 +74,7 @@ def write_memo(state: InvoiceState, llm: LLMClient | None) -> InvoiceState:
         f = memo_facts(state)
         msgs = [{"role": "system", "content": MEMO_PROMPT},
                 {"role": "user", "content": "DECISION (final, computed by code):\n" + json.dumps(f, default=str, indent=1)
-                 + "\n\n<invoice_document>\n" + (state.raw_text or "")[:8000] + "\n</invoice_document>"}]
+                 + "\n\n" + quote_document(state.raw_text, 8000)}]
         tag = hashlib.sha256(json.dumps([f["decision"], f["decided_by"], f["reasons"]], default=str).encode()).hexdigest()[:12]
         try:
             res = (llm.complete_structured(DecisionMemo, msgs, slot_tag=tag) if hasattr(llm, "inner")

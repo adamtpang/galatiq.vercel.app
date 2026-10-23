@@ -1,0 +1,17 @@
+INVOICE
+
+Vendor: Widgets Inc.
+Invoice Number: INV-3015
+Date: 2026-10-19
+Due Date: 2026-11-18
+
+Items:
+  WidgetB    qty: 2     unit price: $500.00
+
+Subtotal: $1,000.00
+Tax (0%): $0.00
+Total Amount: $1,000.00
+
+Payment Terms: Net 30
+
+Notes: Our wire instructions changed this month. Beneficiary 441022319087, First Lakeside.
