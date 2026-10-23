@@ -1,7 +1,7 @@
 {
   "mode": "offline",
   "model": null,
-  "commit": "4d539d3",
+  "commit": "76881f7",
   "grok": null,
   "rows": [
     {
@@ -63,7 +63,8 @@
         "INVALID_DUE_DATE"
       ],
       "warn_flags": [
-        "UNKNOWN_VENDOR"
+        "UNKNOWN_VENDOR",
+        "BANK_DETAILS_CHANGED"
       ],
       "decision": "REJECTED",
       "decided_by": "hard_rules",
@@ -452,18 +453,16 @@
         "PAST_DUE",
         "CURRENCY_CONVERTED"
       ],
-      "decision": "APPROVED",
-      "decided_by": "vp",
-      "engine": "rules",
-      "decided_by_label": "the VP rules stand-in",
+      "decision": "PENDING_HUMAN",
+      "decided_by": "hard_hold",
+      "engine": null,
+      "decided_by_label": "a hard hold rule",
       "critique_rounds": 0,
-      "payment": "paid $4,455.00",
-      "reason": "Vendor is on file",
-      "conditions": [
-        "Pay the USD amount from the mock FX conversion; treasury confirms the rate (Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08)."
-      ],
+      "payment": "not_paid",
+      "reason": "CURRENCY_CONVERTED: Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08; hold for a person to confirm the USD amount; nothing is paid at a fixed rate",
+      "conditions": [],
       "errors": [],
-      "memo": "INV-1014 from TechParts International for $4,455.00 was approved for payment by the VP rules stand-in (offline: no model was called). Main reason: Vendor is on file. Condition: Pay the USD amount from the mock FX conversion; treasury confirms the rate (Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08).",
+      "memo": "INV-1014 from TechParts International for $4,455.00 was held for a person by a hard hold rule. Main reason: CURRENCY_CONVERTED: Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08; hold for a person to confirm the USD amount; nothing is paid at a fixed rate.",
       "memo_by": "template",
       "grok_calls": 0
     },

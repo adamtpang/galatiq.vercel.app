@@ -25,7 +25,7 @@ Point at: one JSON line per agent step (ingest, validate, risk, approval, memo, 
 python main.py --batch data/invoices --offline
 ```
 
-Expected: 7 paid ($34,830.00), 12 rejected, 1 held for a human (1012.pdf). Same result every run.
+Expected: 6 paid ($30,375.00), 12 rejected, 2 held for a human (1012.pdf and 1014.xml). Same result every run.
 
 ## 3. Edge cases worth showing
 
@@ -39,7 +39,7 @@ Expected: 7 paid ($34,830.00), 12 rejected, 1 held for a human (1012.pdf). Same 
 | 1011, 1012, 1013 | Same invoice in two formats. The second copy is rejected as a duplicate. | `DUPLICATE_INVOICE` |
 | 1012.pdf | OCR noise fixed (`2O26`, `$3,500.O0`), vendor renamed ("formerly FastShip Ltd."), $25 under the limit. The rename hard hold sends it to a human before the VP (decision 9). | `VENDOR_RENAMED`, decided_by `hard_hold` |
 | 1013 | WidgetA, WidgetB and GadgetX each over stock only after summing repeated lines; a "Sample" line is charged; total off by $50. | `STOCK_EXCEEDED` evidence lists the lines |
-| 1014 | Billed in EUR, paid in USD at the fixed mock rate. | `CURRENCY_CONVERTED` |
+| 1014 | Billed in EUR. Held for a person, who types the USD amount; nothing is paid at the fixed mock rate (decision 22). | `CURRENCY_CONVERTED` |
 | 2004 (extra, added) | A clean $12,500 invoice from Widgets Inc. Over the $10,000 limit, so the critic reviews the VP's approval. Offline the VP and critic rules stand-ins approve it and it is paid (`runs/demo/critic_offline`). Live results vary: in the live eval run the Grok VP approved and the Grok critic signed off; in the committed live demo runs (`runs/demo/critic_live`, `runs/demo/extra_live`) the Grok VP held it, so no critic call was made. | `critic_review`, decided_by `vp+critic` |
 | 2005 (extra, added) | $12,500 from Gadgets Co. with GadgetX at $1,000 (catalog $750). Offline the critic rules stand-in objects twice and the deadlock goes to a person (`runs/demo/extra_offline`); live the Grok VP held it on the price. | `critic_review`, `vp_revise`, decided_by `deadlock` |
 | 3008 (adversarial) | Known vendor, $1,000, clean math, but asks to pay a new IBAN. Held by the bank-details hard hold (decision 11). | `BANK_DETAILS_CHANGED` |

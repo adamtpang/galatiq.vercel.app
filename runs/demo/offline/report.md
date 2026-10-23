@@ -19,7 +19,7 @@
 | invoice_1012.txt | INV-1012 | QuickShip Distributers | $9,975.00 | 45 | DUPLICATE_INVOICE | REJECTED | the hard rules | 0 | not_paid | DUPLICATE_INVOICE: Same invoice already received as invoice_1012.pdf |
 | invoice_1013.json | INV-1013 | Atlas Industrial Supply | $22,562.80 | 25 | STOCK_EXCEEDED, STOCK_EXCEEDED, STOCK_EXCEEDED, TOTAL_MISMATCH | REJECTED | the hard rules | 0 | not_paid | STOCK_EXCEEDED: WidgetA: requested 22 across lines [1, 4, 7], only 15 in stock |
 | invoice_1013.pdf | INV-1013 | Atlas Industrial Supply | $22,562.80 | 25 | STOCK_EXCEEDED, STOCK_EXCEEDED, STOCK_EXCEEDED, TOTAL_MISMATCH, DUPLICATE_INVOICE | REJECTED | the hard rules | 0 | not_paid | STOCK_EXCEEDED: WidgetA: requested 22 across lines [1, 4, 7], only 15 in stock |
-| invoice_1014.xml | INV-1014 | TechParts International | $4,455.00 | 0 | - | APPROVED | the VP rules stand-in | 0 | paid $4,455.00 | Vendor is on file |
+| invoice_1014.xml | INV-1014 | TechParts International | $4,455.00 | 0 | - | PENDING_HUMAN | a hard hold rule | 0 | not_paid | CURRENCY_CONVERTED: Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08; hold for a person to confirm the USD amount; nothing is paid at a fixed rate |
 | invoice_1015.csv | INV-1015 | Reliable Components Inc. | $6,500.00 | 0 | - | APPROVED | the VP rules stand-in | 0 | paid $6,500.00 | Vendor is on file |
 | invoice_1016.json | INV-1016 | Widgets Inc. | $3,233.00 | 0 | UNKNOWN_ITEM | REJECTED | the hard rules | 0 | not_paid | UNKNOWN_ITEM: 'WidgetC' is not in inventory |
 
@@ -42,6 +42,6 @@
 - **invoice_1012.txt** (template): INV-1012 from QuickShip Distributers for $9,975.00 was rejected by the hard rules. Main reason: DUPLICATE_INVOICE: Same invoice already received as invoice_1012.pdf.
 - **invoice_1013.json** (template): INV-1013 from Atlas Industrial Supply for $22,562.80 was rejected by the hard rules. Main reason: STOCK_EXCEEDED: WidgetA: requested 22 across lines [1, 4, 7], only 15 in stock.
 - **invoice_1013.pdf** (template): INV-1013 from Atlas Industrial Supply for $22,562.80 was rejected by the hard rules. Main reason: STOCK_EXCEEDED: WidgetA: requested 22 across lines [1, 4, 7], only 15 in stock.
-- **invoice_1014.xml** (template): INV-1014 from TechParts International for $4,455.00 was approved for payment by the VP rules stand-in (offline: no model was called). Main reason: Vendor is on file. Condition: Pay the USD amount from the mock FX conversion; treasury confirms the rate (Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08).
+- **invoice_1014.xml** (template): INV-1014 from TechParts International for $4,455.00 was held for a person by a hard hold rule. Main reason: CURRENCY_CONVERTED: Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08; hold for a person to confirm the USD amount; nothing is paid at a fixed rate.
 - **invoice_1015.csv** (template): INV-1015 from Reliable Components Inc. for $6,500.00 was approved for payment by the VP rules stand-in (offline: no model was called). Main reason: Vendor is on file.
 - **invoice_1016.json** (template): INV-1016 from Widgets Inc. for $3,233.00 was rejected by the hard rules. Main reason: UNKNOWN_ITEM: 'WidgetC' is not in inventory.

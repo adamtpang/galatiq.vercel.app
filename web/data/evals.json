@@ -1,6 +1,6 @@
 {
  "source": "evals/results (python -m evals)",
- "offline_generated_at": "2026-10-22 21:17 CDT",
+ "offline_generated_at": "2026-10-22 21:49 CDT",
  "live_generated_at": "2026-10-22 20:28 CDT",
  "model": "grok-4.7",
  "extraction": {
@@ -129,10 +129,10 @@
   {
    "label": "committed demo runs (runs/demo/offline vs runs/demo/live), 20 samples",
    "invoices": 20,
-   "agree": 17,
-   "rate": 0.85,
+   "agree": 16,
+   "rate": 0.8,
    "disagreement_routing": {
-    "to_human": 3,
+    "to_human": 4,
     "paid_on_one_side": [
      {
       "file": "invoice_1001.txt",
@@ -148,10 +148,15 @@
       "file": "invoice_1010.txt",
       "paid_by": "offline",
       "amount": 7185.0
+     },
+     {
+      "file": "invoice_1014.xml",
+      "paid_by": "live",
+      "amount": 4455.0
      }
     ],
-    "paid_on_one_side_usd": 18125.0,
-    "paid_by_both": 4
+    "paid_on_one_side_usd": 22580.0,
+    "paid_by_both": 3
    },
    "disagreements": [
     {
@@ -171,6 +176,12 @@
      "offline": "APPROVED",
      "live": "PENDING_HUMAN",
      "live_reason": "Vendor Consolidated Materials Group is on file."
+    },
+    {
+     "file": "invoice_1014.xml",
+     "offline": "PENDING_HUMAN",
+     "live": "APPROVED",
+     "live_reason": "Vendor TechParts International is on file and approved with bank details."
     }
    ]
   },
@@ -328,7 +339,7 @@
     "PAST_DUE",
     "DUPLICATE_INVOICE"
    ],
-   "reason": "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-22 9:17 PM CDT) under a different number (INV-1101)"
+   "reason": "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-22 9:49 PM CDT) under a different number (INV-1101)"
   }
  },
  "separate_run_live": {
@@ -807,20 +818,20 @@
  },
  "offline_latency": {
   "samples": {
-   "latency_mean_ms": 4.7,
-   "wall_s": 0.23
+   "latency_mean_ms": 5.0,
+   "wall_s": 0.25
   },
   "adversarial": {
-   "latency_mean_ms": 2.0,
+   "latency_mean_ms": 2.2,
    "wall_s": 0.09
   },
   "extra": {
-   "latency_mean_ms": 1.8,
+   "latency_mean_ms": 2.4,
    "wall_s": 0.04
   },
   "unseen": {
-   "latency_mean_ms": 2.1,
-   "wall_s": 0.03
+   "latency_mean_ms": 3.3,
+   "wall_s": 0.04
   }
  }
 }

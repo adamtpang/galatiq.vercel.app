@@ -74,8 +74,10 @@ def test_offline_makes_no_llm_calls(offline):
 
 def test_committed_demo_agreement(offline):
     demo = offline["agreement"][0]
-    assert demo["invoices"] == 20 and demo["agree"] == 17
-    assert sorted(d["file"] for d in demo["disagreements"]) == ["invoice_1001.txt", "invoice_1004_revised.json", "invoice_1010.txt"]
+    # 1014 (EUR) is held offline since decision 22; the committed live demo (05a4ef5, before it) paid it
+    assert demo["invoices"] == 20 and demo["agree"] == 16
+    assert sorted(d["file"] for d in demo["disagreements"]) == ["invoice_1001.txt", "invoice_1004_revised.json",
+                                                                "invoice_1010.txt", "invoice_1014.xml"]
 
 
 def test_adversarial_as_a_separate_later_run(offline):

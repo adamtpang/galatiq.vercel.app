@@ -1,0 +1,32 @@
+{
+  "mode": "grok",
+  "model": "grok-4.7",
+  "commit": "76881f7",
+  "grok": "Grok worked on 1 of 1 invoices (5 API calls this run; reused cached answers are not counted as calls). Hard rules rejected 0 of them; Grok cannot turn those into a payment: it cross-checked the reading, reviewed each rejection (it can only escalate one to a person) and wrote the memo.",
+  "rows": [
+    {
+      "file": "invoice_1014.xml",
+      "invoice": "INV-1014",
+      "vendor": "TechParts International",
+      "total_usd": 4455.0,
+      "risk": 18,
+      "block_flags": [],
+      "warn_flags": [
+        "PAST_DUE",
+        "CURRENCY_CONVERTED"
+      ],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "hard_hold",
+      "engine": null,
+      "decided_by_label": "a hard hold rule",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "CURRENCY_CONVERTED: Billed in EUR; $4,125.00 EUR = $4,455.00 USD at mock rate 1.08; hold for a person to confirm the USD amount; nothing is paid at a fixed rate",
+      "conditions": [],
+      "errors": [],
+      "memo": "Invoice INV-1014 from TechParts International is billed in euros for $4,125.00 EUR, shown as $4,455.00 USD. The decision is PENDING_HUMAN because of the flag warn CURRENCY_CONVERTED: it was converted at a mock rate of 1.08 and is on hold until a person confirms the USD amount. Nothing is paid at a fixed rate.",
+      "memo_by": "grok",
+      "grok_calls": 5
+    }
+  ]
+}

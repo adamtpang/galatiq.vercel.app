@@ -1,6 +1,6 @@
 # Run log: all 20 sample invoices
 
-Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026: offline at commit 4d539d3, live at commit 05a4ef5 (05a4ef5 only added data and docs on top of 4d539d3, so the code is the same).
+Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026: offline at commit 76881f7, live at commit 05a4ef5. The live run predates the review 3 fixes (76881f7); among the samples they change only 1014, which the offline run now holds (non-USD, decision 22) and the live run paid.
 
 - **Offline** (`--offline`): no model is called; the risk review, VP, critic and rejection review are rules stand-ins (fixed rules written from the agents' prompts), and a template writes the memo: `runs/demo/offline/`
 - **Live** (`--mode live`, grok-4.7 via the xAI API for the cross-check, risk review, VP, critic and memo): `runs/demo/live/`
@@ -28,11 +28,11 @@ Each folder has `trace.jsonl` (every agent step), `summary.json` and `report.md`
 | invoice_1012.txt | $9,975.00 | 45 / 45 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1013.json | $22,562.80 | 25 / 25 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1013.pdf | $22,562.80 | 25 / 25 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
-| invoice_1014.xml | $4,455.00 | 0 / 18 | APPROVED (vp, rules stand-in) | APPROVED (vp, Grok) | paid $4,455.00 / paid $4,455.00 |
+| invoice_1014.xml | $4,455.00 | 0 / 18 | PENDING_HUMAN (hard_hold) | APPROVED (vp, Grok) **differs** | not_paid / paid $4,455.00 |
 | invoice_1015.csv | $6,500.00 | 0 / 5 | APPROVED (vp, rules stand-in) | APPROVED (vp, Grok) | paid $6,500.00 / paid $6,500.00 |
 | invoice_1016.json | $3,233.00 | 0 / 0 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 
-Offline: 7 paid ($34,830.00), 12 rejected, 1 held for a human.
+Offline: 6 paid ($30,375.00), 12 rejected, 2 held for a human.
 
 Live: 4 paid ($16,705.00), 12 rejected, 4 held for a human.
 
@@ -43,6 +43,7 @@ Both runs use the same code and policy. Each line says which way the decision we
 - **invoice_1001.txt**: offline APPROVED (paid $5,000.00), live PENDING_HUMAN (risk 12, not_paid). Live reason: Vendor Widgets Inc. is on file and the invoice total is 5000.0 USD. Conditions: Confirm whether payment is Net 15 or due 2026-02-01 before release.
 - **invoice_1004_revised.json**: offline APPROVED (paid $5,940.00), live PENDING_HUMAN (risk 42, not_paid). Live reason: Vendor is on file and catalog prices match, but prior INV-1004 was rejected at $1,890.00. Conditions: Do not pay until a human confirms the PO amendment and that the prior rejection is cleared.
 - **invoice_1010.txt**: offline APPROVED (paid $7,185.00), live PENDING_HUMAN (risk 30, not_paid). Live reason: Vendor Consolidated Materials Group is on file. Conditions: Confirm the rush-order premium is authorized before payment.
+- **invoice_1014.xml**: offline PENDING_HUMAN (not_paid), live APPROVED (risk 18, paid $4,455.00). Live reason: Vendor TechParts International is on file and approved with bank details. Conditions: Pay only to the bank on file.; Settle the EUR invoice amount, or convert only at the recorded rate.
 
 Live results are not perfectly repeatable: the live eval run (`evals/results/live.md`) decided some of these invoices differently. Re-running the same invoices on the same database with the decision cache gives identical decisions (`evals/results/cache_repeatability.md`).
 

@@ -1,0 +1,32 @@
+{
+  "mode": "grok",
+  "model": "grok-4.7",
+  "commit": "76881f7",
+  "grok": "Grok worked on 1 of 1 invoices (5 API calls this run; reused cached answers are not counted as calls). Hard rules rejected 0 of them; Grok cannot turn those into a payment: it cross-checked the reading, reviewed each rejection (it can only escalate one to a person) and wrote the memo.",
+  "rows": [
+    {
+      "file": "t19.txt",
+      "invoice": "INV-9219",
+      "vendor": "Summit Manufacturing Co.",
+      "total_usd": 500.0,
+      "risk": 65,
+      "block_flags": [],
+      "warn_flags": [
+        "PAST_DUE",
+        "BANK_DETAILS_CHANGED"
+      ],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "hard_hold",
+      "engine": null,
+      "decided_by_label": "a hard hold rule",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "BANK_DETAILS_CHANGED: Invoice mentions payment instructions or bank details (remit); confirm where to pay with the vendor contact on file before paying; hold for human verification of the vendor and bank details",
+      "conditions": [],
+      "errors": [],
+      "memo": "Invoice INV-9219 from Summit Manufacturing Co. is for $500.00 (two WidgetA items). The decision is PENDING_HUMAN, placed on hold by hard_hold. The main reason is the flag BANK_DETAILS_CHANGED: the invoice mentions payment instructions or bank details (remit), so where to pay must be confirmed with the vendor contact on file before any payment.",
+      "memo_by": "grok",
+      "grok_calls": 5
+    }
+  ]
+}

@@ -12,6 +12,16 @@ spot check at commit 7d320a2 (Oct 22, 9:19 PM CT, `python main.py --invoice_path
 on a fresh database): no repair call, REJECTED by hard rules with INVALID_FIELD_TYPE, Grok's rejection review agreed,
 not paid; 2 Grok calls, $0.0204 billed.
 
+**Review 3 fixes (commit 76881f7) and the live numbers.** The offline results below were regenerated at 76881f7. The
+live numbers were not re-run in full and predate these fixes. Among the 20 samples the fixes change only 1014 (EUR),
+which is now held for a person instead of paid at the mock rate; the new payment-instruction hold matches only 1003
+("Wire transfer preferred."), which hard rules reject anyway. Live spot checks at 76881f7 on Oct 22, 2026 between
+9:50 and 9:52 PM CT, each `python main.py --invoice_path=<file> --mode live` on a fresh database (traces in
+`evals/results/spot_review3/`): `invoice_1014.xml` held (CURRENCY_CONVERTED), not paid; the reviewer's `t17.txt`
+("payments should now go to our Chase account ending 7781") and `t19.txt` ("use the new remit-to on our portal") both
+held (BANK_DETAILS_CHANGED), not paid, and on both Grok's risk review set `payment_details_changed` to true and quoted
+the sentence (on 1014 it set it to false). 15 Grok calls, $0.1025 billed in total.
+
 Earlier live results (before review 2) came from local checkpoint commits 4719dbe, 982b14f and 849b0af that were
 never pushed to main. They are now on the branch
 [`live-eval-checkpoints`](https://github.com/adamtpang/galatiq.vercel.app/tree/live-eval-checkpoints). Every live
@@ -21,13 +31,14 @@ result now committed on main was re-run at 05a4ef5 and replaces them.
 
 | Run | Paid | Rejected | Held for a person |
 |---|---|---|---|
-| Offline rules stand-ins (`runs/demo/offline`) | 7 invoices, $34,830.00 | 12 | 1 |
+| Offline rules stand-ins (`runs/demo/offline`, 76881f7) | 6 invoices, $30,375.00 | 12 | 2 |
 | Live demo run, grok-4.7 (`runs/demo/live`, 8:29 PM CT) | 4 invoices, $16,705.00 | 12 | 4 |
 | Live eval run, grok-4.7 (`evals/results/runs/live/main`, 7:46 PM CT) | 4 invoices, $17,250.00 | 12 | 4 |
 
 The same 12 are rejected in every run: hard rules run first and any blocking flag rejects. Live, Grok's rejection
 review read all 12 in each run and agreed with all 12; it can only escalate a rejection to a person, never pay it.
-1012.pdf is held in every run by the vendor-rename hard hold. The other 7 are the ones the VP decides:
+1012.pdf is held in every run by the vendor-rename hard hold. Offline, 1014 is also held (non-USD, decision 22). The
+other invoices are the ones the VP decides:
 
 | File | Offline | Live demo run | Live eval run |
 |---|---|---|---|
@@ -36,10 +47,10 @@ review read all 12 in each run and agreed with all 12; it can only escalate a re
 | 1006 | Paid | Paid | Paid |
 | 1010 | Paid | Held (rush price 20% over catalog) | Held (same) |
 | 1011.pdf, 1015 | Paid | Paid | Paid |
-| 1014 (EUR) | Paid | Paid | Held (first payment, EUR prices off the USD catalog) |
+| 1014 (EUR) | Held (non-USD, decision 22) | Paid (before decision 22) | Held (first payment, EUR prices off the USD catalog) |
 
-Every live and offline difference is an invoice the rules stand-ins would pay and the Grok VP held, never the
-reverse. The full side by side with live reasons is in `docs/run_log.md`.
+Every other live and offline difference is an invoice the rules stand-ins would pay and the Grok VP held, never the
+reverse. 1014 is the exception: the live demo run predates decision 22 and paid it. The full side by side with live reasons is in `docs/run_log.md`.
 
 **How 1004 and its revision end up.** INV-1004 (Precision Parts, $1,890.00) passes every inventory check, but `invoice_1004_revised.json` is revision R1 of the same invoice ($5,940.00), so the batch prescan rejects the original as superseded (`SUPERSEDED_BY_REVISION`) and R1 carries on (`REVISION_SUPERSEDES`). Before decision 13 the address watch list listed 742 Evergreen Terrace, which is also the address the mock vendor master has on file for Precision Parts, so R1 was always held and the 1004 family was never paid: the mock data contradicted itself. Now a watch-list entry does not fire on the vendor's own address on file (an `ADDRESS_ON_FILE` info flag records the match), so offline R1 is paid $5,940.00 and the original is never paid. Another vendor at that address still fires the watch list (adversarial 3007, held).
 
@@ -65,7 +76,7 @@ committed copy (`evals/results/`, `web/data/evals.json`). `tests/test_evals.py` 
 | Eval | Offline | Live (grok-4.7, 05a4ef5) |
 |---|---|---|
 | (a) Extraction, all fields, 26 files | 119/127 (93.7%) | 127/127 pipeline; 126/127 Grok-only |
-| (b) Agreement with offline, 20 samples | - | 17/20 in the eval run; 17/20 in the committed demo runs |
+| (b) Agreement with offline, 20 samples | - | 17/20 in the eval run (against the offline run at 05a4ef5); 16/20 in the committed demo runs (offline at 76881f7) |
 | (c) Adversarial set caught (15) | 15/15; 15/15 as a separate later run | 15/15; 15/15 as a separate later run |
 | (d) Cost, 20 samples | $0, 0 calls | $0.6575 billed, 85 calls |
 | (d) Latency, 20 samples | 4.7 ms mean per invoice | 38.9 s mean per invoice, 778.9 s batch |

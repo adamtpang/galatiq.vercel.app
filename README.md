@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/adamtpang/galatiq.vercel.app/actions/workflows/ci.yml/badge.svg)](https://github.com/adamtpang/galatiq.vercel.app/actions/workflows/ci.yml)
 
+**Start here: [READ_THIS_FIRST.md](READ_THIS_FIRST.md)** (one page: what it does, two commands, results, limits).
+
 A prototype that reads, checks, approves and pays Acme Corp's invoices (the Galatiq FDE case). Deterministic code
 reads the files, does all the math and applies the hard rules. Live, Grok agents read every invoice next to the parser,
 review risk with read-only tools, argue the approval as VP and critic, review every hard-rule rejection (they can only
@@ -31,7 +33,7 @@ python main.py review                                          # the human revie
 python main.py ui                                              # the review queue in the browser (127.0.0.1:8765)
 python main.py --batch data/invoices --mode live               # Grok agents (needs XAI_API_KEY)
 python -m evals                                                # five evals offline, about a second (--live adds Grok)
-pytest                                                         # 394 offline tests, about 20 seconds
+pytest                                                         # 427 offline tests, about 20 seconds
 ```
 
 Each run writes `runs/<run_id>/trace.jsonl` (every step), `summary.json` and `report.md`. Times are local with the
@@ -43,12 +45,14 @@ zone shown (for example `2026-10-22 7:36 PM CDT`). At 80 columns the table wraps
 
 | Run | Paid | Rejected | Held for a person |
 |---|---|---|---|
-| Offline, rules stand-ins | 7 invoices, $34,830.00 | 12 | 1 |
+| Offline, rules stand-ins | 6 invoices, $30,375.00 | 12 | 2 |
 | Live demo run, grok-4.7 | 4 invoices, $16,705.00 | 12 | 4 |
 | Live eval run, grok-4.7 | 4 invoices, $17,250.00 | 12 | 4 |
 
 - The same 12 are rejected in every run (over stock, unknown items, missing vendor, duplicates, a superseded
-  revision). Every live and offline difference is an invoice the rules would pay and the Grok VP held.
+  revision). Every other live and offline difference is an invoice the rules would pay and the Grok VP held, except
+  1014 (EUR): offline it is now held because every non-USD invoice goes to a person (decision 22), and the live demo
+  run, made before that change, paid it at the mock rate.
 - Adversarial set (15 added traps: injections, lookalike and renamed vendors, bank changes, duplicates, wrong types,
   a closing prompt-fence tag): 15 of 15 caught offline and live, and again as a separate later run.
 - Unseen layouts (4 added, never tuned on): offline all 4 held for a person; live Grok read all 4 correctly and
@@ -57,8 +61,10 @@ zone shown (for example `2026-10-22 7:36 PM CDT`). At 80 columns the table wraps
 - Live cost on the 20 samples: 85 Grok calls, $0.6575 billed, 38.9 s mean per invoice. A re-run on the same
   database with the decision cache gave identical decisions for 20 of 20 with 0 calls.
 
-All live results were run on Oct 22, 2026 at commit 05a4ef5 (the review 2 code; the only later commit changes no
-live sample result, see "Honest limits"). The committed live runs cost $3.87 billed in total.
+All live results in the table were run on Oct 22, 2026 at commit 05a4ef5 (the review 2 code), before the review 3
+fixes (commit 76881f7). Those fixes change one sample result, 1014, now held. They were not re-run live in full;
+three live spot checks at 76881f7 (1014 and two of the reviewer's bank sentences) are in `docs/evals.md`. The
+committed live runs cost $3.87 billed in total, plus $0.10 for the spot checks.
 
 ## Design
 
@@ -71,16 +77,31 @@ file ─▶ Ingest ─▶ Validate ─▶ Risk ─▶ Approve ─▶ Memo ─▶
 A LangGraph `StateGraph` passes one typed Pydantic state through the nodes; every node appends to the trace.
 
 - **Code owns the math.** Grok never computes or changes an amount. Any blocking flag rejects, whatever a model says.
-- **Hard holds before any opinion:** prompt injection, renamed or lookalike vendor, changed bank details, Grok and
-  the parser disagreeing, an ungrounded Grok reading, an unreadable layout, an internal error, and (live) a Grok check
-  that failed to run. Each sends the invoice to a person.
-- **Fail closed.** An exception in ingestion, validation or risk is an INTERNAL_ERROR hold. A guard after the memo
-  turns any approval with an error or a blocking flag into a hold or a rejection. The payment step refuses again on its
-  own (errors, blocking flags, an interrupted earlier payment, an amount that is not a positive finite USD number).
-  Wrong value types are a blocking INVALID_FIELD_TYPE.
+- **Hard holds before any opinion:** prompt injection, renamed or lookalike vendor, any wording about where or how to
+  pay (bank, account number, wire, ACH, Zelle, PayPal, crypto, escrow, remit-to; live also Grok's
+  `payment_details_changed` field), a non-USD invoice, Grok and the parser disagreeing, an ungrounded Grok reading,
+  an unreadable layout, an internal error, and (live) a Grok check that failed to run. Each sends the invoice to a
+  person.
+- **Fail closed.** An exception while reading the file holds the invoice for a person (INTERNAL_ERROR) before any
+  other rule. An exception in validation or risk adds an INTERNAL_ERROR flag: a blocking flag found before the crash
+  still rejects, otherwise the invoice is held. An exception in the approval step holds it. A guard after the memo turns
+  any approval with an error or a blocking flag into a hold or a rejection. The payment step refuses again on its own
+  (errors, blocking flags, an interrupted earlier payment, an amount that is not a positive finite USD number). If the
+  bank call raises an unexpected exception, or anything else in the payment step raises, the invoice is held for a
+  person and nothing is paid (after a bank-call exception the payments row is marked `unknown`: check with
+  the bank before paying). A bank error
+  that is still failing after 3 retries leaves the invoice approved but unpaid, marked failed and queued as
+  PAYMENT_FAILED. Wrong value types (including a quantity like "two") are a blocking INVALID_FIELD_TYPE.
+- **A person approving is not one click.** In the review queue (CLI or `python main.py ui`), when the numbers do not
+  add up or the currency is not USD the reviewer must type the amount to pay (prefilled with what the lines add up
+  to), and any approval paying over $10,000 needs a second confirmation. The server enforces both (decision 21).
 - **Prompt hygiene.** Invoice text goes inside `<invoice_document>` tags as data; fence and role tags in the text are
-  neutralized first.
-- **Two loops.** Extraction self-corrects: Pydantic errors go back to Grok, up to 3 attempts. Approval: when the VP
+  neutralized first. **Offline, injection detection is pattern-based**: regular expressions run on the text after
+  Unicode normalization, lower-casing and joining spaced-out letters. They catch the wordings they were written for
+  (including the 10 the third reviewer invented), not every wording. **Live, Grok is the real reader**: it reads every
+  invoice and its structured `prompt_injection` field holds the invoice like a pattern hit.
+- **Two loops.** Extraction self-corrects: Pydantic errors go back to Grok, up to 3 attempts (tested with a scripted model;
+  not seen live). Approval: when the VP
   approves an invoice over $10,000, near the limit or high risk, a critic can object and the VP can revise; after 2
   objections it goes to a person with both arguments.
 - **Rejection review.** Every hard-rule rejection is reviewed (Grok live, a rules stand-in offline). It can only
@@ -88,7 +109,7 @@ A LangGraph `StateGraph` passes one typed Pydantic state through the nodes; ever
 
 So, by construction, **Grok cannot pay anything the rules block**: blocking flags reject before the VP, the rejection
 review can only escalate, and the guard and the payment step both refuse an invoice with a blocking flag unless a
-person approved it in the review queue. Policy decisions 1 to 19 are in [docs/DECISIONS.md](docs/DECISIONS.md);
+person approved it in the review queue. Policy decisions 1 to 22 are in [docs/DECISIONS.md](docs/DECISIONS.md);
 architecture, assumptions, testing and the production plan are in [docs/design.md](docs/design.md).
 
 ## Honest limits
@@ -100,6 +121,8 @@ architecture, assumptions, testing and the production plan are in [docs/design.m
   (deadlock) and 2006 (the critic objects, the VP revises to a rejection) show the loop with rules stand-ins.
 - **The live rejection review escalated once** (3014 in the separate later run); otherwise it agreed with every
   rejection. Its offline rules stand-in escalates only arithmetic-only rejections from known, low-risk vendors.
+- **The review 3 fixes are newer than the full live runs** (see Results). Three live spot checks confirm the main
+  ones; everything else about them is tested offline.
 - **One fix is newer than the live numbers.** The live eval found that Grok's repair could rebuild 3014 and drop its
   wrong-type errors (it was still not paid: a duplicate rule rejected it). Files with wrong types are no longer sent to
   Grok repair. This is tested with a scripted model and spot-checked live on 3014 (see `docs/evals.md`).

@@ -65,8 +65,9 @@ def main() -> None:
         "# Run log: all 20 sample invoices",
         "",
         f"Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026: "
-        f"offline at commit {off.get('commit')}, live at commit {live.get('commit')} (05a4ef5 only added data and docs "
-        "on top of 4d539d3, so the code is the same).",
+        f"offline at commit {off.get('commit')}, live at commit {live.get('commit')}. The live run predates the review 3 "
+        "fixes (76881f7); among the samples they change only 1014, which the offline run now holds (non-USD, decision 22) "
+        "and the live run paid.",
         "",
         "- **Offline** (`--offline`): no model is called; the risk review, VP, critic and rejection review are rules stand-ins "
         "(fixed rules written from the agents' prompts), and a template writes the memo: `runs/demo/offline/`",
