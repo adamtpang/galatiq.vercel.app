@@ -13,6 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from ..cache import CachedLLM
 from ..llm import LLMClient, LLMOutputError, LLMUnavailable, quote_document
 from ..models import DecisionStatus, InvoiceState, TraceEvent, decided_by_label
 from ..validation import ADVISORY
@@ -30,9 +31,10 @@ MEMO_PROMPT = (
 NEXT = {DecisionStatus.APPROVED: "Payment goes out through the mock payment function (paid once, idempotent).",
         DecisionStatus.REJECTED: "Not paid. The reasons are in the audit log; ask the vendor for a corrected invoice "
                                  "if the order is real.",
-        DecisionStatus.PENDING_HUMAN: "A person reviews it: python main.py review {num} (or python main.py ui)."}
+        DecisionStatus.PENDING_HUMAN: "A person reviews it: python main.py review {num} (or python main.py ui).",
+        DecisionStatus.SUPERSEDED: "Not paid. A later revision replaces it; the revision is the invoice to pay."}
 WORDS = {DecisionStatus.APPROVED: "approved for payment", DecisionStatus.REJECTED: "rejected",
-         DecisionStatus.PENDING_HUMAN: "held for a person"}
+         DecisionStatus.PENDING_HUMAN: "held for a person", DecisionStatus.SUPERSEDED: "superseded by a revision"}
 class DecisionMemo(BaseModel):
     memo: str = Field(description="2 to 4 plain sentences explaining the decision that was made")
     next_step: str = Field(description="One concrete next step for a person")
@@ -50,6 +52,8 @@ def memo_facts(state: InvoiceState) -> dict[str, Any]:
 
 def template_memo(state: InvoiceState) -> DecisionMemo:
     d, inv = state.decision, state.invoice
+    if d is None:
+        raise ValueError("template_memo needs a decision")   # write_memo returns early when there is none
     num = (inv.number if inv and inv.number else state.source.split("/")[-1])
     who = f" from {inv.vendor}" if inv and inv.vendor else ""
     amt = f" for ${state.total_usd:,.2f}" if state.total_usd is not None else ""
@@ -77,7 +81,7 @@ def write_memo(state: InvoiceState, llm: LLMClient | None) -> InvoiceState:
                  + "\n\n" + quote_document(state.raw_text, 8000)}]
         tag = hashlib.sha256(json.dumps([f["decision"], f["decided_by"], f["reasons"]], default=str).encode()).hexdigest()[:12]
         try:
-            res = (llm.complete_structured(DecisionMemo, msgs, slot_tag=tag) if hasattr(llm, "inner")
+            res = (llm.complete_structured(DecisionMemo, msgs, slot_tag=tag) if isinstance(llm, CachedLLM)
                    else llm.complete_structured(DecisionMemo, msgs))
             if not isinstance(res.value, DecisionMemo):
                 raise LLMOutputError(f"expected DecisionMemo, got {type(res.value).__name__}", [])
@@ -85,7 +89,7 @@ def write_memo(state: InvoiceState, llm: LLMClient | None) -> InvoiceState:
         except (LLMUnavailable, LLMOutputError) as e:
             out = {"by": "template", "grok_error": str(e)}
     m = m or template_memo(state)
-    assert state.decision.model_dump_json() == before   # the memo never touches the decision
+    assert state.decision is not None and state.decision.model_dump_json() == before   # the memo never touches the decision
     state.memo = out | {"text": m.memo, "next_step": m.next_step, "decision": d.status.value}
     state.trace.append(TraceEvent(agent=AGENT, step="memo", detail=state.memo))
     return state

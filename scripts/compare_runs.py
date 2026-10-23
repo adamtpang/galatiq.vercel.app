@@ -40,7 +40,10 @@ def main(a: str, b: str, json_out: str | None = None) -> int:
         same += eq
         rows.append(f"| {x['file']} | {x['decision']} | {y['decision']} | {x['risk']} | {y['risk']} | {x['payment']} | {y['payment']} | {'yes' if eq else 'NO'} |")
     paid = sum(r["total_usd"] or 0 for r in ra["rows"] if r["decision"] == "APPROVED")
-    count = lambda rs, d: sum(r["decision"] == d for r in rs)
+
+    def count(rs, d):
+        return sum(r["decision"] == d for r in rs)
+
     out = [f"# Live re-run with the decision cache: {Path(a).name} vs {Path(b).name}", "",
            f"Model {ra['model']}. Same database, cache on. Decision, decided by, risk, reason, flags and conditions "
            f"identical for {same} of {len(ra['rows'])} invoices. Code commit {ra.get('commit') or 'not recorded'} "

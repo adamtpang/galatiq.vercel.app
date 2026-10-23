@@ -188,7 +188,7 @@ def decide(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str 
             raise ValueError(f"Not paid: ${pay_amount:,.2f} is over ${CONFIRM_OVER:,.0f}, so it needs a second, "
                              "explicit confirmation (tick the confirm box, or pass --confirm-large)")
     state = resolve(conn, row, approve, note)
-    if state.decision.status == DecisionStatus.APPROVED:
+    if state.decision is not None and state.decision.status == DecisionStatus.APPROVED:
         if pay_amount is not None and amount is not None:
             state.total_usd = pay_amount
             state.decision.reasons.append(f"Amount to pay typed by the reviewer: ${pay_amount:,.2f}")

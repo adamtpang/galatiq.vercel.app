@@ -84,6 +84,8 @@ def llm_extract(raw: str, source: str, fmt: str, llm: LLMClient, problem: str | 
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": f"{head}Invoice text:\n{neutralize(raw[:20000])}"},
     ])
+    if not isinstance(res.value, ExtractedInvoice):
+        raise LLMOutputError(f"expected ExtractedInvoice, got {type(res.value).__name__}", [])
     return _from_llm(res.value, source, fmt), res
 
 
@@ -135,7 +137,7 @@ def compare_readings(parsed: Invoice, grok: Invoice) -> list[str]:
     if _num_key(parsed.number) != _num_key(grok.number):
         diffs.append(f"invoice number: parser {parsed.number!r}, Grok {grok.number!r}")
     if (parsed.total is None) != (grok.total is None) or (
-            parsed.total is not None and abs(parsed.total - grok.total) > 0.01):
+            parsed.total is not None and grok.total is not None and abs(parsed.total - grok.total) > 0.01):
         diffs.append(f"total: parser {parsed.total}, Grok {grok.total}")
 
     def lines(inv: Invoice):
@@ -156,6 +158,8 @@ def cross_check(state: InvoiceState, raw: str, path: str, fmt: str, inventory: I
     """Decision 12, live only: Grok reads every invoice the parser read, independently, and the two readings
     are compared. The parser's reading stays the one that is used; a disagreement is an
     EXTRACTION_DISAGREEMENT warning and a hard hold, so a person looks before anything is paid."""
+    if state.invoice is None:   # nothing parsed to compare against; the caller only cross-checks a parsed invoice
+        return
     try:
         g, res = llm_extract(raw, path, fmt, llm)
     except (LLMUnavailable, LLMOutputError) as e:

@@ -135,8 +135,9 @@ class GrokClient:
                 self.usage_log.append(usage_record(resp, purpose, time.monotonic() - t0))
                 return resp
             except Exception as e:  # network, rate limit, 5xx: retry with backoff
-                if getattr(e, "status_code", None) in NO_RETRY:   # bad key or bad request: retrying cannot help
-                    raise LLMUnavailable(f"xAI API error {e.status_code}: {e}") from e
+                code = getattr(e, "status_code", None)
+                if code in NO_RETRY:   # bad key or bad request: retrying cannot help
+                    raise LLMUnavailable(f"xAI API error {code}: {e}") from e
                 last = e
                 self._sleep(min(2 ** i, 8))
         raise LLMUnavailable(f"xAI API failed after {self.api_retries} tries: {last}")

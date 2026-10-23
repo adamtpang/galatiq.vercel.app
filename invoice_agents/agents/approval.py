@@ -28,7 +28,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
 
-from ..llm import LLMClient, quote_document
+from ..llm import LLMClient, LLMOutputError, quote_document
 from ..models import Decision, DecisionStatus, Flag, InvoiceState, Severity, TraceEvent
 from ..validation import ADVISORY
 
@@ -65,6 +65,8 @@ class CriticOpinion(BaseModel):
 # --- facts given to the agents -------------------------------------------------------
 def facts(state: InvoiceState, policy: dict[str, Any]) -> dict[str, Any]:
     inv = state.invoice
+    if inv is None:   # decide() only asks for facts after the hard rules, which reject a missing invoice
+        raise ValueError("facts() needs a parsed invoice")
     ap = policy.get("approval", {})
     return {
         "invoice_number": inv.number, "revision": inv.revision, "vendor": inv.vendor,
@@ -232,10 +234,13 @@ class LLMRejectionReviewer:
         self.llm = llm
 
     def review(self, state: InvoiceState, f: dict, rejection: Decision) -> RejectionReview:
-        return self.llm.complete_structured(RejectionReview, [
+        res = self.llm.complete_structured(RejectionReview, [
             {"role": "system", "content": REJECTION_REVIEW_PROMPT}, {"role": "system", "content": GUARDRAILS},
             {"role": "user", "content": _user_message(state, f, "HARD-RULE REJECTION:\n"
-                                                      + json.dumps(rejection.reasons) + "\n\n")}]).value
+                                                      + json.dumps(rejection.reasons) + "\n\n")}])
+        if not isinstance(res.value, RejectionReview):
+            raise LLMOutputError(f"expected RejectionReview, got {type(res.value).__name__}", [])
+        return res.value
 
 
 ARITHMETIC_CODES = {"TOTAL_MISMATCH", "SUBTOTAL_MISMATCH", "LINE_AMOUNT_MISMATCH"}
@@ -280,6 +285,16 @@ def review_rejection(state: InvoiceState, rejection: Decision, reviewer: Any, po
                     risk_score=rejection.risk_score,
                     reasons=[f"{label} escalated the hard-rule rejection to a person: {rv.reason}"] + rejection.reasons,
                     arguments={"hard_rule_rejection": rejection.model_dump(mode="json"), "rejection_review": rv.model_dump()})
+
+
+def superseded(state: InvoiceState) -> Decision | None:
+    """Decision 24: an original replaced by a later revision passes validation (SUPERSEDED_BY_REVISION is info) but is
+    never paid: its outcome is SUPERSEDED, not REJECTED. The revision is the invoice that may be paid."""
+    sup = [f for f in state.flags if f.code == "SUPERSEDED_BY_REVISION"]
+    if not sup:
+        return None
+    return Decision(status=DecisionStatus.SUPERSEDED, decided_by="supersession", risk_score=(state.risk or {}).get("score"),
+                    reasons=[f"SUPERSEDED_BY_REVISION: {sup[0].message}; not paid, the revision is the invoice to pay"])
 
 
 def error_hold(state: InvoiceState) -> Decision | None:
@@ -338,8 +353,8 @@ def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
                                             "reported is printed in the file, and the checks reconcile"))
     for key, code in HOLD_FLAGS.items():
         if cfg.get(key):
-            why = HOLD_WHY.get(code, "hold for human verification of the vendor and bank details")
-            reasons += [f"{code}: {f.message}; {why}" for f in state.flags if f.code == code]
+            hold_why = HOLD_WHY.get(code, "hold for human verification of the vendor and bank details")
+            reasons += [f"{code}: {f.message}; {hold_why}" for f in state.flags if f.code == code]
     if not reasons:
         return None
     return Decision(status=DecisionStatus.PENDING_HUMAN, reasons=reasons, risk_score=(state.risk or {}).get("score"),
@@ -394,13 +409,18 @@ STATUS = {"approve": DecisionStatus.APPROVED, "reject": DecisionStatus.REJECTED,
 
 def decide(state: InvoiceState, vp: VP, critic: Critic, policy: dict[str, Any], reviewer: Any = None) -> Decision:
     if any(f.code == "INTERNAL_ERROR" and (f.evidence or {}).get("stage") == "ingestion" for f in state.flags):
-        return error_hold(state)   # review 3: a crash while reading the file holds; its missing fields are not evidence
+        held = error_hold(state)
+        if held is not None:   # always set here, since an INTERNAL_ERROR flag exists
+            return held   # review 3: a crash while reading the file holds; its missing fields are not evidence
     hold = unreadable_hold(state, policy)
     if hold:
         return hold
     rejection = hard_rules(state)
     if rejection:
         return review_rejection(state, rejection, reviewer, policy)
+    sup = superseded(state)
+    if sup:
+        return sup
     hard = error_hold(state) or hard_holds(state, policy)
     if hard:
         return hard
@@ -464,6 +484,9 @@ def price_hold(state: InvoiceState, d: Decision, policy: dict[str, Any]) -> Deci
 
 
 def approve(state: InvoiceState, llm: LLMClient, policy: dict[str, Any]) -> InvoiceState:
+    vp: VP
+    critic: Critic
+    reviewer: Any
     if llm is not None and llm.available:
         vp, critic, reviewer = LLMVP(llm), LLMCritic(llm), LLMRejectionReviewer(llm)
     else:
@@ -491,7 +514,8 @@ def pin_check(state: InvoiceState, llm: Any, policy: dict[str, Any]) -> InvoiceS
                             evidence={"configured": info["configured_model"], "returned": sorted(set(other))}))
     cfg = policy.get("approval", {}).get("hard_holds", {}) or {}
     d = state.decision
-    if cfg.get("model_mismatch", True) and d is not None and d.status != DecisionStatus.REJECTED:
+    if cfg.get("model_mismatch", True) and d is not None and d.status not in (DecisionStatus.REJECTED,
+                                                                              DecisionStatus.SUPERSEDED):
         state.decision = Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="model_pin",
                                   risk_score=d.risk_score, reasons=[f"MODEL_MISMATCH: {msg}; hold for a human"] + d.reasons,
                                   arguments={"decision_before_pin": d.model_dump(mode="json")})

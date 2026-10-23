@@ -83,6 +83,8 @@ def _read_labels(stripped: str, scan: _Scan) -> None:
     for i, m in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(stripped)
         name = _field_for(m.group("label"))
+        if name is None:
+            continue
         value = stripped[m.end():end].strip()
         if name == "tax" and m.group("paren"):
             scan.tax_rate_raw = m.group("paren")

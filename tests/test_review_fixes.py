@@ -1,6 +1,4 @@
 """Fixes from the independent review (Oct 22, 2026): one test per gap it found."""
-import json
-import math
 
 import pytest
 from pydantic import ValidationError

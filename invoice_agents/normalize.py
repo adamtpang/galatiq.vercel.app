@@ -13,6 +13,8 @@ from difflib import get_close_matches
 _OCR_MAP = str.maketrans({"O": "0", "o": "0", "l": "1", "I": "1"})
 _NUMERIC_TOKEN = re.compile(r"(?<![A-Za-z])[\d$][\d,.$OolI]*[\dOolI](?![A-Za-z])")
 
+_FOLD = str.maketrans("01l", "oii")   # look-alike characters folded before comparing SKUs
+
 
 def fix_ocr_digits(text: str) -> tuple[str, list[str]]:
     """Replace O->0, l/I->1 inside numeric-looking tokens. Returns (text, corrections)."""
@@ -146,7 +148,7 @@ def normalize_sku(raw: str, catalog: list[str]) -> SkuMatch:
     else:
         raw_base = raw
     def fold(k: str) -> str:
-        return k.translate(str.maketrans({"0": "o", "1": "i", "l": "i"}))
+        return k.translate(_FOLD)
 
     ocr = fold(_key(raw_base))
     for k, c in keys.items():

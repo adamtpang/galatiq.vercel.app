@@ -22,7 +22,7 @@ from .db import Inventory
 from .models import Flag, Invoice, InvoiceState, Severity, TraceEvent
 from .normalize import match_text, terms_days
 
-B, W, I = Severity.BLOCK, Severity.WARN, Severity.INFO
+B, W, INFO = Severity.BLOCK, Severity.WARN, Severity.INFO
 # ingestion records this error when a file carries NaN or infinity where a number belongs
 NON_FINITE_ERROR = "non-finite number"
 
@@ -124,7 +124,7 @@ def check_inventory(inv: Invoice, inventory: Inventory, policy: dict) -> list[Fl
             out.append(_f("UNKNOWN_ITEM", B, f"'{li.sku_raw}' is not in inventory", line=n, item=li.sku_raw))
             continue
         if li.sku != li.sku_raw:
-            out.append(_f("SKU_NORMALIZED", I, f"'{li.sku_raw}' read as {li.sku}", line=n,
+            out.append(_f("SKU_NORMALIZED", INFO, f"'{li.sku_raw}' read as {li.sku}", line=n,
                           raw=li.sku_raw, sku=li.sku, confidence=li.sku_confidence))
         if li.qty > 0:
             requested[li.sku] += li.qty
@@ -142,7 +142,7 @@ def check_inventory(inv: Invoice, inventory: Inventory, policy: dict) -> list[Fl
             out.append(_f("STOCK_EXCEEDED", B, f"{sku}: requested {qty:g}{agg}, only {row.stock} in stock",
                           item=sku, requested=qty, stock=row.stock, lines=lines[sku]))
         elif len(lines[sku]) > 1:
-            out.append(_f("LINES_AGGREGATED", I, f"{sku} appears on lines {lines[sku]}; {qty:g} total is within stock",
+            out.append(_f("LINES_AGGREGATED", INFO, f"{sku} appears on lines {lines[sku]}; {qty:g} total is within stock",
                           item=sku, requested=qty, stock=row.stock, lines=lines[sku]))
     return out
 
@@ -212,7 +212,7 @@ def check_dates(inv: Invoice, policy: dict) -> list[Flag]:
         days = terms_days(inv.terms)
         tol = policy.get("payment_terms", {}).get("tolerance_days", 2)
         if days is not None and abs(gap - days) > tol:
-            out.append(_f("TERMS_MISMATCH", I, f"Terms say {inv.terms} but due date is {gap} days after issue",
+            out.append(_f("TERMS_MISMATCH", INFO, f"Terms say {inv.terms} but due date is {gap} days after issue",
                           terms=inv.terms, days_between=gap))
     return out
 
@@ -278,7 +278,7 @@ def check_prices(inv: Invoice, inventory: Inventory, policy: dict) -> list[Flag]
             out.append(_f("PRICE_VARIANCE", W, f"{li.sku} at {_money(price_usd)} is {pct:.0f}% above catalog "
                           f"{_money(row.unit_price)}", **ev))
         elif pct < -down:
-            out.append(_f("PRICE_VARIANCE", I, f"{li.sku} at {_money(price_usd)} is {-pct:.0f}% below catalog "
+            out.append(_f("PRICE_VARIANCE", INFO, f"{li.sku} at {_money(price_usd)} is {-pct:.0f}% below catalog "
                           f"{_money(row.unit_price)}", **ev))
     return out
 
@@ -312,7 +312,7 @@ def check_overbilling(inv: Invoice, inventory: Inventory, policy: dict) -> list[
 def check_line_notes(inv: Invoice) -> list[Flag]:
     out = []
     for n, li in enumerate(inv.items, 1):
-        if li.note and re.search(r"\bsample\b", li.note, re.I) and (li.unit_price or 0) > 0:
+        if li.note and re.search(r"\bsample\b", li.note, re.I) and li.unit_price is not None and li.unit_price > 0:
             out.append(_f("SAMPLE_CHARGED", W, f"Line {n} is marked '{li.note}' but is charged "
                           f"{_money(li.qty * li.unit_price)}", line=n, item=li.sku_raw, note=li.note))
     return out
@@ -367,12 +367,12 @@ def check_vendor(inv: Invoice, inventory: Inventory, policy: dict | None = None)
                               f"(similarity {sim:.2f})", vendor=inv.vendor, lookalike_of=near, similarity=round(sim, 3)))
     if v is not None and v.address and inv.vendor_address and _norm(v.address) == _norm(inv.vendor_address):
         # decision 13: the risk agent does not apply the address watch list to the vendor's own address on file
-        out.append(_f("ADDRESS_ON_FILE", I, f"Vendor address matches the vendor master ({v.address})",
+        out.append(_f("ADDRESS_ON_FILE", INFO, f"Vendor address matches the vendor master ({v.address})",
                       address=v.address))
     if v is not None and not v.approved:
         out.append(_f("VENDOR_NOT_APPROVED", B, f"'{inv.vendor}' is not an approved vendor", vendor=inv.vendor))
     if re.search(r"\bacme\b", inv.vendor, re.I):
-        out.append(_f("VENDOR_NAME_LOOKALIKE", I, f"Vendor name '{inv.vendor}' resembles the buyer (Acme)",
+        out.append(_f("VENDOR_NAME_LOOKALIKE", INFO, f"Vendor name '{inv.vendor}' resembles the buyer (Acme)",
                       vendor=inv.vendor))
     return out
 
@@ -383,10 +383,10 @@ def check_amount_thresholds(total_usd: float | None, policy: dict) -> list[Flag]
     ap = policy.get("approval", {})
     limit, near = ap.get("approval_threshold_usd", 10000), ap.get("near_limit_usd", 9500)
     if total_usd > limit:
-        return [_f("OVER_APPROVAL_THRESHOLD", I, f"{_money(total_usd)} is over {_money(limit)}: extra scrutiny",
+        return [_f("OVER_APPROVAL_THRESHOLD", INFO, f"{_money(total_usd)} is over {_money(limit)}: extra scrutiny",
                    total_usd=total_usd, threshold=limit)]
     if total_usd >= near:
-        return [_f("NEAR_APPROVAL_THRESHOLD", I, f"{_money(total_usd)} is just under the {_money(limit)} limit",
+        return [_f("NEAR_APPROVAL_THRESHOLD", INFO, f"{_money(total_usd)} is just under the {_money(limit)} limit",
                    total_usd=total_usd, threshold=limit, near_limit=near)]
     return []
 
@@ -492,7 +492,7 @@ class DuplicateRegistry:
         if not out:   # an original re-run still learns about a revision or a conflict stored since
             for r in (r for r in rows if inv.number and r["number_key"] == number_key(inv) and r["base_fp"] != fp):
                 if inv.revision and r["revision"] != inv.revision:
-                    out.append(_f("REVISION_SUPERSEDES", I, f"Revision {inv.revision} replaces {self._where(r)} "
+                    out.append(_f("REVISION_SUPERSEDES", INFO, f"Revision {inv.revision} replaces {self._where(r)} "
                                   f"(total {_money(r['total'] or 0)} -> {_money(inv.total or 0)})",
                                   supersedes=r["source_file"], previous_total=r["total"],
                                   delta=round((inv.total or 0) - (r["total"] or 0), 2)))
@@ -501,7 +501,7 @@ class DuplicateRegistry:
                                       f"({self._where(r)}); paying the revision would pay twice",
                                       original=r["source_file"], original_total=r["total"]))
                 elif r["revision"] and r["revision"] != inv.revision:
-                    out.append(_f("SUPERSEDED_BY_REVISION", B, f"Replaced by revision {r['revision']} "
+                    out.append(_f("SUPERSEDED_BY_REVISION", INFO, f"Replaced by revision {r['revision']} "
                                   f"in {self._where(r)}", superseded_by=r["source_file"]))
                 else:
                     out.append(_f("DUPLICATE_NUMBER_CONFLICT", B, f"Invoice number reused with different content "
@@ -552,7 +552,7 @@ class DuplicateRegistry:
         for p_inv in earlier:
             if inv.revision and inv.revision != p_inv.revision:
                 delta = round((inv.total or 0) - (p_inv.total or 0), 2)
-                out.append(_f("REVISION_SUPERSEDES", I, f"Revision {inv.revision} replaces {Path(p_inv.source_file or '').name} "
+                out.append(_f("REVISION_SUPERSEDES", INFO, f"Revision {inv.revision} replaces {Path(p_inv.source_file or '').name} "
                               f"(total {_money(p_inv.total or 0)} -> {_money(inv.total or 0)})",
                               supersedes=p_inv.source_file, previous_total=p_inv.total, delta=delta))
             elif not (p_inv.revision and p_inv.revision != inv.revision):
@@ -571,7 +571,7 @@ class DuplicateRegistry:
             out = self._compare(inv, planned[:idx])
             for later in planned[idx + 1:]:
                 if later.revision and later.revision != inv.revision and fingerprint(later) != fingerprint(inv):
-                    out.append(_f("SUPERSEDED_BY_REVISION", B, f"Replaced by revision {later.revision} "
+                    out.append(_f("SUPERSEDED_BY_REVISION", INFO, f"Replaced by revision {later.revision} "
                                   f"in {Path(later.source_file or '').name}", superseded_by=later.source_file))
                     break
             return out
@@ -580,7 +580,7 @@ class DuplicateRegistry:
         if inv.revision:
             for p_inv, p_state in prior:
                 if p_inv.revision != inv.revision and fingerprint(p_inv) != fingerprint(inv) and p_state is not None:
-                    p_state.flags.append(_f("SUPERSEDED_BY_REVISION", B, f"Replaced by revision {inv.revision} "
+                    p_state.flags.append(_f("SUPERSEDED_BY_REVISION", INFO, f"Replaced by revision {inv.revision} "
                                             f"in {Path(inv.source_file or '').name}", superseded_by=inv.source_file))
         prior.append((inv, state))
         return out
@@ -623,7 +623,7 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
         total_usd = None
     flags += check_amount_thresholds(total_usd, policy)
     if any("OCR" in c for c in inv.corrections):
-        flags.append(_f("OCR_CORRECTED", I, "Fixed OCR look-alike characters",
+        flags.append(_f("OCR_CORRECTED", INFO, "Fixed OCR look-alike characters",
                         corrections=[c for c in inv.corrections if c.startswith("OCR")]))
     if registry is not None:
         match_content = bool((policy.get("duplicates") or {}).get("match_content"))

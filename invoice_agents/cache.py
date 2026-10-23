@@ -71,9 +71,9 @@ class CachedLLM:
     def __init__(self, inner: Any, conn: sqlite3.Connection | None, enabled: bool = True):
         self.inner, self.conn, self.enabled = inner, conn, enabled and conn is not None
         self.name, self.model = inner.name, inner.model
-        if self.enabled:
-            self.conn.execute(SCHEMA)
-            self.conn.commit()
+        if self.enabled and conn is not None:
+            conn.execute(SCHEMA)
+            conn.commit()
         self.key: str | None = None
         self._n: dict[str, int] = {}
         self.hits = self.misses = 0
@@ -100,13 +100,13 @@ class CachedLLM:
         return f"{kind}#{self._n[kind]}"
 
     def _get(self, slot: str):
-        if not (self.enabled and self.key):
+        if not (self.enabled and self.key) or self.conn is None:
             return None
         return self.conn.execute("SELECT output, model FROM llm_cache WHERE cache_key=? AND slot=?",
                                  (self.key, slot)).fetchone()
 
     def _put(self, slot: str, output: Any, model: str | None) -> None:
-        if self.enabled and self.key:
+        if self.enabled and self.key and self.conn is not None:
             self.conn.execute("INSERT OR REPLACE INTO llm_cache (cache_key, slot, output, model) VALUES (?,?,?,?)",
                               (self.key, slot, json.dumps(output, default=str), model))
             self.conn.commit()

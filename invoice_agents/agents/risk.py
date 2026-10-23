@@ -115,7 +115,7 @@ def signals(state: InvoiceState, policy: dict[str, Any]) -> list[dict]:
     addr = ((inv.vendor_address or "") + " " + text).lower() if inv else text
     on_file = [f.evidence.get("address", "").lower() for f in state.flags if f.code == "ADDRESS_ON_FILE"]
     for a in on_file:   # decision 13: a vendor's own address on file is not a watch-list hit
-        addr = addr.replace(a, " ").replace((inv.vendor_address or "").lower(), " ")
+        addr = addr.replace(a, " ").replace(((inv.vendor_address if inv else None) or "").lower(), " ")
     hits = [a for a in cfg.get("suspicious_addresses", []) if a in addr]
     if hits:
         add("suspicious_address", "Vendor address is on the watch list", hits)
@@ -124,7 +124,8 @@ def signals(state: InvoiceState, policy: dict[str, Any]) -> list[dict]:
     if t is not None and ap.get("near_limit_usd", 9500) <= t <= ap.get("approval_threshold_usd", 10000):
         add("threshold_gaming", f"Total ${t:,.2f} sits just under the ${ap.get('approval_threshold_usd', 10000):,} limit", t)
     if "VENDOR_RENAMED" in codes:
-        add("vendor_rename", f"Vendor was renamed (formerly {inv.vendor_former_name})", inv.vendor_former_name)
+        former = inv.vendor_former_name if inv else None
+        add("vendor_rename", f"Vendor was renamed (formerly {former})", former)
     if codes & {"TOTAL_MISMATCH", "SUBTOTAL_MISMATCH", "LINE_AMOUNT_MISMATCH"}:
         add("math_mismatch", "Invoice totals do not add up", sorted(codes & {"TOTAL_MISMATCH", "SUBTOTAL_MISMATCH",
                                                                             "LINE_AMOUNT_MISMATCH"}))

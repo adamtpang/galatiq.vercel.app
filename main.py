@@ -13,7 +13,7 @@ import json
 import re
 from difflib import get_close_matches
 from pathlib import Path
-from typing import Optional
+from typing import NoReturn, Optional
 
 import typer
 from dotenv import load_dotenv
@@ -48,7 +48,7 @@ def run(
     load_dotenv()
     if ctx.invoked_subcommand:
         return
-    target = invoice_path or batch
+    target: Path | None = invoice_path or batch
     if target is None:
         console.print(ctx.get_help())
         raise typer.Exit(1)
@@ -109,7 +109,7 @@ def brief_alias(target: Path) -> Path | None:
     return cands[0]
 
 
-def missing_path(target: Path) -> None:
+def missing_path(target: Path) -> NoReturn:
     """Exit 2 with the nearest file names, e.g. for the brief's data/invoices/invoice1.txt."""
     console.print(f"[red]No such file or directory:[/] {target}")
     if target.parent.is_dir():
@@ -217,7 +217,7 @@ def review(
         console.print(f"[red]{e}[/]")
         raise typer.Exit(1)
     p = state.payment or {}
-    num, vendor = state.invoice.number, state.invoice.vendor
+    num, vendor = (state.invoice.number, state.invoice.vendor) if state.invoice else (None, None)
     if p.get("status") == "paid":
         console.print(f"mock_payment: {p.get('bank_message')}")
         outcome = f"paid ${p['amount']:,.2f} to {vendor} (attempts: {p['attempts']}, key {p['idempotency_key']})"
@@ -227,7 +227,8 @@ def review(
         outcome = f"[red]payment failed[/] after {p['attempts']} attempts: {'; '.join(p.get('errors', []))}"
     else:
         outcome = "not paid; rejection written to the audit log"
-    console.print(f"{num}: {state.decision.status.value.lower()} by a human ({note or 'no note'}). {outcome}")
+    status = state.decision.status.value.lower() if state.decision else "undecided"
+    console.print(f"{num}: {status} by a human ({note or 'no note'}). {outcome}")
     if p.get("status") == "failed":
         raise typer.Exit(1)
 

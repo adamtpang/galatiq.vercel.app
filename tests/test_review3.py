@@ -298,3 +298,16 @@ def test_price_over_catalog_is_a_hold_not_a_condition(tmp_path):
 def test_no_overbilling_flag_on_the_20_samples(tmp_path):
     states, _ = _run(tmp_path, sorted(INVOICES.iterdir()))
     assert [Path(s.source).name for s in states if any(f.code == "OVERBILLING" for f in s.flags)] == []
+
+
+# --- decision 24: a superseded original passes validation and is SUPERSEDED, never paid -------------------
+def test_superseded_original_passes_validation_and_is_not_paid(tmp_path):
+    states, ctx = _run(tmp_path, sorted(INVOICES.iterdir()))
+    by = {Path(s.source).name: s for s in states}
+    orig = by["invoice_1004.json"]
+    assert not [f for f in orig.flags if f.severity.value == "block"]
+    assert orig.decision.status == DecisionStatus.SUPERSEDED and orig.payment["status"] == "not_paid"
+    assert by["invoice_1004_revised.json"].payment["status"] == "paid"
+    assert [tuple(r) for r in ctx.conn.execute(
+        "SELECT invoice_number, amount FROM payments WHERE status='paid' AND invoice_number='INV-1004'")] == [("INV-1004", 5940.0)]
+    assert ctx.conn.execute("SELECT count(*) FROM audit_log WHERE event='superseded'").fetchone()[0] == 1

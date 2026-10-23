@@ -47,7 +47,7 @@ class PaymentAgent:
         # looked up at call time, so a patched or replaced mock_payment is the one called
         self.rng, self.sleep, self.bank = random.Random(seed), sleep, bank or (lambda v, a: mock_payment(v, a))
 
-    def _call_bank(self, vendor: str, amount: float) -> tuple[dict, str]:
+    def _call_bank(self, vendor: str | None, amount: float) -> tuple[dict, str]:
         if self.chaos and self.rng.random() < self.chaos:
             raise BankError("chaos: injected bank timeout")
         buf = io.StringIO()
@@ -59,6 +59,7 @@ class PaymentAgent:
 
     def _refuse(self, state: InvoiceState, amount) -> InvoiceState:
         d = state.decision
+        assert d is not None, "_refuse is only called from pay(), which has checked the decision"
         d.status, d.decided_by = DecisionStatus.REJECTED, "payment_guard"
         d.reasons = [f"PAYMENT_GUARD: amount {amount!r} is not a finite number above zero; nothing was paid"] + d.reasons
         state.trace.append(TraceEvent(agent=AGENT, step="guard_refused", detail={"amount": repr(amount)}))
@@ -85,6 +86,7 @@ class PaymentAgent:
         blocks = [f.code for f in state.flags if f.severity == Severity.BLOCK]
         if blocks and d.decided_by != "human":   # only a person may approve past a blocking flag (escalated rejection)
             return self._hold(state, f"the invoice has blocking flags ({', '.join(blocks)})")
+        raw_amount: float | None
         if state.total_usd is not None:
             raw_amount = state.total_usd
         elif (inv.currency or "USD") == "USD":
@@ -109,7 +111,7 @@ class PaymentAgent:
             "INSERT OR IGNORE INTO payments (invoice_number, vendor, amount, currency, idempotency_key, status) "
             "VALUES (?,?,?,?,?, 'in_progress')", (inv.number, inv.vendor, amount, "USD", key))
         self.conn.commit()
-        errors = []
+        errors: list[str] = []
         for attempt in range(1, self.retries + 2):
             try:
                 res, msg = self._call_bank(inv.vendor, amount)
@@ -144,15 +146,17 @@ class PaymentAgent:
 
 
 def log_rejection(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState:
-    """Rejected invoices are never paid; the reasons go to the audit log."""
+    """Rejected and superseded invoices are never paid; the reasons go to the audit log."""
     d = state.decision
     inv = state.invoice
-    detail = {"source": state.source, "reasons": d.reasons if d else [], "decided_by": d.decided_by if d else None,
+    sup = d is not None and d.status == DecisionStatus.SUPERSEDED
+    detail = {"source": state.source, "status": d.status.value if d else None, "reasons": d.reasons if d else [], "decided_by": d.decided_by if d else None,
               "blocking_flags": [f.model_dump(mode="json") for f in state.flags if f.severity.value == "block"],
               "memo": (state.memo or {}).get("text")}
     conn.execute("INSERT INTO audit_log (invoice_number, agent, event, detail) VALUES (?,?,?,?)",
-                 (inv.number if inv else None, AGENT, "rejected", json.dumps(detail, default=str)))
+                 (inv.number if inv else None, AGENT, "superseded" if sup else "rejected",
+                  json.dumps(detail, default=str)))
     conn.commit()
-    state.payment = {"status": "not_paid", "reason": "rejected"}
+    state.payment = {"status": "not_paid", "reason": "superseded by a revision" if sup else "rejected"}
     state.trace.append(TraceEvent(agent=AGENT, step="rejection_logged", detail={"reasons": detail["reasons"]}))
     return state

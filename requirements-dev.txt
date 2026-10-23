@@ -1,0 +1,2 @@
+# Dev tools: tests, lint and type checks. `pip install -r requirements-dev.txt`, then `make check`.
+-r requirements.txt

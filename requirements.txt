@@ -9,3 +9,6 @@ openai==3.36.1        # OpenAI-compatible client for the xAI API
 langgraph==1.2.16     # orchestration (invoice_agents/graph.py)
 python-dotenv==1.2.4
 pytest==9.1.1
+# static checks (also run by tests/test_static_checks.py, so CI enforces them); see requirements-dev.txt
+ruff==0.17.2
+mypy==2.4.0

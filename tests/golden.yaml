@@ -10,7 +10,7 @@
 invoice_1001.txt:          {decision: APPROVED, paid: 5000.00}
 invoice_1002.txt:          {decision: REJECTED, must_flag: [STOCK_EXCEEDED]}
 invoice_1003.txt:          {decision: REJECTED, must_flag: [ZERO_STOCK, INVALID_DUE_DATE]}
-invoice_1004.json:         {decision: REJECTED, must_flag: [SUPERSEDED_BY_REVISION]}
+invoice_1004.json:         {decision: SUPERSEDED, by: supersession, must_flag: [SUPERSEDED_BY_REVISION]}   # passes validation; never paid (decision 24)
 invoice_1004_revised.json: {decision: APPROVED, paid: 5940.00, must_flag: [REVISION_SUPERSEDES, ADDRESS_ON_FILE]}   # 742 Evergreen Terrace is the address on file for Precision Parts (decision 13)
 invoice_1005.json:         {decision: REJECTED, must_flag: [STOCK_EXCEEDED]}
 invoice_1006.csv:          {decision: APPROVED, paid: 2750.00}

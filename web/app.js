@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   var DATA = null, SRC = {}, MODE = "live", SET = "case", FILTER = "all", SELECTED = null, REPORT = "live", P = null;
-  var PILL = { APPROVED: ["approve", "Approved"], REJECTED: ["reject", "Rejected"], PENDING_HUMAN: ["review", "Held for a human"] };
+  var PILL = { APPROVED: ["approve", "Approved"], REJECTED: ["reject", "Rejected"], PENDING_HUMAN: ["review", "Held for a human"], SUPERSEDED: ["reject", "Superseded"] };
   var BY = { hard_rules: "hard rules", hard_hold: "a hard hold rule", error: "the fail-closed error rule", payment_guard: "the payment guard", human: "a person", model_pin: "the model pin" };
   // Offline, the VP, critic and rejection review are fixed rules written from the agents' prompts: never call them agents.
   var BY_ENGINE = { vp: ["the VP agent (Grok)", "the VP rules stand-in"], "vp+critic": ["the VP and critic agents (Grok)", "the VP and critic rules stand-ins"],
@@ -262,15 +262,16 @@
     document.querySelectorAll("[data-run]").forEach(function (b) { var r = DATA.runs[key(b.dataset.run, SET)]; if (r) b.innerHTML = esc(runName(b.dataset.run)) + '<span class="seg-sub">' + esc(fmtWhen(r.recorded_at).time) + "</span>"; });
   }
   function renderSummary() {
-    var r = run(), invs = r.invoices, paid = 0, nPaid = 0, rej = 0, held = 0, fraud = 0, fraudN = 0;
+    var r = run(), invs = r.invoices, paid = 0, nPaid = 0, rej = 0, held = 0, sup = 0, fraud = 0, fraudN = 0;
     invs.forEach(function (i) {
       if (i.payment && i.payment.status === "paid") { paid += i.payment.amount; nPaid++; }
       if (i.decision.status === "REJECTED") rej++;
       if (i.decision.status === "PENDING_HUMAN") held++;
+      if (i.decision.status === "SUPERSEDED") sup++;
       if (isFraudBlocked(i)) { fraud += i.total_usd || 0; fraudN++; }
     });
     $("showing").innerHTML = "Showing <b>" + esc(runName(MODE)) + "</b>, " + (SET === "extra" ? invs.length + " extra test invoices (added, not case data)" : SET === "critic" ? "extra invoice 2004 ($12,500, added, not case data) run on its own; the critic reviews it only if the VP approves" + (invs.length && invs[0].decision.status !== "APPROVED" && !invs[0].decision.critique_rounds ? " (in this run the VP did not approve, so no critic call was made)" : "") : "20 case invoices") + ", recorded " + esc(fmtWhen(r.recorded_at).full) + ". Same run as the report.";
-    $("summary").innerHTML = card(money(paid), "paid · " + nPaid) + card(String(rej), "rejected") + card(String(held), "held") + card(money(fraud), "high-risk blocked · " + fraudN, "Rejected with risk score " + hr() + " or more");
+    $("summary").innerHTML = card(money(paid), "paid · " + nPaid) + card(String(rej), "rejected" + (sup ? " · " + sup + " superseded" : "")) + card(String(held), "held") + card(money(fraud), "high-risk blocked · " + fraudN, "Rejected with risk score " + hr() + " or more");
     var o = DATA.runs[key(MODE === "offline" ? "live" : "offline", SET)], diff = [];
     if (o) r.invoices.forEach(function (i) { var j = o.invoices.find(function (x) { return x.file === i.file; }); if (j && j.decision.status !== i.decision.status) diff.push(invNumber(i.number)); });
     $("run-note").textContent = (MODE === "offline" ? "Offline: no model is called. The risk review, VP, critic and rejection review are rules stand-ins (fixed rules written from the agents' prompts), not agents; the memo is a template." : "Live: Grok reads every invoice (a cross-check against the parser), does the risk review, the VP and the critic, and writes every decision memo. The critic only reviews approvals over $10,000, near the limit or high risk. Live decisions can differ run to run even at temperature 0; hard rules run first, and Grok can only raise risk or hold, never pay what the rules block.") +
@@ -391,6 +392,7 @@
       var s = ev.detail.status;
       if (s === "REJECTED") { P.tot.rej++; if (isFraudBlocked(inv)) { P.tot.fraud += inv.total_usd || 0; P.tot.nFraud++; } }
       if (s === "PENDING_HUMAN") P.tot.held++;
+      if (s === "SUPERSEDED") P.tot.sup = (P.tot.sup || 0) + 1;
     }
     if (ev.step === "paid") { P.tot.paid += ev.detail.amount || 0; P.tot.nPaid++; }
     if (show) { var feed = $("feed"); feed.insertAdjacentHTML("beforeend", stepHtml(ev, inv, P.r)); feed.scrollTop = feed.scrollHeight; renderStepper(); }
@@ -416,7 +418,7 @@
     $("prog-eta").textContent = P.finished ? "Finished" : (P.playing ? "ETA " : "Paused · ") + fmtClock((P.total - P.T) / P.speed) + (P.playing ? "" : " left");
     $("prog-real").textContent = "About " + fmtClock(P.real) + " into the real run";
     var t = P.tot;
-    $("totals").innerHTML = tcard(money(t.paid), "paid", "good") + tcard(String(t.rej), "rejected", "bad") + tcard(String(t.held), "held", "warn") + tcard(money(t.fraud), "high-risk blocked", "", "Rejected with risk score " + hr() + " or more");
+    $("totals").innerHTML = tcard(money(t.paid), "paid", "good") + tcard(String(t.rej), "rejected" + (t.sup ? " · " + t.sup + " superseded" : ""), "bad") + tcard(String(t.held), "held", "warn") + tcard(money(t.fraud), "high-risk blocked", "", "Rejected with risk score " + hr() + " or more");
     updateWaiting();
   }
   function tcard(big, cap, cls, title) { return '<div class="tot ' + cls + '"' + (title ? ' title="' + esc(title) + '"' : "") + '><span class="tot-big">' + esc(big) + '</span><span class="small muted">' + esc(cap) + "</span></div>"; }
@@ -500,13 +502,13 @@
     return '<li><div class="r-row"><span><b>' + esc(invNumber(i.number)) + "</b>" + dupTag(i) + ' <span class="muted">' + vendorHtml(i.vendor) + '</span></span><span class="r-right">' + (right || money(i.total_usd)) + "</span></div>" +
       '<div class="r-sub small muted"><button type="button" class="linkish" data-open-file="' + esc(i.file) + '">' + esc(i.file) + "</button></div>" + (extra || "") + "</li>";
   }
-  function statusRank(s) { return { APPROVED: 0, PENDING_HUMAN: 1, REJECTED: 2 }[s]; }
+  function statusRank(s) { return { APPROVED: 0, PENDING_HUMAN: 1, REJECTED: 2, SUPERSEDED: 3 }[s]; }
   function syncRepButtons() { document.querySelectorAll("[data-rep]").forEach(function (b) { b.classList.toggle("on", b.dataset.rep === REPORT); b.setAttribute("aria-pressed", b.dataset.rep === REPORT); }); }
   function renderReport() {
     var r = DATA.runs[REPORT], o = DATA.runs[REPORT === "live" ? "offline" : "live"], invs = r.invoices, n = invs.length, w = fmtWhen(r.recorded_at);
     syncRepButtons();
     var by = function (s) { return invs.filter(function (i) { return i.decision.status === s; }); };
-    var paid = invs.filter(function (i) { return i.payment && i.payment.status === "paid"; }), rej = by("REJECTED"), held = by("PENDING_HUMAN"), appr = by("APPROVED");
+    var paid = invs.filter(function (i) { return i.payment && i.payment.status === "paid"; }), rej = by("REJECTED"), held = by("PENDING_HUMAN"), appr = by("APPROVED"), sup = by("SUPERSEDED");
     var paidSum = paid.reduce(function (a, i) { return a + i.payment.amount; }, 0);
     var hard = invs.filter(function (i) { return i.decision.decided_by === "hard_rules"; }).length;
     var hh = invs.filter(function (i) { return i.decision.decided_by === "hard_hold"; }).length;
@@ -514,7 +516,7 @@
     invs.forEach(function (i) { i.timeline.forEach(function (e) { if (e.step === "tool_call") tools++; }); });
     var h = [];
     h.push('<p class="memo-note small muted">' + esc(runName(REPORT)) + " · recorded " + esc(w.full) + " · assembled from the trace; only the linking words are a template.</p>");
-    h.push('<div class="st-cards"><div class="st approve"><b>' + appr.length + '</b><span>paid</span></div><div class="st reject"><b>' + rej.length + '</b><span>rejected</span></div><div class="st review"><b>' + held.length + '</b><span>need you</span></div><div class="st"><b>' + whole(paidSum) + "</b><span>paid out</span></div></div>");
+    h.push('<div class="st-cards"><div class="st approve"><b>' + appr.length + '</b><span>paid</span></div><div class="st reject"><b>' + rej.length + '</b><span>rejected' + (sup.length ? " · " + sup.length + " superseded" : "") + '</span></div><div class="st review"><b>' + held.length + '</b><span>need you</span></div><div class="st"><b>' + whole(paidSum) + "</b><span>paid out</span></div></div>");
     h.push('<section class="m-sec"><h3>What I did</h3><p>Read all ' + n + " files in " + fmtDur(r.duration_ms) + ". " + (isLive(r) ? (function () { var cc = r.invoices.filter(function (i) { return i.cross_check && i.cross_check.ok; }), ag = cc.filter(function (i) { return i.cross_check.agree; }).length, rb = r.invoices.filter(function (i) { return i.timeline.some(function (e) { return e.step === "llm_repair"; }); }).length;
         return "Grok checked the parser's reading of " + cc.length + " (" + (ag === cc.length ? "all agreed" : ag + " agreed") + ")" + (rb ? ", rebuilt " + rb + " the parser could not read," : "") + " and wrote all " + n + " memos. "; })() : "") + hard + " were settled by hard rules. " + (hh ? hh + " held by a hard hold rule, before the VP. " : "") + (isLive(r) ? (n - hard) + " got a Grok risk review (" + plural(tools, "tool call") + ") and " + (n - hard - hh) + " a VP decision." : (n - hard - hh) + " went through the VP rules stand-in" + (invs.some(function (i) { return i.decision.critique_rounds; }) ? " and the critic rules stand-in" : "") + ".") + "</p></section>");
 

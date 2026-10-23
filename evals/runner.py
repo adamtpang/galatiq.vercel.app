@@ -25,7 +25,7 @@ import tempfile
 import time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -90,10 +90,10 @@ def score_invoice(inv: Invoice | None, gt: dict) -> dict:
     got = predicted(inv)
     out = {}
     for f in FIELDS:
-        exp = gt.get(f)
-        if isinstance(exp, (datetime,)) or hasattr(exp, "isoformat"):
+        exp: Any = gt.get(f)   # ground truth read from YAML
+        if isinstance(exp, (date, datetime)):
             exp = exp.isoformat()
-        g = None if got is None else got[f]
+        g: Any = None if got is None else got[f]
         if got is None:
             ok = False
         elif f == "vendor":
@@ -191,7 +191,7 @@ def unseen_eval(states: list[InvoiceState], expected: dict, mode: str) -> dict:
         inv = s.invoice
         status = s.decision.status.value if s.decision else "UNKNOWN"
         got = predicted(inv)
-        read_ok = bool(got) and _t(got["vendor"]) == _t(exp["vendor"]) and got["total"] is not None \
+        read_ok = got is not None and _t(got["vendor"]) == _t(exp["vendor"]) and got["total"] is not None \
             and abs(got["total"] - float(exp["total"])) < 0.005 \
             and Counter((_t(n), float(q)) for n, q in got["line_items"]) == Counter((_t(n), float(q)) for n, q in exp["line_items"])
         cases.append({"file": name, "decision": status, "decided_by": s.decision.decided_by if s.decision else None,
@@ -257,14 +257,14 @@ def agreement(offline: dict[str, dict], live: dict[str, dict], files: list[str],
     common = [f for f in files if f in offline and f in live]
     dis = []
     for f in common:
-        o, l = offline[f], live[f]
-        if o["decision"] != l["decision"]:
+        o, lv = offline[f], live[f]
+        if o["decision"] != lv["decision"]:
             dis.append({"file": f, "offline": o["decision"], "offline_by": o.get("decided_by"),
-                        "offline_reasons": o.get("reasons", []), "live": l["decision"], "live_by": l.get("decided_by"),
-                        "live_reasons": l.get("reasons", []), "live_conditions": l.get("conditions", []),
-                        "live_risk": (l.get("risk") or {}).get("score"),
+                        "offline_reasons": o.get("reasons", []), "live": lv["decision"], "live_by": lv.get("decided_by"),
+                        "live_reasons": lv.get("reasons", []), "live_conditions": lv.get("conditions", []),
+                        "live_risk": (lv.get("risk") or {}).get("score"),
                         "offline_risk": (o.get("risk") or {}).get("score"),
-                        "grok_risk_reasons": (l.get("risk") or {}).get("grok_reasons", [])})
+                        "grok_risk_reasons": (lv.get("risk") or {}).get("grok_reasons", [])})
     n = len(common)
     # Repeatability metric, not a policy: if a disagreement between live and offline sent the invoice to a
     # person, how many would go, and how much would one side have paid without that check.
@@ -302,10 +302,10 @@ def adversarial_eval(states: list[InvoiceState], expected: dict) -> dict:
         exp = expected[name]
         status = s.decision.status.value if s.decision else "UNKNOWN"
         paid = (s.payment or {}).get("status") == "paid"
-        caught = status != "APPROVED" and not paid
+        is_caught = status != "APPROVED" and not paid
         risk = s.risk or {}
         cases.append({"file": name, "trap": exp["trap"], "expected": exp["expected"], "decision": status,
-                      "decided_by": s.decision.decided_by if s.decision else None, "paid": paid, "caught": caught,
+                      "decided_by": s.decision.decided_by if s.decision else None, "paid": paid, "caught": is_caught,
                       "risk_score": risk.get("score"),
                       "signals": [x["signal"] for x in risk.get("signals", [])],
                       "flags": [f.code for f in s.flags if f.severity.value != "info"],
@@ -393,7 +393,7 @@ def agreements(off: dict, live: dict | None) -> list[dict]:
 
 
 def summary_md(off: dict, live: dict | None) -> str:
-    L = [f"# Eval summary", "",
+    L = ["# Eval summary", "",
          f"Offline: generated {off['generated_at']}, base commit {off.get('commit')}. "
          + (f"Live ({live['model']}): run {live['generated_at']}, base commit {live.get('commit')}." if live else "No live run on file."),
          "", "| Eval | Offline | Live |", "|---|---|---|"]
@@ -649,7 +649,7 @@ def separate_run_live(out: Path, write: bool = True) -> int:
             "usage": {k: u[k] for k in ("calls", "prompt_tokens", "cached_prompt_tokens", "completion_tokens", "reasoning_tokens")},
             "list_price_usd": round(price(u, pricing), 4),
             "billed_usd": round(ticks / 1e10, 4) if ticks is not None else None,
-            "returned_models": sorted({r.get("model") for r in client.usage_log if r.get("model")})}
+            "returned_models": sorted({str(r["model"]) for r in client.usage_log if r.get("model")})}
     lines = [f"# Separate later run, live ({res['model']}, {res['generated_at']}, commit {res['commit']})", "",
              f"The 20 samples run first, then the {res['total']} adversarial invoices as a new run on the same database.", "",
              f"Caught {res['caught']}/{res['total']}. Missed: {', '.join(res['missed']) or 'none'}. "

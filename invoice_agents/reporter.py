@@ -10,7 +10,7 @@ from rich.table import Table
 
 from .models import InvoiceState, Severity, decided_by_label
 
-STATUS_STYLE = {"APPROVED": "bold green", "REJECTED": "bold red", "PENDING_HUMAN": "bold yellow"}
+STATUS_STYLE = {"APPROVED": "bold green", "REJECTED": "bold red", "PENDING_HUMAN": "bold yellow", "SUPERSEDED": "bold blue"}
 
 
 def money(v: float | None) -> str:
@@ -128,7 +128,9 @@ def summary_line(states: list[InvoiceState]) -> str:
     paid = sum((s.payment or {}).get("amount", 0) for s in states if (s.payment or {}).get("status") == "paid")
     failed = [s for s in states if (s.payment or {}).get("status") == "failed"]
     line = (f"{len(states)} invoice{'' if len(states) == 1 else 's'}: {counts['APPROVED']} approved, "
-            f"{counts['REJECTED']} rejected, {counts['PENDING_HUMAN']} pending human review. Paid this run: {money(paid)}.")
+            f"{counts['REJECTED']} rejected, {counts['PENDING_HUMAN']} pending human review"
+            + (f", {counts['SUPERSEDED']} superseded by a revision" if counts["SUPERSEDED"] else "")
+            + f". Paid this run: {money(paid)}.")
     if failed:
         amt = sum((s.payment or {}).get("amount", 0) for s in failed)
         line += (f" {len(failed)} payment{'' if len(failed) == 1 else 's'} FAILED after retries ({money(amt)} not paid); "
