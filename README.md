@@ -19,7 +19,7 @@ Python 3.11 or newer, no API key, about a minute:
 ```bash
 git clone https://github.com/adamtpang/galatiq.vercel.app galatiq && cd galatiq
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt && python main.py --batch data/invoices --offline
+python -m pip install -r requirements.txt && python main.py --batch data/invoices --offline
 ```
 
 Windows PowerShell: `py -3 -m venv .venv`, then use `.\.venv\Scripts\python.exe` in place of `python`.

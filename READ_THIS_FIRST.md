@@ -6,7 +6,7 @@ hard rules. Live, Grok agents cross-read every invoice, review risk with read-on
 critic, review each rejection (they can only escalate it) and write a memo. Offline, rules stand-ins take their place
 and no model is called. Every decision has reasons and a trace in `runs/`.
 
-**Run it** (Python 3.11+, no API key, after `pip install -r requirements.txt`):
+**Run it** (Python 3.11+, no API key, after `python -m pip install -r requirements.txt`):
 
 ```bash
 python main.py --batch data/invoices --offline  # the 20 case invoices: table, reasons, trace path
