@@ -34,24 +34,28 @@ def dec(r: dict, live: bool = False) -> str:
     return s + ")"
 
 
-DIFFS = """\
-## Where live and offline disagree
+def diffs(off: dict, live: dict) -> list[str]:
+    """Where the two runs disagree, generated from the live reasons so the words match the committed run."""
+    lo = {r["file"]: r for r in live["rows"]}
+    out = ["## Where live and offline disagree", "",
+           "Both runs use the same code and policy. Each line says which way the decision went; the reasons are the "
+           "live VP's own, from `runs/demo/live/summary.json`.", ""]
+    for r in off["rows"]:
+        l = lo[r["file"]]
+        if r["decision"] == l["decision"]:
+            continue
+        why = l["reason"] or "no reason recorded"
+        if l["conditions"]:
+            why += " Conditions: " + "; ".join(l["conditions"])
+        out.append(f"- **{r['file']}**: offline {r['decision']} ({r['payment']}), live {l['decision']} (risk {l['risk']}, "
+                   f"{l['payment']}). Live reason: {why}")
+    out += ["", "Live results are not perfectly repeatable: the live eval run (`evals/results/live.md`) decided some of "
+            "these invoices differently. Re-running the same invoices on the same database with the decision cache gives "
+            "identical decisions (`evals/results/cache_repeatability.md`).", "",
+            "Risk scores differ on most clean invoices because the live risk agent can add points on top of the rule "
+            "score (it can never lower it).", ""]
+    return out
 
-Both runs use the same policy, including the address watch list and the hard hold rules for prompt injection, renamed or lookalike vendors, changed bank details, Grok and parser disagreeing, Grok-rebuilt invoices and unreadable layouts (decisions 8 to 14 in `docs/DECISIONS.md`). In live mode Grok also reads every invoice next to the parser (trace step `grok_cross_check`; all 20 agreed in this run) and writes the memo for every decision, and the risk agent calls three read-only tools (`lookup_vendor`, `query_inventory`, `vendor_history`) before it scores; the calls are in the trace as `tool_call` events. Every difference goes the cautious way: Grok sent an invoice to a human where the offline rules paid it. Neither run paid anything the other refused.
-
-- **invoice_1004_revised.json**: offline pays revision R1 ($5,940.00); its address is the one on file for Precision Parts, so the watch list does not fire (decision 13). The live VP held it (risk 38): the earlier INV-1004 was rejected and R1 cites a PO amendment with no PO number.
-- **invoice_1006.csv**: the live VP held it (risk 20) as the vendor's first recorded invoice with no address in the vendor master, and asked for the remit-to address and bank details to be confirmed. Offline pays.
-- **invoice_1010.txt**: the live VP held it (risk 22) until a buyer confirms the $300 WidgetA rush rate (20% over the $250 catalog price). Offline approves with that check as a payment condition.
-- **invoice_1014.xml**: the live VP held it (risk 18) as the vendor's first payment, billed in EUR with line prices that do not match the USD catalog. Offline pays it in USD at the mock rate.
-
-Live results are not perfectly repeatable. A second live run of the same code (the cache measurement, `evals/results/cache_repeatability.md`) paid 1006, which this demo run held; see the README for the eval run.
-
-Same outcome, by a different path:
-
-- **invoice_1012.pdf**: PENDING_HUMAN in both runs, decided by the vendor-rename hard hold (decision 9) before the VP and critic. Live, the risk agent still ran its tools and raised the risk to 70, but no VP or critic call was made.
-
-Risk scores differ on most clean invoices because the live risk agent can add points on top of the rule score (it can never lower it). None of those increases crossed a threshold except where noted above.
-"""
 
 
 def main() -> None:
@@ -60,10 +64,9 @@ def main() -> None:
     out = [
         "# Run log: all 20 sample invoices",
         "",
-        "Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026. The offline run "
-        f"was regenerated at commit {off.get('commit') or 'see summary.json'} after independent review 2; the live run is "
-        "from the earlier checkpoint 982b14f (branch `live-eval-checkpoints`) and could not be re-run because the xAI "
-        "account is out of credits, so it predates the review 2 changes (for example the rejection review).",
+        f"Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026: "
+        f"offline at commit {off.get('commit')}, live at commit {live.get('commit')} (05a4ef5 only added data and docs "
+        "on top of 4d539d3, so the code is the same).",
         "",
         "- **Offline** (`--offline`): no model is called; the risk review, VP, critic and rejection review are rules stand-ins "
         "(fixed rules written from the agents' prompts), and a template writes the memo: `runs/demo/offline/`",
@@ -88,7 +91,7 @@ def main() -> None:
         n, amt, rej, held = counts(s["rows"])
         out.append("")
         out.append(f"{name}: {n} paid ({money(amt)}), {rej} rejected, {held} held for a human.")
-    out += ["", DIFFS, "## Live reasons (first reason per invoice the VP decided)", "",
+    out += [""] + diffs(off, live) + ["## Live reasons (first reason per invoice the VP decided)", "",
             "| File | Decision | Reason | Conditions |", "|---|---|---|---|"]
     for l in live["rows"]:
         if l["decided_by"] in ("hard_rules", "hard_hold"):

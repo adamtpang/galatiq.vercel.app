@@ -1,7 +1,7 @@
 {
  "model": "grok-4.7",
  "runs": [
-  "cache-1",
+  "live",
   "cache-2"
  ],
  "invoices": 20,
@@ -16,21 +16,21 @@
   "conditions"
  ],
  "first": {
-  "api_calls": 71,
-  "billed_usd": 0.4612,
-  "span_s": 655.7,
+  "api_calls": 83,
+  "billed_usd": 0.6346,
+  "span_s": 844.6,
   "cache_hits": 0,
-  "cache_misses": 43,
+  "cache_misses": 55,
   "models": [
    "grok-4.7"
   ],
-  "approved_usd": 17250.0
+  "approved_usd": 16705.0
  },
  "second": {
   "api_calls": 0,
   "billed_usd": 0.0,
   "span_s": 0.2,
-  "cache_hits": 43,
+  "cache_hits": 55,
   "cache_misses": 0,
   "models": [
    "grok-4.7"
@@ -50,5 +50,9 @@
    4
   ]
  },
+ "commit": [
+  "05a4ef5",
+  "05a4ef5"
+ ],
  "recorded_at": "2026-10-22"
 }

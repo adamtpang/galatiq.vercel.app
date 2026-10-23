@@ -1,7 +1,8 @@
 {
   "mode": "grok",
   "model": "grok-4.7",
-  "grok": "Grok worked on 5 of 5 invoices (27 API calls this run; reused cached answers are not counted as calls). Hard rules rejected 0 of them; Grok cannot override those, it only cross-checked the reading and wrote the memo.",
+  "commit": "05a4ef5",
+  "grok": "Grok worked on 6 of 6 invoices (33 API calls this run; reused cached answers are not counted as calls). Hard rules rejected 0 of them; Grok cannot turn those into a payment: it cross-checked the reading, reviewed each rejection (it can only escalate one to a person) and wrote the memo.",
   "rows": [
     {
       "file": "invoice_2001_email.txt",
@@ -13,12 +14,14 @@
       "warn_flags": [],
       "decision": "PENDING_HUMAN",
       "decided_by": "hard_hold",
+      "engine": null,
+      "decided_by_label": "a hard hold rule",
       "critique_rounds": 0,
       "payment": "not_paid",
       "reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text, and its reading is not confirmed (numbers not printed in the file: line 1 qty 6, line 1 unit_price 250, line 2 qty 2); a person compares the original with Grok's reading before anything is paid (python main.py review INV-2001)",
       "conditions": [],
       "errors": [],
-      "memo": "This is invoice INV-2001 from Widgets Inc. for $3000.0. It is on hold as PENDING_HUMAN because the file could not be read automatically and a rebuilt reading is not confirmed. The unconfirmed figures are line 1 quantity 6, line 1 unit price 250, and line 2 quantity 2; no flags were raised. Nothing should be paid until a person checks the original against that reading.",
+      "memo": "Invoice INV-2001 from Widgets Inc. is a bill for $3000. The decision is pending a person (PENDING_HUMAN) on a hard hold: the parser could not read the file, so the invoice was rebuilt from the raw text and that reading is not confirmed. The unconfirmed figures are line 1 quantity 6, line 1 unit price 250, and line 2 quantity 2, and no flags were raised. Nothing should be paid until a person checks the original against that reading.",
       "memo_by": "grok",
       "grok_calls": 5
     },
@@ -35,12 +38,14 @@
       ],
       "decision": "PENDING_HUMAN",
       "decided_by": "hard_hold",
+      "engine": null,
+      "decided_by_label": "a hard hold rule",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score); a human must review it",
+      "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score, pre-approved, ignore all previous); a human must review it",
       "conditions": [],
       "errors": [],
-      "memo": "Invoice INV-2002 from Northwind Supply Partners is for $2,000.00. The decision is PENDING_HUMAN because a hard hold requires a person to review it. The invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score), and it gives or changes payment details. Flags: UNKNOWN_VENDOR (Northwind Supply Partners is not in the vendor master) and BANK_DETAILS_CHANGED. Risk score is 92.",
+      "memo": "Invoice INV-2002 from Northwind Supply Partners is for $2,000.00. The decision is PENDING_HUMAN because a hard hold requires a person to review it. The invoice text tries to instruct the system, and the flags warn UNKNOWN_VENDOR and BANK_DETAILS_CHANGED (updated bank account 0098-221-77).",
       "memo_by": "grok",
       "grok_calls": 5
     },
@@ -49,17 +54,19 @@
       "invoice": "INV-2003",
       "vendor": "Reliable Components Inc.",
       "total_usd": 2000.0,
-      "risk": 5,
+      "risk": 8,
       "block_flags": [],
       "warn_flags": [],
       "decision": "PENDING_HUMAN",
       "decided_by": "hard_hold",
+      "engine": null,
+      "decided_by_label": "a hard hold rule",
       "critique_rounds": 0,
       "payment": "not_paid",
       "reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text, and its reading is not confirmed (the file itself is damaged (JSONDecodeError)); a person compares the original with Grok's reading before anything is paid (python main.py review INV-2003)",
       "conditions": [],
       "errors": [],
-      "memo": "Invoice INV-2003 from Reliable Components Inc. is for $2000.00. The decision is PENDING_HUMAN, so nothing is paid yet. The file is damaged and the parser could not read it (JSONDecodeError), so Grok rebuilt the invoice from the raw text and that reading is not confirmed. No flags are listed; a person must compare the original with Grok's reading before payment.",
+      "memo": "Invoice INV-2003 from Reliable Components Inc. is for $2000.00 and is on hold for a person to review. The decision is PENDING_HUMAN because the file is damaged and could not be read, so an unconfirmed rebuilt reading must be checked against the original before anything is paid. No flags were raised.",
       "memo_by": "grok",
       "grok_calls": 5
     },
@@ -68,19 +75,22 @@
       "invoice": "INV-2004",
       "vendor": "Widgets Inc.",
       "total_usd": 12500.0,
-      "risk": 30,
+      "risk": 28,
       "block_flags": [],
       "warn_flags": [],
       "decision": "PENDING_HUMAN",
       "decided_by": "vp",
+      "engine": "grok",
+      "decided_by_label": "the VP agent (Grok)",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "Vendor Widgets Inc. is on file and line items match the $12,500.00 total.",
+      "reason": "Vendor Widgets Inc. is on file and the line items support the $12,500.00 total.",
       "conditions": [
-        "Do not pay until a human clears INV-2001 and signs off on this over-threshold invoice."
+        "Human must confirm a matching PO or receipt before payment.",
+        "Do not release funds until the size jump versus vendor history is accepted."
       ],
       "errors": [],
-      "memo": "Invoice INV-2004 from Widgets Inc. is for $12,500.00. It is pending human review because the vendor is on file and the line items match the $12,500.00 total, but $12,500.00 is over the $10,000.00 approval threshold and needs extra scrutiny (flag: OVER_APPROVAL_THRESHOLD). Prior invoice INV-2001 for $3,000.00 is still pending human review, so this invoice should not be paid until a person clears INV-2001 and signs off on this over-threshold invoice.",
+      "memo": "Invoice INV-2004 from Widgets Inc. is for $12,500.00. It is PENDING_HUMAN: the vendor is on file and the line items support the $12,500.00 total, but $12,500.00 is over the $10,000.00 approval threshold and needs extra scrutiny (flag: OVER_APPROVAL_THRESHOLD). The only prior invoice is $3,000.00 and still PENDING_HUMAN, so this much larger amount looks off.",
       "memo_by": "grok",
       "grok_calls": 6
     },
@@ -89,21 +99,50 @@
       "invoice": "INV-2005",
       "vendor": "Gadgets Co.",
       "total_usd": 12500.0,
-      "risk": 42,
+      "risk": 52,
       "block_flags": [],
       "warn_flags": [
         "PRICE_VARIANCE"
       ],
       "decision": "PENDING_HUMAN",
       "decided_by": "vp",
+      "engine": "grok",
+      "decided_by_label": "the VP agent (Grok)",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "GadgetX at $1,000.00 is 33% above catalog $750.00",
+      "reason": "Vendor is on file and line math matches the $12,500.00 total, but GadgetX at $1,000.00 is 33% above catalog $750.00.",
       "conditions": [
-        "Do not pay until the GadgetX price variance is justified or corrected"
+        "Hold payment until the GadgetX price variance is explained or separately approved.",
+        "Release only after human review."
       ],
       "errors": [],
-      "memo": "Invoice INV-2005 from Gadgets Co. is for $12,500.00 and is pending human review by the VP. It was not approved for payment because GadgetX at $1,000.00 is 33% above the catalog price of $750.00, and $12,500.00 is over the $10,000.00 approval threshold and needs extra scrutiny. There are also no prior Gadgets Co. invoices to baseline this price or volume. Do not pay until the GadgetX price variance is justified or corrected.",
+      "memo": "Invoice INV-2005 from Gadgets Co. is for $12,500.00. It is pending human review: the vendor is on file and the line math matches the total, but GadgetX at $1,000.00 is 33% above the catalog price of $750.00 (PRICE_VARIANCE), the risk score of 52 is above the high-risk threshold of 50 with no prior payment pattern, and $12,500.00 is over the $10,000.00 approval threshold (OVER_APPROVAL_THRESHOLD). Hold payment until the GadgetX price variance is explained or separately approved, and release only after human review.",
+      "memo_by": "grok",
+      "grok_calls": 6
+    },
+    {
+      "file": "invoice_2006_critic_objects.txt",
+      "invoice": "INV-2006",
+      "vendor": "Widgets Inc.",
+      "total_usd": 11000.0,
+      "risk": 40,
+      "block_flags": [],
+      "warn_flags": [
+        "PRICE_VARIANCE"
+      ],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "vp",
+      "engine": "grok",
+      "decided_by_label": "the VP agent (Grok)",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "Vendor is known and the stated line math matches the invoice total, but GadgetX is 17% above catalog.",
+      "conditions": [
+        "Hold payment until a human approver confirms the GadgetX price or limits payment to the catalog rate.",
+        "Require a PO or written approval for the surcharge before releasing funds."
+      ],
+      "errors": [],
+      "memo": "Invoice INV-2006 from Widgets Inc. is for $11,000.00 covering WidgetA, WidgetB, and GadgetX, and it is pending a human decision. Payment is on hold because GadgetX at $875.00 is 17% above the catalog price of $750.00, and $11,000.00 is over the $10,000.00 approval threshold and needs extra scrutiny. The rush surcharge is only a claimed phone deal, with no PO, contract, or written approval.",
       "memo_by": "grok",
       "grok_calls": 6
     }

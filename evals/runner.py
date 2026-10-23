@@ -383,6 +383,15 @@ def git_commit() -> str | None:
         return None
 
 
+def agreements(off: dict, live: dict | None) -> list[dict]:
+    """Agreement rows for the summary and the site. The committed-demo-runs row is always recomputed from the
+    committed runs/demo files (the offline result), so it stays right when the demo runs are regenerated after a
+    live eval; the eval-run rows come from the live result."""
+    demo = [a for a in off["agreement"] if a["label"].startswith("committed demo runs")]
+    rest = [a for a in (live or {}).get("agreement", []) if not a["label"].startswith("committed demo runs")]
+    return demo + rest
+
+
 def summary_md(off: dict, live: dict | None) -> str:
     L = [f"# Eval summary", "",
          f"Offline: generated {off['generated_at']}, base commit {off.get('commit')}. "
@@ -396,7 +405,7 @@ def summary_md(off: dict, live: dict | None) -> str:
     o = off["extraction"]["pipeline"]["overall"]
     lv = (f"{frac(lx['pipeline']['overall'])} pipeline; {frac(lx['grok_only']['overall'])} Grok-only" if lx else "-")
     L.append(f"| (a) Extraction: all fields | {frac(o)} | {lv} |")
-    for a in (live or off)["agreement"]:
+    for a in agreements(off, live):
         L.append(f"| (b) Decision agreement, {a['label'].replace('this eval run', 'eval live run')} | - | {a['agree']}/{a['invoices']} ({pct(a['rate'])}) |")
     oa = off["adversarial"]
     la = live["adversarial"] if live else None
@@ -413,8 +422,7 @@ def summary_md(off: dict, live: dict | None) -> str:
                  f"{ou['total'] - ou['rejected']}/{ou['total']} not rejected ({ou['held']} held, {ou['paid']} paid) | "
                  + (f"{lu['read_correctly']}/{lu['total']} read correctly, {lu['paid']}/{lu['total']} paid, "
                     f"{lu['held']} held, {lu['rejected']} rejected" if lu else "-") + " |")
-    routed = live if live and any(a.get("disagreement_routing") for a in live["agreement"]) else off
-    for a in routed["agreement"]:
+    for a in agreements(off, live):
         r = a.get("disagreement_routing")
         if r and "samples" in a["label"]:
             L.append(f"| (b) Disagreement routing (a metric; sending disagreements to a person is a plan, not policy), "
@@ -459,7 +467,11 @@ def detail_md(res: dict) -> str:
         L += ["", f"Grok-only extraction: {c['calls']} calls over {c['files']} files, billed ${c['billed_usd']}, "
                   f"mean {c['wall_s_per_file_mean']}s per file."]
     L += ["", "## (b) Live vs offline decision agreement", ""]
-    for a in res["agreement"]:
+    if res["mode"] == "live":
+        L += ["The committed demo runs (runs/demo/offline vs runs/demo/live) are compared in `offline.md` and "
+              "`summary.md`, recomputed from the committed files each time, so they stay right when the demo runs "
+              "are regenerated. This file covers the eval's own live run.", ""]
+    for a in (x for x in res["agreement"] if res["mode"] != "live" or not x["label"].startswith("committed demo runs")):
         L += [f"**{a['label']}**: {a['agree']}/{a['invoices']} agree ({pct(a['rate'])}).", ""]
         for d in a["disagreements"]:
             L.append(f"- {d['file']}: offline {d['offline']} ({d['offline_by']}, risk {d['offline_risk']}), "
@@ -480,7 +492,8 @@ def detail_md(res: dict) -> str:
               "duplicate checks must use stored history. Rules only (offline): these checks run before any Grok call.", "",
               f"Caught: {sr['caught']}/{sr['total']} ({pct(sr['catch_rate'])}). Missed: {', '.join(sr['missed']) or 'none'}.", "",
               f"3006: {sr['duplicate_3006']['decision']} ({sr['duplicate_3006']['decided_by']}). {sr['duplicate_3006']['reason']}"]
-    routing = [a for a in res["agreement"] if a.get("disagreement_routing")]
+    routing = [a for a in res["agreement"] if a.get("disagreement_routing")
+               and (res["mode"] != "live" or not a["label"].startswith("committed demo runs"))]
     if routing:
         L += ["", "### Repeatability: disagreement routing (a metric, not a policy)", "",
               "If every invoice where live and offline disagree went to a person:", ""]
@@ -596,7 +609,7 @@ def web_summary(off: dict, live: dict | None) -> dict:
                       | {"disagreement_routing": a.get("disagreement_routing")}
                       | {"disagreements": [{"file": d["file"], "offline": d["offline"], "live": d["live"],
                                             "live_reason": (d["live_reasons"] or [""])[0]} for d in a["disagreements"]]}
-                      for a in (live or off)["agreement"]],
+                      for a in agreements(off, live)],
         "separate_run": off.get("adversarial_separate_run") and {
             k: off["adversarial_separate_run"][k] for k in ("caught", "total", "catch_rate", "missed", "duplicate_3006")},
         "separate_run_live": _saved("separate_run_live.json", lambda r: {

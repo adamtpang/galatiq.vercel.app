@@ -269,7 +269,7 @@
       if (i.decision.status === "PENDING_HUMAN") held++;
       if (isFraudBlocked(i)) { fraud += i.total_usd || 0; fraudN++; }
     });
-    $("showing").innerHTML = "Showing <b>" + esc(runName(MODE)) + "</b>, " + (SET === "extra" ? invs.length + " extra test invoices (added, not case data)" : SET === "critic" ? "extra invoice 2004 ($12,500, added, not case data) run on its own, so the critic loop runs" : "20 case invoices") + ", recorded " + esc(fmtWhen(r.recorded_at).full) + ". Same run as the report.";
+    $("showing").innerHTML = "Showing <b>" + esc(runName(MODE)) + "</b>, " + (SET === "extra" ? invs.length + " extra test invoices (added, not case data)" : SET === "critic" ? "extra invoice 2004 ($12,500, added, not case data) run on its own; the critic reviews it only if the VP approves" + (invs.length && invs[0].decision.status !== "APPROVED" && !invs[0].decision.critique_rounds ? " (in this run the VP did not approve, so no critic call was made)" : "") : "20 case invoices") + ", recorded " + esc(fmtWhen(r.recorded_at).full) + ". Same run as the report.";
     $("summary").innerHTML = card(money(paid), "paid · " + nPaid) + card(String(rej), "rejected") + card(String(held), "held") + card(money(fraud), "high-risk blocked · " + fraudN, "Rejected with risk score " + hr() + " or more");
     var o = DATA.runs[key(MODE === "offline" ? "live" : "offline", SET)], diff = [];
     if (o) r.invoices.forEach(function (i) { var j = o.invoices.find(function (x) { return x.file === i.file; }); if (j && j.decision.status !== i.decision.status) diff.push(invNumber(i.number)); });

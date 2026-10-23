@@ -224,6 +224,11 @@ def ingest(path: str | Path, inventory: Inventory, llm: LLMClient | None = None)
 
     if usable(inv):
         state.extraction_mode = "deterministic"
+    elif inv is not None and inv.type_errors:
+        # Wrong value types (a list, object or true/false where a number belongs): keep the parser's reading so the
+        # blocking INVALID_FIELD_TYPE flag stands. No LLM repair: Grok would guess a value and the type errors would
+        # be lost (a guess is worse than a hold, as with NaN).
+        state.extraction_mode = "deterministic"
     elif llm.available:
         problem = parse_error or "parser found no line items or no total"
         try:

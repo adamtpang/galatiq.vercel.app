@@ -273,3 +273,26 @@ def test_grounding_reads_csv_cells_one_by_one():
     assert {1.0, 2.0, 250.0, 500.0, 1250.0} <= printed_numbers(raw)
     # prose keeps thousands commas together: "$1,250.00" is 1250, and no stray 1 or 250 is added
     assert printed_numbers("Total due: $1,250.00") == {1250.0}
+
+
+def test_wrong_types_are_never_repaired_by_grok_live(tmp_path):
+    """Found by the live eval after review 2: with the key set, 3014's wrong types made the parser give up, Grok's
+    repair turned `quantity: true` into 1 and the type errors were lost. A file with wrong types is now kept as the
+    parser read it (INVALID_FIELD_TYPE, blocking), like NaN: a guess is worse than a hold."""
+    from invoice_agents.agents.approval import RejectionReview
+
+    class G(ScriptGrok):
+        def complete_structured(self, schema, messages, max_attempts=3):
+            if schema is RejectionReview:
+                self.schemas.append(schema.__name__)
+                return LLMResult(value=RejectionReview(verdict="agree", reason="ok"), model="fake")
+            return super().complete_structured(schema, messages, max_attempts)
+
+    reading = ExtractedInvoice(invoice_number="INV-3014", vendor="Widgets Inc.", due_date="2026-11-18", total=500.0,
+                               items=[ExtractedItem(name="WidgetB", qty=1, unit_price=500.0)])
+    g = G(reading=reading)
+    st = _run(tmp_path, [INVOICES.parent / "invoices_adversarial" / "invoice_3014_wrong_types.json"], g)[0]
+    assert "ExtractedInvoice" not in g.schemas and st.extraction_mode != "llm_repair"
+    assert "INVALID_FIELD_TYPE" in {f.code for f in st.flags}
+    assert st.decision.status in (DecisionStatus.REJECTED, DecisionStatus.PENDING_HUMAN)
+    assert st.payment["status"] != "paid"

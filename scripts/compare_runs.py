@@ -43,7 +43,8 @@ def main(a: str, b: str, json_out: str | None = None) -> int:
     count = lambda rs, d: sum(r["decision"] == d for r in rs)
     out = [f"# Live re-run with the decision cache: {Path(a).name} vs {Path(b).name}", "",
            f"Model {ra['model']}. Same database, cache on. Decision, decided by, risk, reason, flags and conditions "
-           f"identical for {same} of {len(ra['rows'])} invoices.", "",
+           f"identical for {same} of {len(ra['rows'])} invoices. Code commit {ra.get('commit') or 'not recorded'} "
+           f"(second run {rb.get('commit') or 'not recorded'}).", "",
            "| | first run | second run |", "|---|---|---|",
            f"| Approved / rejected / held | {count(ra['rows'], 'APPROVED')} / {count(ra['rows'], 'REJECTED')} / {count(ra['rows'], 'PENDING_HUMAN')} "
            f"| {count(rb['rows'], 'APPROVED')} / {count(rb['rows'], 'REJECTED')} / {count(rb['rows'], 'PENDING_HUMAN')} |",
@@ -60,7 +61,7 @@ def main(a: str, b: str, json_out: str | None = None) -> int:
             "model": ra["model"], "runs": [Path(a).name, Path(b).name], "invoices": len(ra["rows"]), "identical": same,
             "compared": list(SAME_KEYS), "first": sa | {"approved_usd": round(paid, 2)}, "second": sb,
             "decisions": {k: [count(r["rows"], k) for r in (ra, rb)] for k in ("APPROVED", "REJECTED", "PENDING_HUMAN")},
-            "recorded_at": "2026-10-22"}, indent=1))
+            "commit": [ra.get("commit"), rb.get("commit")], "recorded_at": "2026-10-22"}, indent=1))
     else:
         print("\n".join(out))
     return 0 if same == len(ra["rows"]) else 1

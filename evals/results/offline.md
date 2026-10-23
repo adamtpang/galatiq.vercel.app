@@ -1,6 +1,6 @@
 # Eval results (offline)
 
-Generated 2026-10-22 19:42 CDT, base commit 4d539d3.
+Generated 2026-10-22 21:17 CDT, base commit 05a4ef5.
 
 ## (a) Extraction accuracy
 
@@ -28,30 +28,31 @@ Misses (pipeline):
 
 ## (b) Live vs offline decision agreement
 
-**committed demo runs (runs/demo/offline vs runs/demo/live), 20 samples**: 16/20 agree (80.0%).
+**committed demo runs (runs/demo/offline vs runs/demo/live), 20 samples**: 17/20 agree (85.0%).
 
-- invoice_1004_revised.json: offline APPROVED (vp, risk 0), live PENDING_HUMAN (vp, risk 38). Live reasons: Known vendor and line math match the $5,940.00 total, under the approval threshold.; Prior INV-1004 was rejected at $1,890.00; R1 resubmits the same number at $5,940.00.; Notes cite a PO amendment but give no PO number or amendment identifier.. Conditions: Do not pay until a human confirms the PO amendment and that the prior rejection is cleared.. Grok risk notes: Vendor history shows prior INV-1004 (no revision) status REJECTED at $1,890.00; this R1 resubmits the same invoice number at $5,940.00.; Notes state "Revised invoice - additional items added per PO amendment" but the invoice cites no PO number or amendment identifier.
-- invoice_1006.csv: offline APPROVED (vp, risk 0), live PENDING_HUMAN (vp, risk 20). Live reasons: Vendor is on file and line math matches the $2750 total, under the approval threshold.; First recorded invoice and a null vendor master address are unresolved.; Info lookalike flag (name resembles the buyer) should be cleared by a human before payment.. Conditions: Confirm remit-to address and that bank details match the approved vendor record before release.. Grok risk notes: Vendor history has no earlier invoices for Acme Industrial Supplies (first recorded invoice INV-1006).; Vendor master address is null even though the vendor is approved and bank_on_file is true.
-- invoice_1010.txt: offline APPROVED (vp, risk 10), live PENDING_HUMAN (vp, risk 22). Live reasons: Vendor is on file, but history has no earlier invoices.; WidgetA rush line is 20% above the $250.00 catalog rate.; Price-variance warning should be confirmed before payment.. Conditions: Pay only after a buyer confirms the rush premium was authorized.. Grok risk notes: Vendor master lists Consolidated Materials Group as approved with a bank account on file, but vendor history has no earlier invoices.; Invoice text labels the $300.00 WidgetA line as '(rush order)' while the other WidgetA line is at the $250.00 catalog rate; quantities (8+4) are within stock of 15.
-- invoice_1014.xml: offline APPROVED (vp, risk 0), live PENDING_HUMAN (vp, risk 18). Live reasons: Vendor is on file, but this is the first payment and invoice history is empty.; EUR line prices do not match the USD catalog (WidgetA 225.00 vs 250.0, WidgetB 475.00 vs 500.0).; Currency-conversion warning is open; risk score 18 is below 50 and total_usd 4455.0 is under the approval threshold.. Conditions: Confirm EUR pricing against the purchase order or an updated catalog before release.; Verify bank details on file before the first payment.. Grok risk notes: No earlier invoices for TechParts International (vendor_history empty), so this is a first payment despite the vendor being approved with a bank on file.; Line prices are EUR (WidgetA 225.00, WidgetB 475.00) while catalog prices are USD (WidgetA 250.0, WidgetB 500.0); quantities 4 and 6 are within stock (15 and 10).
+- invoice_1001.txt: offline APPROVED (vp, risk 0), live PENDING_HUMAN (vp, risk 12). Live reasons: Vendor Widgets Inc. is on file and the invoice total is 5000.0 USD.; Line quantities and unit prices are consistent with that total.; Info flag TERMS_MISMATCH: Net 15 does not match a due date 17 days after issue.. Conditions: Confirm whether payment is Net 15 or due 2026-02-01 before release.
+- invoice_1004_revised.json: offline APPROVED (vp, risk 0), live PENDING_HUMAN (vp, risk 42). Live reasons: Vendor is on file and catalog prices match, but prior INV-1004 was rejected at $1,890.00.; R1 resubmits the same invoice number at $5,940.00 with no PO or amendment reference.; Risk score 42 is under the high-risk cutoff, yet the unsupported amount jump needs review.. Conditions: Do not pay until a human confirms the PO amendment and that the prior rejection is cleared.. Grok risk notes: Vendor history shows prior INV-1004 (revision null) status REJECTED at $1,890.00; this R1 resubmits the same invoice number at $5,940.00.; Notes state "Revised invoice - additional items added per PO amendment" but cite no PO number or amendment reference. Catalog unit prices match (WidgetA 250, WidgetB 500, GadgetX 750) and the vendor is approved with address and bank on file.
+- invoice_1010.txt: offline APPROVED (vp, risk 10), live PENDING_HUMAN (vp, risk 30). Live reasons: Vendor Consolidated Materials Group is on file.; Invoice math is clean and total is 7185.00 USD, under the approval threshold.; WidgetA rush line is 20% above catalog ($300.00 vs $250.00); risk score 30.. Conditions: Confirm the rush-order premium is authorized before payment.
 
-**eval live run (2026-10-22 18:34 CDT) vs this offline run, samples (20)**: 17/20 agree (85.0%).
+**eval live run (2026-10-22 20:28 CDT) vs this offline run, samples (20)**: 17/20 agree (85.0%).
 
-- invoice_1004_revised.json: offline APPROVED (vp, risk 0), live PENDING_HUMAN (vp, risk 40). Live reasons: Known vendor and catalog prices match, but prior INV-1004 was rejected and R1 raises the total from $1,890.00 to $5,940.00.; Notes cite a PO amendment, yet no PO number or amendment reference is provided.. Conditions: Pay only after a human confirms the PO amendment and that the prior rejection is cleared.. Grok risk notes: Vendor history shows prior INV-1004 (revision null, total $1,890.00) status REJECTED; this R1 resubmits the same invoice number.; Notes claim "Revised invoice - additional items added per PO amendment" but the invoice text gives no PO number or amendment reference to support that claim.; Unit prices on the invoice match catalog: WidgetA $250.00, WidgetB $500.00, GadgetX $750.00.
-- invoice_1010.txt: offline APPROVED (vp, risk 10), live PENDING_HUMAN (vp, risk 30). Live reasons: Vendor is on file and the invoice total is under the approval threshold.; WidgetA is billed at catalog on one line and 20% above catalog on a partial rush line, not as a separate fee.; No prior invoices exist to support this partial rush premium.. Conditions: Confirm the rush authorization and price variance before releasing payment.. Grok risk notes: Same invoice prices WidgetA at catalog $250.00 (qty 8, amount $2,000.00) and at $300.00 as 'WidgetA (rush order)' (qty 4, amount $1,200.00); the premium is not a separate fee and applies only to part of the quantity.; Vendor history has no earlier invoices for Consolidated Materials Group, so the partial rush premium has no prior billing pattern to compare.
-- invoice_1014.xml: offline APPROVED (vp, risk 0), live PENDING_HUMAN (vp, risk 15). Live reasons: Vendor TechParts International is on file and the billed total matches the invoice.; No earlier invoices are on file for this vendor.; EUR unit prices do not line up with USD catalog prices; currency conversion is already flagged.. Conditions: Confirm EUR unit prices against the USD catalog before payment.; Pay only the approved EUR total after that check.. Grok risk notes: No earlier invoices on file for TechParts International.; Catalog prices are USD (WidgetA 250.00, WidgetB 500.00) while billed unit prices are EUR (225.00 and 475.00); currency conversion is already flagged.
+- invoice_1004_revised.json: offline APPROVED (vp, risk 0), live PENDING_HUMAN (vp, risk 45). Live reasons: Vendor is on file and the stated total matches the line items plus tax, but prior INV-1004 was rejected at $1,890.00.; R1 resubmits the same invoice number at $5,940.00 with no PO number or amendment identifier for the claimed added items.; Risk score 45 is below the high-risk cutoff, yet the unsupported revision increase needs human review.. Conditions: Pay only after a valid PO amendment covering the added items is confirmed and the prior rejection is cleared.. Grok risk notes: Vendor history shows prior INV-1004 (revision null) status REJECTED at $1,890.00; this document resubmits the same invoice number as revision R1 at $5,940.00.; Notes claim "Revised invoice - additional items added per PO amendment" but the invoice cites no PO number or amendment identifier to support that claim.
+- invoice_1010.txt: offline APPROVED (vp, risk 10), live PENDING_HUMAN (vp, risk 28). Live reasons: Vendor is on file and the invoice total matches the authoritative amount.; WidgetA is billed at two rates, with the rush line 20% above catalog and no rush authorization or PO referenced.; Risk score is below the high-risk cutoff, so this is a documentation issue for a human rather than a hard reject.. Conditions: Confirm a PO or written rush authorization before paying the premium line.; Release payment only after that authorization is on file.. Grok risk notes: Same SKU billed at two rates on one invoice: WidgetA 8 @ $250.00 and 'WidgetA (rush order)' 4 @ $300.00; the premium is only labeled in the line description, with no rush authorization or PO referenced in the invoice text.
+- invoice_1014.xml: offline APPROVED (vp, risk 0), live PENDING_HUMAN (vp, risk 20). Live reasons: Vendor is on file, but there are no earlier invoices to compare.; WidgetB converts to 513 USD, above the 500 USD catalog price.; EUR conversion is only a warning and the total is under the approval threshold, but the price variance needs review.. Conditions: Confirm the WidgetB price exception against catalog before payment.. Grok risk notes: No earlier invoices on file for TechParts International (vendor_history empty), so there is no prior payment pattern to compare.; WidgetB unit_price 475.00 EUR (invoice line item) is above catalog_unit_price_usd 500.0 at the facts mock rate 1.08 (475 EUR converts to 513 USD). WidgetA unit_price 225.00 EUR converts to 243 USD, below catalog 250.0 USD. Quantities are within stock (WidgetA stock 15, WidgetB stock 10).
 
-**eval live run (2026-10-22 18:34 CDT) vs this offline run, adversarial (15)**: 8/8 agree (100.0%).
-
-
-**eval live run (2026-10-22 18:34 CDT) vs this offline run, extra (6)**: 5/5 agree (100.0%).
+**eval live run (2026-10-22 20:28 CDT) vs this offline run, adversarial (15)**: 15/15 agree (100.0%).
 
 
-**eval live run (2026-10-22 18:34 CDT) vs this offline run, unseen (4)**: 1/4 agree (25.0%).
+**eval live run (2026-10-22 20:28 CDT) vs this offline run, extra (6)**: 5/6 agree (83.3%).
 
-- invoice_4001_supplier_at.txt: offline PENDING_HUMAN (hard_hold, risk 25), live APPROVED (vp, risk 5). Live reasons: Vendor Widgets Inc. is on file; Line items reconcile to the 1000.00 USD total; Risk score is 5, far below the high-risk threshold
-- invoice_4002_pipe_table.txt: offline PENDING_HUMAN (hard_hold, risk 25), live APPROVED (vp, risk 5). Live reasons: Vendor Reliable Components Inc. is on file.; Line items reconcile to the invoice total of 2250.00 USD.; Risk score 5 is low and the only flag is informational.
-- invoice_4003_prose_email.txt: offline PENDING_HUMAN (hard_hold, risk 0), live APPROVED (vp, risk 5). Live reasons: Vendor Atlas Industrial Supply is on file; Line math is clean: 4 × $500.00 equals the $2,000.00 total; Risk score 5 is far below the high-risk threshold and no risk reasons were raised
+- invoice_2006_critic_objects.txt: offline REJECTED (vp+critic, risk 30), live PENDING_HUMAN (vp, risk 55). Live reasons: GadgetX is 17% above catalog with no written support for the claimed phone surcharge.; Risk score 55 exceeds the high-risk threshold, with urgent wording that conflicts with Net 30 terms.; Amount is over the $10,000 approval threshold and needs extra scrutiny.. Conditions: Do not pay the GadgetX premium until a written surcharge agreement is on file.; Honor Net 30; do not release payment immediately.. Grok risk notes: Notes claim a premium with no written support: "GadgetX carries the rush production surcharge agreed by phone." Catalog price for GadgetX is $750.00 and vendor master shows no such surcharge.; Stated terms conflict with the payment demand: Payment Terms are "Net 30" but Notes say "Please process payment immediately so we can release the shipment."
+
+**eval live run (2026-10-22 20:28 CDT) vs this offline run, unseen (4)**: 0/4 agree (0.0%).
+
+- invoice_4001_supplier_at.txt: offline PENDING_HUMAN (hard_hold, risk 25), live APPROVED (vp, risk 5). Live reasons: Vendor Widgets Inc. is on file; Line items sum exactly to the $1,000 total; Risk score 5 is far below the high-risk threshold and no risk reasons were raised. Conditions: Pay Net 30 per the invoice terms
+- invoice_4002_pipe_table.txt: offline PENDING_HUMAN (hard_hold, risk 25), live APPROVED (vp, risk 5). Live reasons: Vendor Reliable Components Inc. is on file.; Line math reconciles to the invoice total of 2250 USD.; Risk score is low and the amount is well under the approval threshold.
+- invoice_4003_prose_email.txt: offline PENDING_HUMAN (hard_hold, risk 0), live APPROVED (vp, risk 8). Live reasons: Vendor Atlas Industrial Supply is on file; Line math is clean: 4 × $500 equals the $2,000 total; Risk score 8 is well below the high-risk threshold and the amount is under the approval limit
+- invoice_4004_odd_headers.csv: offline PENDING_HUMAN (hard_hold, risk 0), live APPROVED (vp, risk 5). Live reasons: Vendor Summit Manufacturing Co. is on file.; Line math is clean: 1×250 + 2×500 equals the 1250 total.; Risk score 5 is far below the high-risk cutoff and the amount is under the approval threshold.
 
 ## (c) Adversarial set
 
@@ -81,17 +82,17 @@ The samples run first; the adversarial set runs later as its own run on the same
 
 Caught: 15/15 (100.0%). Missed: none.
 
-3006: REJECTED (hard_rules). DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-22 7:42 PM CDT) under a different number (INV-1101)
+3006: REJECTED (hard_rules). DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-22 9:17 PM CDT) under a different number (INV-1101)
 
 ### Repeatability: disagreement routing (a metric, not a policy)
 
 If every invoice where live and offline disagree went to a person:
 
-- committed demo runs (runs/demo/offline vs runs/demo/live), 20 samples: 4 of 20 to a person; paid on one side only: invoice_1004_revised.json paid by offline ($5,940.00); invoice_1006.csv paid by offline ($2,750.00); invoice_1010.txt paid by offline ($7,185.00); invoice_1014.xml paid by offline ($4,455.00); approved by both: 3.
-- eval live run (2026-10-22 18:34 CDT) vs this offline run, samples (20): 3 of 20 to a person; paid on one side only: invoice_1004_revised.json paid by offline ($5,940.00); invoice_1010.txt paid by offline ($7,185.00); invoice_1014.xml paid by offline ($4,455.00); approved by both: 4.
-- eval live run (2026-10-22 18:34 CDT) vs this offline run, adversarial (15): 0 of 8 to a person; paid on one side only: none; approved by both: 0.
-- eval live run (2026-10-22 18:34 CDT) vs this offline run, extra (6): 0 of 5 to a person; paid on one side only: none; approved by both: 1.
-- eval live run (2026-10-22 18:34 CDT) vs this offline run, unseen (4): 3 of 4 to a person; paid on one side only: invoice_4001_supplier_at.txt paid by live ($1,000.00); invoice_4002_pipe_table.txt paid by live ($2,250.00); invoice_4003_prose_email.txt paid by live ($2,000.00); approved by both: 0.
+- committed demo runs (runs/demo/offline vs runs/demo/live), 20 samples: 3 of 20 to a person; paid on one side only: invoice_1001.txt paid by offline ($5,000.00); invoice_1004_revised.json paid by offline ($5,940.00); invoice_1010.txt paid by offline ($7,185.00); approved by both: 4.
+- eval live run (2026-10-22 20:28 CDT) vs this offline run, samples (20): 3 of 20 to a person; paid on one side only: invoice_1004_revised.json paid by offline ($5,940.00); invoice_1010.txt paid by offline ($7,185.00); invoice_1014.xml paid by offline ($4,455.00); approved by both: 4.
+- eval live run (2026-10-22 20:28 CDT) vs this offline run, adversarial (15): 0 of 15 to a person; paid on one side only: none; approved by both: 0.
+- eval live run (2026-10-22 20:28 CDT) vs this offline run, extra (6): 1 of 6 to a person; paid on one side only: none; approved by both: 1.
+- eval live run (2026-10-22 20:28 CDT) vs this offline run, unseen (4): 4 of 4 to a person; paid on one side only: invoice_4001_supplier_at.txt paid by live ($1,000.00); invoice_4002_pipe_table.txt paid by live ($2,250.00); invoice_4003_prose_email.txt paid by live ($2,000.00); invoice_4004_odd_headers.csv paid by live ($1,250.00); approved by both: 0.
 
 ## (e) Unseen layouts
 
@@ -110,55 +111,55 @@ Rejected 0, held 4, paid 0, read correctly 0 of 4; met the expectation: 4/4.
 
 | Batch | Invoices | LLM calls | Prompt (cached) | Completion | Reasoning | Billed USD | List price USD | Latency mean per invoice | Batch wall s |
 |---|---|---|---|---|---|---|---|---|---|
-| samples | 20 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 4.9 ms | 0.24 |
+| samples | 20 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 4.7 ms | 0.23 |
 | adversarial | 15 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 2.0 ms | 0.09 |
-| extra | 6 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 2.2 ms | 0.04 |
-| unseen | 4 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 2.3 ms | 0.03 |
+| extra | 6 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 1.8 ms | 0.04 |
+| unseen | 4 | 0 | 0 (0) | 0 | 0 | 0.0000 | 0.0000 | 2.1 ms | 0.03 |
 
 | File | Decision | Calls | Tools | Prompt | Completion | Reasoning | Billed USD | Latency s |
 |---|---|---|---|---|---|---|---|---|
-| invoice_1001.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.007 |
-| invoice_1002.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
+| invoice_1001.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.009 |
+| invoice_1002.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_1003.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_1004.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_1004_revised.json | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
+| invoice_1004_revised.json | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
 | invoice_1005.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_1006.csv | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
 | invoice_1007.csv | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.005 |
-| invoice_1008.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.004 |
-| invoice_1009.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
-| invoice_1010.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
-| invoice_1011.pdf | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.013 |
+| invoice_1008.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
+| invoice_1009.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
+| invoice_1010.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.004 |
+| invoice_1011.pdf | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.014 |
 | invoice_1011.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_1012.pdf | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.019 |
+| invoice_1012.pdf | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.018 |
 | invoice_1012.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
 | invoice_1013.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_1013.pdf | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.019 |
-| invoice_1014.xml | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
-| invoice_1015.csv | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.004 |
+| invoice_1013.pdf | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.018 |
+| invoice_1014.xml | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
+| invoice_1015.csv | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
 | invoice_1016.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_3001_injection_note.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
-| invoice_3002_injection_reworded.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
+| invoice_3001_injection_note.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
+| invoice_3002_injection_reworded.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
 | invoice_3003_lookalike_vendor.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_3004_renamed_vendor.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
+| invoice_3004_renamed_vendor.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
 | invoice_3005_just_under_limit.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_3006_duplicate_new_number.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
-| invoice_3007_watchlist_address.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_3008_bank_details_change.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
+| invoice_3006_duplicate_new_number.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
+| invoice_3007_watchlist_address.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
+| invoice_3008_bank_details_change.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
 | invoice_3009_moved_banks.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_3010_system_precleared.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
 | invoice_3011_assistant_final_answer.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_3012_fence_close.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_3013_notes_list.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
+| invoice_3012_fence_close.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.004 |
+| invoice_3013_notes_list.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
 | invoice_3014_wrong_types.json | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_3015_wire_change.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
+| invoice_3015_wire_change.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_2001_email.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_2002_injection.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_2003_truncated.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_2004_over_limit_clean.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.003 |
+| invoice_2003_truncated.json | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
+| invoice_2004_over_limit_clean.txt | APPROVED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_2005_over_limit_price.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_2006_critic_objects.txt | REJECTED | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
 | invoice_4001_supplier_at.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_4002_pipe_table.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
-| invoice_4003_prose_email.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.004 |
-| invoice_4004_odd_headers.csv | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.002 |
+| invoice_4002_pipe_table.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.004 |
+| invoice_4003_prose_email.txt | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
+| invoice_4004_odd_headers.csv | PENDING_HUMAN | 0 | 0 | 0 | 0 | 0 | 0.0 | 0.001 |
