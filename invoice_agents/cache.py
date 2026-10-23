@@ -30,6 +30,7 @@ from typing import Any
 
 from . import ROOT
 from .llm import LLMResult
+from .file_io import read_invoice_bytes
 
 TEXT_SUFFIXES = {".txt", ".json", ".csv", ".xml", ".md", ".eml"}
 SCHEMA = ("CREATE TABLE IF NOT EXISTS llm_cache (cache_key TEXT NOT NULL, slot TEXT NOT NULL, output TEXT NOT NULL, "
@@ -42,7 +43,7 @@ def _sha(b: bytes) -> str:
 
 def normalized_content(path: str | Path) -> bytes:
     p = Path(path)
-    data = p.read_bytes()
+    data = read_invoice_bytes(p)
     if p.suffix.lower() in TEXT_SUFFIXES:
         text = data.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
         data = "\n".join(line.rstrip() for line in text.split("\n")).strip().encode()

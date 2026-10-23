@@ -29,7 +29,8 @@ injections are all held offline.
 
 **Honest limits**
 
-- The full live runs predate the review 3 fixes and decisions 22 to 24; only spot checks were run live after them.
+- The full live runs predate the review 3 fixes, decisions 22 to 24, and submission-audit payment and condition guards.
+  Later evidence is offline/scripted, apart from the documented earlier live spot checks.
 - Offline injection and bank-change detection is pattern-based; live, Grok is the real reader.
 - The critic has never been seen to object live. On five invoices written for it (2005 to 2009) the Grok VP held
   first; the objection and revise loop is shown only offline with rules stand-ins.

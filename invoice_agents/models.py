@@ -73,7 +73,7 @@ class DecisionStatus(str, Enum):
 class Decision(BaseModel):
     status: DecisionStatus
     reasons: list[str] = Field(default_factory=list)
-    conditions: list[str] = Field(default_factory=list)
+    conditions: list[str] = Field(default_factory=list, description="Unresolved prerequisites blocking payment")
     risk_score: int | None = Field(default=None, ge=0, le=100)
     critique_rounds: int = 0
     decided_by: str = "unknown"   # hard_rules | hard_hold | rejection_review | vp | vp+critic | deadlock | human | error | payment_guard

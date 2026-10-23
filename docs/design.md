@@ -29,7 +29,7 @@ A LangGraph `StateGraph` (`invoice_agents/graph.py`) passes one typed `InvoiceSt
 - The address watch list is two addresses; it skips a vendor's own address on file.
 - FX is a fixed mock table, display only; non-USD invoices are held.
 - Batch order is filename order, so the first copy of a duplicate is the original.
-- Payment conditions are recorded, not enforced; anything that must block is a hold.
+- Payment conditions are unresolved prerequisites and block payment until a human confirms them. Reasons hold nonblocking explanations.
 - INV-1004 passes validation but is superseded by R1, which is paid offline.
 - A Net-terms mismatch is info only; past-due dates are a display-only warning.
 - Stock is not decremented across invoices in a batch.
@@ -60,4 +60,13 @@ Not estimated: fraud losses avoided and early-payment discounts.
 
 ## Testing
 
-`pytest` runs the offline suite in about 25 seconds with no network: parsers, every validation check, payment idempotency and chaos, the review queue and UI, approval rules, hard holds, the critic loop, a golden test pinning every sample's decision, the evals, the reviewers' own repro files, and ruff and mypy (`tests/test_static_checks.py`). `make check` runs the same lint, type check and tests. `pytest -m live` makes one real Grok call. CI runs on Python 3.11 and 3.12. A Dockerfile runs the offline batch.
+Both automatic and human payment routes use `PaymentAgent.pay`, including recovery. The review queue stores a
+version and the authorized USD amount. Resolving a review uses an atomic pending/version check; the payment claim
+checks persistent authorization under a SQLite write lock. Automatic retries also claim their queue entry before
+calling the bank. Human rejections persist across reruns. Unknown outcomes cannot be retried through the UI or CLI;
+they require external reconciliation, for which this mock prototype has no automated settlement connector.
+
+All invoice reads, including batch prescan, both PDF engines and cache hashing, share a bounded 10 MB loader.
+Docker excludes local handoff context, agent directories, credentials and evaluation scratch files.
+
+`pytest` runs the offline suite without external services: parsers, every validation check, payment idempotency and chaos, the review queue and localhost UI, approval rules, hard holds, the critic loop, a golden test pinning every sample's decision, the evals, adversarial regressions, and ruff and mypy (`tests/test_static_checks.py`). `tests/test_submission_safety.py` covers rejection persistence, failed and uncertain human payments, competing reviews, stale review versions, conditional approvals and input/payment boundaries. `make check` runs the same lint, type check and tests. `pytest -m live` makes one real Grok call. CI runs on Python 3.11 and 3.12. A Dockerfile runs the offline batch.

@@ -53,7 +53,7 @@ def test_queue_lists_held_invoices(server):
 
 def test_approve_pays_and_writes_audit_log(server):
     srv, db, url = server
-    r = post(url, {"token": srv.token, "id": queue_id(db, "INV-1012"), "action": "approve", "note": "called vendor"})
+    r = post(url, {"token": srv.token, "id": queue_id(db, "INV-1012"), "version": 0, "action": "approve", "note": "called vendor"})
     assert r.status == 303 and "paid" in urllib.parse.unquote(r.headers["Location"])
     with connect(db) as c:
         assert c.execute("SELECT status FROM payments WHERE invoice_number='INV-1012'").fetchone()[0] == "paid"
@@ -64,7 +64,7 @@ def test_approve_pays_and_writes_audit_log(server):
 
 def test_reject_logs_and_does_not_pay(server):
     srv, db, url = server
-    r = post(url, {"token": srv.token, "id": queue_id(db, "INV-1012"), "action": "reject", "note": "no"})
+    r = post(url, {"token": srv.token, "id": queue_id(db, "INV-1012"), "version": 0, "action": "reject", "note": "no"})
     assert r.status == 303
     with connect(db) as c:
         assert c.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0
@@ -84,7 +84,7 @@ def test_unreadable_file_cannot_be_approved(server):
     srv, db, url = server
     with connect(db) as c:
         rid = c.execute("SELECT id FROM review_queue WHERE source_file LIKE '%2003%'").fetchone()[0]
-    r = post(url, {"token": srv.token, "id": rid, "action": "approve"})
+    r = post(url, {"token": srv.token, "id": rid, "version": 0, "action": "approve"})
     assert "No payable amount" in urllib.parse.unquote(r.headers["Location"])
     with connect(db) as c:
         assert c.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0
@@ -96,3 +96,15 @@ def test_foreign_host_header_is_refused(server):
     with pytest.raises(urllib.error.HTTPError) as ex:
         urllib.request.urlopen(req)
     assert ex.value.code == 403
+
+
+@pytest.mark.parametrize("version", [None, "-1"])
+def test_missing_or_stale_review_version_cannot_pay(server, version):
+    srv, db, url = server
+    form = {"token": srv.token, "id": queue_id(db, "INV-1012"), "action": "approve"}
+    if version is not None:
+        form["version"] = version
+    result = post(url, form)
+    assert "reload" in urllib.parse.unquote(result.headers["Location"])
+    with connect(db) as conn:
+        assert conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0] == 0

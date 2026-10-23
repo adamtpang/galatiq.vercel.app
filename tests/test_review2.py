@@ -221,9 +221,9 @@ def test_payment_refuses_blocking_flags_unless_a_person_approved(conn):
     flag = Flag(code="STOCK_EXCEEDED", severity=Severity.BLOCK, message="x")
     st = PaymentAgent(conn, bank=bank).pay(_approved(flags=[flag]))
     assert calls == [] and st.decision.status == DecisionStatus.PENDING_HUMAN
-    human = _approved(flags=[flag])
-    human.decision.decided_by = "human"
-    assert PaymentAgent(conn, bank=bank).pay(human).payment["status"] == "paid" and calls == [500.0]
+    from invoice_agents import hitl
+    human = hitl.decide(conn, hitl.pending(conn)[0], True, "Stock confirmed", payments=PaymentAgent(conn, bank=bank))
+    assert human.payment["status"] == "paid" and calls == [500.0]
 
 
 def test_payment_never_pays_a_foreign_amount_as_dollars(conn):

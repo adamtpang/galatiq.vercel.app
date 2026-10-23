@@ -123,7 +123,8 @@ def test_sku_normalizer(raw, sku, method):
 
 
 def test_edge_files_are_rejected_not_crashing(tmp_path, inventory, policy):
-    from invoice_agents.agents.ingestion import MAX_BYTES, ingest
+    from invoice_agents.agents.ingestion import ingest
+    from invoice_agents.file_io import MAX_BYTES
     from invoice_agents.validation import validate
     (tmp_path / "empty.txt").write_text("")
     (tmp_path / "lunch.txt").write_text("Lunch is at noon on Friday.\n")

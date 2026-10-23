@@ -1,5 +1,8 @@
 .git
 .github
+CODEX_CONTEXT.md
+.codex
+.agents
 .venv
 venv
 .env

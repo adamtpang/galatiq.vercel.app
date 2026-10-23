@@ -45,7 +45,7 @@ python main.py review                                          # the human revie
 python main.py ui                                              # the review queue in the browser (127.0.0.1:8765)
 python main.py --batch data/invoices --mode live               # Grok agents (needs XAI_API_KEY)
 python -m evals                                                # five evals offline, about a second
-pytest                                                         # 441 offline tests, including lint and types
+pytest                                                         # offline tests, including lint and types
 make check                                                     # ruff, mypy and the tests (scripts/check.sh)
 ```
 
@@ -71,7 +71,7 @@ The [acceptance checklist](docs/acceptance.md) maps the brief to the implementat
 - Live cost on the 20 samples: 85 Grok calls, $0.6575, 38.9 s per invoice. A cached re-run gave identical decisions
   with 0 calls.
 
-The full live runs were made on Oct 22, 2026 at commit 05a4ef5, before the review 3 fixes and decisions 22 to 24;
+The full live runs were made on Oct 22, 2026 at commit 05a4ef5, before the review 3 fixes, decisions 22 to 24, and submission-audit payment and condition guards;
 see [docs/evals.md](docs/evals.md) for the spot checks since.
 
 ## Design
@@ -90,6 +90,12 @@ file ─▶ Ingest ─▶ Validate ─▶ Risk ─▶ Approve ─▶ Memo ─▶
   error or a blocking flag. A payment still failing after 3 retries is queued.
 - **A person approving is not one click.** The reviewer types the amount when the numbers do not add up or the
   currency is not USD, and over $10,000 needs a second confirmation (decisions 21 and 23).
+- **Review decisions persist.** A human rejection blocks later automatic payment. Reviews use an atomic version
+  check and bind the approved USD amount, so stale or competing requests cannot authorize another amount.
+- **Payment recovery is shared.** Automatic and human approvals use the same payment path. Failed attempts remain
+  queued for retry; unknown outcomes remain queued for bank reconciliation and cannot be approved again blindly.
+- **Conditions block payment.** Unresolved VP prerequisites go to a person. Human approval confirms them and records
+  them in the audit log. Nonblocking explanations belong in the decision's reasons.
 - **Prompt hygiene.** Invoice text is fenced as data. **Offline, injection detection is pattern-based**: it catches
   the wordings it was written for, not every wording. **Live, Grok is the real reader.**
 - **Two loops.** Extraction self-corrects (Pydantic errors back to Grok, up to 3 attempts). The critic reviews VP
@@ -109,7 +115,8 @@ architecture, assumptions and the production plan: [docs/design.md](docs/design.
   only offline, with rules stand-ins (2005, 2006).
 - **The extraction retry** is proven only with a scripted model; Grok's first answer has always passed live.
 - **The live rejection review escalated once** (3014); otherwise it agreed with every rejection.
-- **Newer than the full live runs:** the review 3 fixes and decisions 22 to 24, checked live only by spot checks.
+- **Newer than the full live runs:** the review 3 fixes and decisions 22 to 24 had limited live spot checks.
+  Submission-audit payment and condition guards are verified offline/scripted only.
 - **Overfitting.** Parsers, vendor master, watch list and patterns were written while looking at these files. The
   adversarial and unseen sets test generalization, and they are small.
 - **Known, not fixed:** stock is not decremented across a batch; `vendor_history` shows earlier rejections without the

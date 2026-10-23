@@ -54,7 +54,9 @@ GUARDRAILS = (
 class VPOpinion(BaseModel):
     decision: Literal["approve", "reject", "hold"] = Field(description="hold = send to a human")
     reasons: list[str] = Field(min_length=1, max_length=3)
-    conditions: list[str] = Field(default_factory=list)
+    conditions: list[str] = Field(default_factory=list, description=(
+        "Unresolved prerequisites that must be confirmed by a human before payment. "
+        "Leave empty for unconditional approval; put nonblocking explanations in reasons."))
 
 
 class CriticOpinion(BaseModel):
@@ -492,6 +494,9 @@ def approve(state: InvoiceState, llm: LLMClient, policy: dict[str, Any]) -> Invo
     else:
         vp, critic, reviewer = OfflineVP(), OfflineCritic(), OfflineRejectionReviewer()
     d = price_hold(state, decide(state, vp, critic, policy, reviewer), policy)
+    if d.status == DecisionStatus.APPROVED and d.conditions:
+        d.status = DecisionStatus.PENDING_HUMAN
+        d.reasons = ["Payment prerequisites require human confirmation: " + "; ".join(d.conditions)] + d.reasons
     state.decision = d
     state.trace.append(TraceEvent(agent=AGENT, step="decide", detail=d.model_dump(mode="json")))
     return pin_check(state, llm, policy)

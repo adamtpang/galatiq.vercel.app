@@ -51,7 +51,8 @@ def _money(st: dict) -> str:
 
 
 def _buttons(row: sqlite3.Row, st: dict, token: str) -> str:
-    ok = payable(st)
+    uncertain = (row["reason"] or "").startswith("PAYMENT_UNCERTAIN:")
+    ok = payable(st) and not uncertain
     extra = ""
     if ok:
         try:
@@ -69,10 +70,13 @@ def _buttons(row: sqlite3.Row, st: dict, token: str) -> str:
         if need or (isinstance(amt, (int, float)) and amt > hitl.CONFIRM_OVER):
             extra += (f'<br><label class="r"><input type="checkbox" name="confirm_large" value="1"> I confirm paying '
                       f'over ${hitl.CONFIRM_OVER:,.0f} (needed above that amount)</label><br>')
-    approve = (f'{extra}<button class="ok" name="action" value="approve">Approve and pay</button>' if ok else
+    approve = ('<span class="r">Payment outcome unknown. Reconcile with the bank before paying again.</span><br>'
+               if uncertain else f'{extra}<button class="ok" name="action" value="approve">Approve and pay</button>' if ok else
                '<span class="r">No payable amount was read, so it cannot be approved here; reject it or enter it by hand.</span><br>')
     return (f'<form method="post" action="/decide"><input type="hidden" name="token" value="{e(token)}">'
-            f'<input type="hidden" name="id" value="{row["id"]}"><input name="note" placeholder="Note (optional)" size="28"> '
+            f'<input type="hidden" name="id" value="{row["id"]}">'
+            f'<input type="hidden" name="version" value="{row["version"]}">'
+            '<input name="note" placeholder="Note (optional)" size="28"> '
             f'{approve}<button class="no" name="action" value="reject">Reject</button></form>')
 
 
@@ -185,6 +189,8 @@ def make_server(db: str | Path | None = None, host: str = "127.0.0.1", port: int
                     msg = "That invoice is no longer in the queue."
                 else:
                     try:
+                        if form.get("version") != str(row["version"]):
+                            raise ValueError("This review changed; reload it before deciding")
                         raw_amt = (form.get("amount") or "").replace("$", "").replace(",", "").strip()
                         try:
                             amount = float(raw_amt) if raw_amt else None

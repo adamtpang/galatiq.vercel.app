@@ -116,7 +116,8 @@ def test_review_ui_server_enforces_the_amount(queued_9121, tmp_path):
                 return None
 
         def post(**form):
-            data = urllib.parse.urlencode({"token": srv.token, "id": row["id"], "action": "approve", **form}).encode()
+            data = urllib.parse.urlencode({"token": srv.token, "id": row["id"], "version": row["version"],
+                                           "action": "approve", **form}).encode()
             try:
                 urllib.request.build_opener(NoRedirect).open(url, data)
             except urllib.error.HTTPError as e:
@@ -267,7 +268,7 @@ def test_review_ui_server_refuses_an_off_invoice_amount(queued_9121, tmp_path):
         class NoRedirect(urllib.request.HTTPRedirectHandler):
             def redirect_request(self, *a, **k):
                 return None
-        data = urllib.parse.urlencode({"token": srv.token, "id": row["id"], "action": "approve",
+        data = urllib.parse.urlencode({"token": srv.token, "id": row["id"], "version": row["version"], "action": "approve",
                                        "amount": "5000"}).encode()
         try:
             urllib.request.build_opener(NoRedirect).open(f"http://127.0.0.1:{srv.server_address[1]}/decide", data)

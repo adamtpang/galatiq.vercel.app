@@ -2,7 +2,7 @@
 
 This is an implementation checklist against the [official assessment](https://github.com/galatiq-ai/galatiq-case-invoices/blob/main/README.md), reviewed October 23, 2026 (README blob `cf307998db23060b9abaf5396cf40a25cde9a0a4`). It is not Galatiq's grading rubric or a claim of defect-free software. Its qualitative criteria still require a reviewer's judgment.
 
-For tracking submission readiness, each of the 20 checks is worth 5 points. A check passes only when its stated evidence exists and its limitations are disclosed. A missing check stays open; the denominator does not shrink. Passing the implementation checks does not imply that a fresh live run has passed.
+A check passes only when its stated evidence exists and its limitations are disclosed. These checks are not a numerical employer score. Passing the implementation checks does not imply that a fresh live run has passed.
 
 | ID | Acceptance condition | Evidence |
 |---|---|---|
@@ -16,7 +16,7 @@ For tracking submission readiness, each of the 20 checks is worth 5 points. A ch
 | 08 | Unknown items and invalid quantities are flagged, including INV-1008, INV-1016 and INV-1009. | `tests/test_validation.py`; `tests/golden.yaml` |
 | 09 | VP review uses explicit policy and extra scrutiny above $10,000. | `config/policy.yaml`; `tests/test_approval.py::test_critic_runs_over_threshold_and_can_sign_off` |
 | 10 | The critic can object, the VP can revise, and unresolved disagreement reaches a human after a bounded loop. | `tests/test_approval.py::test_vp_can_concede`; `test_loop_stops_after_two_rounds_and_deadlocks`; offline extras 2005 and 2006 |
-| 11 | Only approved invoices reach the supplied mock payment function; repeat runs skip paid invoices and interrupted retries are held for reconciliation. | `invoice_agents/agents/payment.py`; `tests/test_payment.py`, including `test_interrupted_retry_does_not_pay_again_after_restart`; `tests/test_history.py` |
+| 11 | Only authorized invoices reach the supplied mock payment function; human rejections persist, stale reviews cannot pay, conditions block, and failed or unknown payments remain visible. | `tests/test_submission_safety.py`; `tests/test_payment.py`; `tests/test_history.py` |
 | 12 | Rejections record reasons, and results and agent steps are available as structured output. | `tests/test_golden.py::test_trace_written`; `tests/test_review2.py::test_every_step_log_line_is_valid_json` |
 | 13 | Grok performs extraction cross-checks and risk/approval reasoning in live mode; offline stand-ins are labeled accurately. | `invoice_agents/llm.py`; `invoice_agents/agents/`; recorded live traces and provenance in `docs/evals.md` |
 | 14 | Multiple stages are orchestrated with explicit state and conditional routes. | `invoice_agents/graph.py` uses LangGraph and Pydantic; `tests/test_golden.py` |
@@ -34,6 +34,19 @@ The October 23 Windows continuation verified 440 offline tests passing with one 
 To reproduce when relevant: `python -m pytest -q -rx` and `python -m evals --no-write`. Neither command enables live tests. Install `requirements.txt` first so lint and type checks are available. A saved result is evidence for its recorded revision, not every future revision.
 
 A subsequent recovery review found that retrying a previously failed payment did not mark it in progress before calling the mock bank. An interruption could therefore leave it eligible for another payment. The retry now commits an atomic claim before the bank call; a regression test verifies that a restarted process holds the uncertain attempt. The updated Windows suite passed 441 offline tests with one live test deselected, including lint and type checks. Publication and CI must still be verified for the revision containing this fix.
+
+The submission audit then added regression coverage for persistent human rejection, failed and unknown payments
+after human approval, competing decisions and automatic retries, stale UI forms, and unresolved approval conditions.
+Recovery now belongs to the common payment path, and review authorization is checked atomically before payment.
+The same audit moved the input-size limit to shared file loading, excluded private local context from Docker,
+and rejected amounts that round to zero. The historical 441-test result predates these changes; check CI on the
+submitted revision for the current suite. This is evidence for defined scenarios, not proof of defect-free software.
+
+The final local audit suite passed 457 offline tests with one live test deselected, including ruff, mypy, concurrent
+review tests and localhost UI tests. Fresh offline evaluation matched 99/99 scored fields on the 20 supplied invoices
+(one relative due date is ambiguous), caught 15/15 adversarial cases both together and in a later run, and held all
+four unfamiliar layouts. Across samples plus six extra inputs, extraction was 119/127 (93.7%); the misses are on
+the deliberately difficult email and truncated JSON examples. These results do not replace the live-evidence limits.
 
 ## Interpretation and limits
 

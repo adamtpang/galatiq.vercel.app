@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ..models import Invoice
+from ..file_io import read_invoice_bytes
 from .pdf import PdfTextError, pdf_to_text
 from .structured import parse_csv, parse_json, parse_xml
 from .text import parse_text
@@ -22,7 +23,7 @@ def read_source(path: str | Path) -> tuple[str, str]:
     if ext == ".pdf":
         text, _engine = pdf_to_text(p)
         return text, "pdf"
-    text = p.read_text(encoding="utf-8", errors="replace")
+    text = read_invoice_bytes(p).decode("utf-8", errors="replace")
     if ext in (".json", ".xml", ".csv"):
         return text, ext[1:]
     head = text.lstrip()[:1]

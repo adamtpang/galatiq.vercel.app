@@ -28,7 +28,7 @@ from .agents.ingestion import ingest
 from .agents.payment import PaymentAgent, log_rejection
 from .config import load_policy
 from .db import Inventory, connect
-from .hitl import clear_failed_payment, enqueue, enqueue_failed_payment
+from .hitl import enqueue
 from .cache import CachedLLM
 from .llm import LLMClient, OfflineClient
 from .models import Decision, DecisionStatus, Flag, InvoiceState, Severity, TraceEvent
@@ -140,19 +140,6 @@ def build_graph(ctx: RunContext):
         # a superseded original (decision 24) is logged as not paid, like a rejection, with its own status
         return "reject" if d.status in (DecisionStatus.REJECTED, DecisionStatus.SUPERSEDED) else "hold"
 
-    def pay(s: InvoiceState) -> InvoiceState:
-        try:
-            s = ctx.payments.pay(s)
-        except Exception as e:  # noqa: BLE001 - review 3: never leave an invoice APPROVED but unpaid
-            s.errors.append(f"payment: {type(e).__name__}: {e}")
-            s = ctx.payments._hold(s, f"the payment step raised {type(e).__name__} ({str(e)[:120]})")
-            return s
-        if (s.payment or {}).get("status") == "failed":
-            enqueue_failed_payment(ctx.conn, s)   # review 2: a failed payment is visible and queued for a person
-        elif (s.payment or {}).get("status") in ("paid", "already_paid"):
-            clear_failed_payment(ctx.conn, s)
-        return s
-
     def report(s: InvoiceState) -> InvoiceState:
         inv = s.invoice
         status = s.decision.status.value if s.decision else "UNKNOWN"
@@ -182,7 +169,7 @@ def build_graph(ctx: RunContext):
     g.add_node("approve", _safe("approval", lambda s: approval.approve(s, ctx.llm, ctx.policy), ctx.llm))
     g.add_node("memo", _safe("memo", lambda s: memo.write_memo(s, ctx.llm), ctx.llm))
     g.add_node("guard", _safe("guard", fail_closed))
-    g.add_node("pay", _safe("payment", pay))
+    g.add_node("pay", _safe("payment", ctx.payments.pay))
     g.add_node("reject", _safe("payment", lambda s: log_rejection(ctx.conn, s)))
     g.add_node("hold", _safe("hitl", lambda s: enqueue(ctx.conn, s)))
     g.add_node("report", _safe("reporter", report))

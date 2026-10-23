@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS review_queue (     -- human-in-the-loop queue (PENDIN
   fingerprint    TEXT NOT NULL UNIQUE,
   reason         TEXT,
   state_json     TEXT NOT NULL,
-  status         TEXT NOT NULL DEFAULT 'pending',   -- pending | approved | rejected
+  status         TEXT NOT NULL DEFAULT 'pending',   -- pending | approved | rejected | paying | paid_on_retry
+  version        INTEGER NOT NULL DEFAULT 0,        -- changed on every review snapshot or decision
   reviewer_note  TEXT,
   created_at     TEXT NOT NULL DEFAULT (datetime('now')),
   decided_at     TEXT

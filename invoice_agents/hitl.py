@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import sqlite3
 
-from .agents.payment import PaymentAgent, log_rejection
+from .agents.payment import PaymentAgent, idempotency_key, log_rejection
 from .db import log_audit
 from .models import Decision, DecisionStatus, InvoiceState, TraceEvent
 from .normalize import normalize_invoice_number
@@ -36,31 +36,59 @@ def amount_entry_reason(st: InvoiceState) -> str | None:
 HUMAN = {"approved": DecisionStatus.APPROVED, "rejected": DecisionStatus.REJECTED}
 
 
-def enqueue(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState:
+def enqueue(conn: sqlite3.Connection, state: InvoiceState, *, payment_guard: bool = False) -> InvoiceState:
+    with conn:
+        conn.execute("BEGIN IMMEDIATE")
+        return _enqueue(conn, state, payment_guard=payment_guard)
+
+
+def _enqueue(conn: sqlite3.Connection, state: InvoiceState, *, payment_guard: bool) -> InvoiceState:
     """Queue a held invoice for a person. If a person already decided this invoice in an earlier
     run, that decision stands (re-running a file is idempotent): nothing is queued again."""
     inv, d = state.invoice, state.decision
     fp = fingerprint(inv) if inv else state.source
-    prev = conn.execute("SELECT status, reviewer_note, datetime(decided_at, 'localtime') FROM review_queue "
+    prev = conn.execute("SELECT *, datetime(decided_at, 'localtime') AS local_decided_at FROM review_queue "
                         "WHERE fingerprint=?", (fp,)).fetchone()
-    if prev is not None and prev[0] in HUMAN:
-        status, note, at = prev[0], prev[1], prev[2]
+    if (prev is not None and prev["status"] == "pending" and (prev["reason"] or "").startswith("PAYMENT_")
+            and (not payment_guard or prev["reason"].startswith("PAYMENT_UNCERTAIN:"))):
+        # A rerun must not erase the settlement state or a reviewer's typed USD amount.
+        saved = queued_state(prev)
+        state.total_usd, state.payment = saved.total_usd, saved.payment
+        state.decision = Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="payment_guard",
+                                  reasons=[prev["reason"]])
+        return state
+    if (prev is not None and prev["status"] in ("approved", "rejected", "paying", "paid_on_retry")
+            and (prev["status"] == "rejected" or not payment_guard)):
+        status, note, at = prev["status"], prev["reviewer_note"], prev["local_decided_at"]
+        saved = queued_state(prev)
+        human = status in HUMAN
         state.decision = Decision(
-            status=HUMAN[status], decided_by="human", risk_score=d.risk_score if d else None,
-            reasons=[f"Already {status} by a human reviewer on {local_stamp(at)}" + (f": {note}" if note else "")],
+            status=HUMAN[status] if human else DecisionStatus.APPROVED,
+            decided_by="human" if human else "payment_guard", risk_score=d.risk_score if d else None,
+            reasons=[(f"Already {status} by a human reviewer on {local_stamp(at)}" if human else
+                      "Previously authorized payment") + (f": {note}" if note else "")],
             arguments={"agents_decision": d.model_dump(mode="json") if d else None})
-        paid = status == "approved" and conn.execute(
-            "SELECT 1 FROM payments WHERE invoice_number IS ? AND vendor IS ? AND status='paid'",
-            (inv.number if inv else None, inv.vendor if inv else None)).fetchone()
-        state.payment = ({"status": "already_paid", "amount": state.total_usd} if paid
+        state.total_usd = saved.total_usd
+        payment = None
+        if status != "rejected" and inv is not None and saved.total_usd is not None:
+            key = idempotency_key(inv.number, inv.vendor, saved.total_usd, inv.revision)
+            payment = conn.execute("SELECT status FROM payments WHERE idempotency_key=?", (key,)).fetchone()
+        paid = payment is not None and payment["status"] == "paid"
+        state.payment = ({"status": "already_paid", "amount": saved.total_usd} if paid
                          else {"status": "not_paid", "reason": f"{status} by a human reviewer"})
+        if status != "rejected" and not paid:
+            state.decision.status = DecisionStatus.PENDING_HUMAN
+            state.payment = {"status": "unknown" if payment and payment["status"] != "failed" else "failed",
+                             "amount": saved.total_usd, "attempts": 0, "errors": ["Approval has no confirmed payment"]}
+            enqueue_failed_payment(conn, state)
         state.trace.append(TraceEvent(agent="hitl", step="already_reviewed",
                                       detail={"fingerprint": fp, "review": status, "note": note, "decided_at": at}))
         return state
     conn.execute(
         "INSERT INTO review_queue (invoice_number, vendor, source_file, fingerprint, reason, state_json) "
         "VALUES (?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET state_json=excluded.state_json, "
-        "reason=excluded.reason, source_file=excluded.source_file",
+        "reason=excluded.reason, source_file=excluded.source_file, status='pending', "
+        "version=review_queue.version+1, decided_at=NULL WHERE review_queue.status!='rejected'",
         (inv.number if inv else None, inv.vendor if inv else None, state.source, fp,
          "; ".join(d.reasons) if d else None,
          # decision 10: a rebuilt invoice keeps its raw text so the reviewer sees the original next to Grok's reading
@@ -73,16 +101,18 @@ def enqueue(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState:
 
 
 def enqueue_failed_payment(conn: sqlite3.Connection, state: InvoiceState) -> None:
-    """An approved invoice whose payment failed after every retry goes to the review queue (PAYMENT_FAILED), so a
-    person sees it; approving it there retries the payment (idempotent). A later successful run clears it."""
+    """Persist failed or uncertain settlement from either the graph or human review."""
     inv, p = state.invoice, state.payment or {}
     fp = fingerprint(inv) if inv else state.source
     reason = (f"PAYMENT_FAILED: approved, but the bank call failed after {p.get('attempts')} attempts "
               f"({'; '.join(p.get('errors', [])[-1:])}); approve to retry the payment, or reject")
+    if p.get("status") == "unknown":
+        reason = "PAYMENT_UNCERTAIN: reconcile the outcome with the bank before any further payment"
     conn.execute(
         "INSERT INTO review_queue (invoice_number, vendor, source_file, fingerprint, reason, state_json) "
         "VALUES (?,?,?,?,?,?) ON CONFLICT(fingerprint) DO UPDATE SET state_json=excluded.state_json, "
-        "reason=excluded.reason, source_file=excluded.source_file, status='pending', decided_at=NULL",
+        "reason=excluded.reason, source_file=excluded.source_file, status='pending', decided_at=NULL, "
+        "version=review_queue.version+1 WHERE review_queue.status!='rejected'",
         (inv.number if inv else None, inv.vendor if inv else None, state.source, fp, reason,
          state.model_dump_json(exclude={"raw_text"})))
     conn.commit()
@@ -93,11 +123,11 @@ def clear_failed_payment(conn: sqlite3.Connection, state: InvoiceState) -> None:
     """A paid invoice no longer needs its PAYMENT_FAILED queue entry."""
     if state.invoice is None:
         return
-    cur = conn.execute("UPDATE review_queue SET status='paid_on_retry', decided_at=datetime('now') "
-                       "WHERE fingerprint=? AND status='pending' AND reason LIKE 'PAYMENT_FAILED:%'",
+    conn.execute("UPDATE review_queue SET status='paid_on_retry', decided_at=datetime('now'), version=version+1 "
+                       "WHERE fingerprint=? AND status IN ('pending', 'paying') "
+                       "AND (reason LIKE 'PAYMENT_FAILED:%' OR reason LIKE 'PAYMENT_UNCERTAIN:%')",
                        (fingerprint(state.invoice),))
-    if cur.rowcount:
-        conn.commit()
+    conn.commit()
 
 
 def pending(conn: sqlite3.Connection) -> list[sqlite3.Row]:
@@ -118,27 +148,41 @@ def find(conn: sqlite3.Connection, invoice_number: str) -> sqlite3.Row | None:
                         "ORDER BY id DESC LIMIT 1", (num,)).fetchone()
 
 
-def resolve(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str | None) -> InvoiceState:
+def resolve(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str | None,
+            pay_amount: float | None = None) -> InvoiceState:
     """Record a person's decision on a queued invoice: review_queue, the invoices history and the audit log.
     The caller pays (approve) or logs the rejection."""
     state = InvoiceState.model_validate_json(row["state_json"])
+    if approve and (row["reason"] or "").startswith("PAYMENT_UNCERTAIN:"):
+        raise ValueError("The bank outcome is uncertain; reconcile it before any further payment")
     prior = state.decision
     state.decision = Decision(
         status=DecisionStatus.APPROVED if approve else DecisionStatus.REJECTED,
         reasons=[note or ("Approved by human reviewer" if approve else "Rejected by human reviewer")],
-        conditions=prior.conditions if (prior and approve) else [],
+        conditions=[],  # a human approval resolves the listed prerequisites; preserve them in the audit arguments
         risk_score=prior.risk_score if prior else None,
         critique_rounds=prior.critique_rounds if prior else 0,
-        decided_by="human", arguments={"queued_reason": row["reason"]})
-    conn.execute("UPDATE review_queue SET status=?, reviewer_note=?, decided_at=datetime('now') WHERE id=?",
-                 ("approved" if approve else "rejected", note, row["id"]))
+        decided_by="human", arguments={"queued_reason": row["reason"], "review_id": row["id"],
+                                       "review_version": row["version"] + 1,
+                                       "resolved_conditions": prior.conditions if prior and approve else []})
+    if approve and pay_amount is not None:
+        state.total_usd = pay_amount
+    changed = conn.execute(
+        "UPDATE review_queue SET status=?, reviewer_note=?, decided_at=datetime('now'), "
+        "version=version+1, state_json=? WHERE id=? AND status='pending' AND version=?",
+        ("approved" if approve else "rejected", note, state.model_dump_json(), row["id"], row["version"]))
+    if changed.rowcount != 1:
+        conn.rollback()
+        raise ValueError("This review changed or was already resolved; reload it before deciding")
     if state.invoice is not None:
         conn.execute("UPDATE invoices SET status=? WHERE fingerprint=?",
                      (state.decision.status.value, document_id(state.invoice, state.source)))
     conn.commit()
     log_audit(conn, state.invoice.number if state.invoice else None, "hitl",
               "human_approved" if approve else "human_rejected",
-              {"source": state.source, "note": note, "queued_reason": row["reason"]})
+              {"source": state.source, "note": note, "queued_reason": row["reason"],
+               "amount": state.total_usd, "review_version": row["version"] + 1,
+               "resolved_conditions": state.decision.arguments["resolved_conditions"]})
     state.trace.append(TraceEvent(agent="hitl", step="resolved", detail={"approve": approve, "note": note}))
     return state
 
@@ -156,6 +200,8 @@ def decide(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str 
     pay_amount = None
     if approve:
         st = InvoiceState.model_validate_json(row["state_json"])
+        if (row["reason"] or "").startswith("PAYMENT_UNCERTAIN:"):
+            raise ValueError("The bank outcome is uncertain; reconcile it before any further payment")
         amt = st.total_usd if st.total_usd is not None else (st.invoice.total if st.invoice else None)
         if st.invoice is None or not st.invoice.items or not amt or amt <= 0:
             raise ValueError("No payable amount was read from this file, so it cannot be approved and paid as read; "
@@ -184,10 +230,12 @@ def decide(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str 
         if not need and amount is not None and abs(amount - amt) > 0.005:
             raise ValueError(f"Not paid: the amount typed (${amount:,.2f}) is not the invoice total (${amt:,.2f})")
         pay_amount = round(amount if amount is not None else amt, 2)
+        if not math.isfinite(pay_amount) or pay_amount <= 0:
+            raise ValueError("The amount to pay must be at least one cent")
         if pay_amount > CONFIRM_OVER and not confirm_large:
             raise ValueError(f"Not paid: ${pay_amount:,.2f} is over ${CONFIRM_OVER:,.0f}, so it needs a second, "
                              "explicit confirmation (tick the confirm box, or pass --confirm-large)")
-    state = resolve(conn, row, approve, note)
+    state = resolve(conn, row, approve, note, pay_amount=pay_amount)
     if state.decision is not None and state.decision.status == DecisionStatus.APPROVED:
         if pay_amount is not None and amount is not None:
             state.total_usd = pay_amount

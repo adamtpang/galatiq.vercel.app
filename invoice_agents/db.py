@@ -30,6 +30,9 @@ def migrate(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE invoices ADD COLUMN {col} {typ}")
     for st in INDEXES:
         conn.execute(st)
+    review_columns = {r[1] for r in conn.execute("PRAGMA table_info(review_queue)")}
+    if "version" not in review_columns:
+        conn.execute("ALTER TABLE review_queue ADD COLUMN version INTEGER NOT NULL DEFAULT 0")
     backfill(conn)
 
 
