@@ -55,10 +55,10 @@ Grok's risk review spotted each problem, so the VP held before any critic call. 
 
 ## Demo: what to run and what to point at
 
-1. `python main.py --invoice_path=data/invoices/invoice1.txt`: runs `invoice_1001.txt` (the case files start at 1001) with one JSON line per step, the `mock_payment` output and the trace path.
+1. `python main.py --invoice_path=data/invoices/invoice1.txt --offline`: runs `invoice_1001.txt` (the case files start at 1001) with one JSON line per step, the `mock_payment` output and the trace path. The brief's command without `--offline` also works; it uses Grok if an API key is configured.
 2. `python main.py --batch data/invoices --offline`: 5 paid ($23,190.00), 11 rejected, 3 held (1010, 1012.pdf, 1014), 1 superseded (1004).
 3. Edge cases: 1003 (fraud, rejected, risk 60); 1004 (`SUPERSEDED_BY_REVISION` info flag, SUPERSEDED, R1 paid, decision 13 address on file); 1010 (lines aggregated, 20% over catalog, held); 1011 to 1013 (duplicates across formats); 1012.pdf (OCR fixes, renamed vendor, hard hold); 1013 (over stock only after summing lines); 1014 (EUR, held); 2005 and 3005 (offline critic deadlock); 3008 (new IBAN, held).
-4. `--chaos 0.3 --seed 7`, then the same batch again: retries with backoff, then `idempotency_skip`.
+4. `--offline --chaos 0.3 --seed 7`, then the same batch again: retries with backoff, then `idempotency_skip`.
 5. `python main.py review INV-1012` and `python main.py ui`: the queue; approve pays through the same idempotent step.
 6. `--mode live` (needs `XAI_API_KEY`): `grok_cross_check`, `tool_call`, `memo`, `llm_repair` on 2001 and 2003.
 7. https://galatiq.vercel.app replays the committed runs.

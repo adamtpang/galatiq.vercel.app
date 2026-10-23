@@ -443,10 +443,15 @@ def test_every_step_log_line_is_valid_json(tmp_path, capsys, files):
 def test_cli_single_file_log_lines_parse(tmp_path, monkeypatch):
     import subprocess
     import sys
-    env = {"INVENTORY_DB": str(tmp_path / "c.db"), "PATH": "/usr/bin:/bin", "COLUMNS": "80", "XAI_API_KEY": ""}
-    out = subprocess.run([sys.executable, "main.py", "--invoice_path=data/invoices/invoice_1012.pdf", "--offline"],
-                         cwd=ROOT, env=env, capture_output=True, text=True, timeout=120).stdout
-    lines = [ln for ln in out.splitlines() if ln.startswith("{")]
+    import os
+    # Windows Python/asyncio requires SystemRoot; keep only runtime environment settings.
+    env = {k: v for k, v in os.environ.items()
+           if k.upper() in {"PATH", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "TEMP", "TMP"}}
+    env.update({"INVENTORY_DB": str(tmp_path / "c.db"), "COLUMNS": "80", "XAI_API_KEY": "", "PYTHONUTF8": "1"})
+    result = subprocess.run([sys.executable, "main.py", "--invoice_path=data/invoices/invoice_1012.pdf", "--offline"],
+                            cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", timeout=120)
+    assert result.returncode == 0, result.stderr
+    lines = [ln for ln in result.stdout.splitlines() if ln.startswith("{")]
     assert len(lines) >= 6 and all(json.loads(ln) for ln in lines)
 
 

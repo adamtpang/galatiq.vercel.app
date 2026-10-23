@@ -1,6 +1,7 @@
 """One test per flag code with a minimal fixture, plus the expected codes for each sample."""
 import sqlite3
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -262,7 +263,7 @@ EXPECTED = {
 
 @pytest.fixture(scope="module")
 def batch(db_file):
-    return {s.source.split("/")[-1]: s for s in run_files(collect(INVOICES), db=str(db_file))}
+    return {Path(s.source).name: s for s in run_files(collect(INVOICES), db=str(db_file))}
 
 
 @pytest.mark.parametrize("name", sorted(EXPECTED))

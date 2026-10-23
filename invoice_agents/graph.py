@@ -169,11 +169,10 @@ def build_graph(ctx: RunContext):
         path = ctx.trace_path()
         if path:
             with open(path, "a", encoding="utf-8") as fh:
-                root = str(ROOT) + "/"  # traces are committed; keep paths repo-relative
                 for ev in s.trace:
-                    fh.write(json.dumps({"run_id": ctx.run_id, "source": Path(s.source).name,
-                                         "invoice": inv.number if inv else None, **ev.model_dump(mode="json")},
-                                        default=str).replace(root, "") + "\n")
+                    payload = {"run_id": ctx.run_id, "source": Path(s.source).name,
+                               "invoice": inv.number if inv else None, **ev.model_dump(mode="json")}
+                    fh.write(json.dumps(trace_relative(payload), default=str) + "\n")
         return s
 
     g = StateGraph(GraphState)
@@ -198,6 +197,22 @@ def build_graph(ctx: RunContext):
         g.add_edge(n, "report")
     g.add_edge("report", END)
     return g.compile()
+
+
+def trace_relative(value: Any) -> Any:
+    """Keep repo paths portable before JSON escapes Windows backslashes."""
+    if isinstance(value, dict):
+        return {k: trace_relative(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [trace_relative(v) for v in value]
+    if isinstance(value, str):
+        prefixes = (str(ROOT) + "/", str(ROOT) + "\\", ROOT.as_posix() + "/")
+        for prefix in prefixes:
+            if value.startswith(prefix):
+                return value[len(prefix):].replace("\\", "/")
+        for prefix in prefixes:
+            value = value.replace(prefix, "")
+    return value
 
 
 def new_run_id() -> str:

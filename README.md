@@ -19,16 +19,28 @@ Python 3.11 or newer, no API key, about a minute:
 ```bash
 git clone https://github.com/adamtpang/galatiq.vercel.app galatiq && cd galatiq
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt && python main.py --batch data/invoices
+pip install -r requirements.txt && python main.py --batch data/invoices --offline
 ```
+
+On Windows PowerShell, after cloning and entering the folder:
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe main.py --batch data/invoices --offline
+.\.venv\Scripts\python.exe -m pytest -q
+```
+
+`--offline` prevents model calls even if an API key is already configured. The local SQLite database is created
+and seeded automatically. It retains payment history, so repeating a run does not pay the same invoice twice.
 
 The brief's command works as written: `python main.py --invoice_path=data/invoices/invoice1.txt` runs
 `invoice_1001.txt` (the case files start at 1001; the CLI says so) and prints one JSON line per agent step, the
 `mock_payment` output, the result table and the trace path.
 
 ```bash
-python main.py --invoice_path=data/invoices/invoice_1012.pdf   # one invoice
-python main.py --batch data/invoices --chaos 0.3               # the bank fails 30% of calls; retries, then queued
+python main.py --invoice_path=data/invoices/invoice_1012.pdf --offline  # one invoice
+python main.py --batch data/invoices --offline --chaos 0.3      # the bank fails 30% of calls; retries, then queued
 python main.py review                                          # the human review queue (CLI)
 python main.py ui                                              # the review queue in the browser (127.0.0.1:8765)
 python main.py --batch data/invoices --mode live               # Grok agents (needs XAI_API_KEY)
@@ -38,6 +50,7 @@ make check                                                     # ruff, mypy and 
 ```
 
 `requirements.txt` pins ruff and mypy too, and `tests/test_static_checks.py` runs both, so CI enforces them.
+The [acceptance checklist](docs/acceptance.md) maps the brief to the implementation, tests and evidence limits.
 
 ## Results
 

@@ -1,4 +1,5 @@
 """Duplicates against stored history (decision 7 across runs), idempotent re-runs, and the review flow."""
+import json
 import sqlite3
 from pathlib import Path
 
@@ -145,6 +146,8 @@ def test_trace_paths_are_repo_relative(tmp_path):
     text = (tmp_path / "runs" / "t" / "trace.jsonl").read_text()
     assert '"data/invoices/invoice_1004.json"' in text
     assert str(ROOT) not in text
+    assert ROOT.as_posix() not in text
+    assert json.dumps(str(ROOT))[1:-1] not in text  # JSON escapes Windows backslashes
 
 
 class RepairGrok:

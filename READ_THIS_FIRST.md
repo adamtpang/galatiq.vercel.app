@@ -9,11 +9,13 @@ and no model is called. Every decision has reasons and a trace in `runs/`.
 **Run it** (Python 3.11+, no API key, after `pip install -r requirements.txt`):
 
 ```bash
-python main.py --batch data/invoices     # the 20 case invoices: table, reasons, trace path
+python main.py --batch data/invoices --offline  # the 20 case invoices: table, reasons, trace path
 pytest                                   # the offline suite, including ruff and mypy
 ```
 
 The brief's own command also works: `python main.py --invoice_path=data/invoices/invoice1.txt`.
+Use `--offline` to prevent model calls even if an API key is configured. Windows setup and the
+[acceptance checklist](docs/acceptance.md) are linked from the [README](README.md).
 
 **Results on the 20 case invoices** (details: [README](README.md), [docs/evals.md](docs/evals.md)):
 
