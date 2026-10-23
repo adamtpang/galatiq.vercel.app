@@ -77,13 +77,13 @@ def init_db(path: Path | str | None = None) -> Path:
     """Create tables and (re)apply the seed. Safe to run any number of times; keeps processed invoices."""
     p = Path(path) if path else db_path()
     with sqlite3.connect(p) as conn:
-        conn.executescript(SEED_SQL.read_text())
+        conn.executescript(SEED_SQL.read_text(encoding="utf-8"))
         migrate(conn)
     return p
 
 
 def ensure_schema(path: Path | str) -> None:
-    stmts = [st for st in SEED_SQL.read_text().split(";") if "CREATE TABLE" in st]
+    stmts = [st for st in SEED_SQL.read_text(encoding="utf-8").split(";") if "CREATE TABLE" in st]
     with sqlite3.connect(path) as conn:
         for st in stmts:
             conn.execute(st)

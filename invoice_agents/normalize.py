@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime
 from difflib import get_close_matches
@@ -54,8 +55,10 @@ def parse_money(value) -> float | None:
 
 # --- dates --------------------------------------------------------------------------
 RELATIVE_DATE_WORDS = {"yesterday", "today", "tomorrow", "asap", "immediately", "now"}
+# "%d/%m/%Y" comes after "%m/%d/%Y", so it is only used when the first number cannot be a month (20/02/2026);
+# an ambiguous 05/04/2026 stays month-first, as before.
 _DATE_FORMATS = [
-    "%Y-%m-%d", "%m/%d/%Y", "%b %d %Y", "%b %d, %Y", "%B %d %Y", "%B %d, %Y",
+    "%Y-%m-%d", "%m/%d/%Y", "%d/%m/%Y", "%b %d %Y", "%b %d, %Y", "%B %d %Y", "%B %d, %Y",
     "%d-%b-%Y", "%d-%B-%Y", "%d %b %Y", "%d %B %Y", "%Y/%m/%d",
 ]
 
@@ -151,3 +154,15 @@ def normalize_sku(raw: str, catalog: list[str]) -> SkuMatch:
             return SkuMatch(c, 0.85, "ocr_lookalike", note=note)
     close = get_close_matches(_key(raw_base), list(keys), n=1, cutoff=0.7)
     return SkuMatch(None, 0.0, "unknown", note=note, suggestion=keys[close[0]] if close else None)
+
+
+_ZERO_WIDTH = re.compile(r"[\u200b-\u200f\u2060\ufeff]")
+_SPACED = re.compile(r"\b(?:\w[ \t]){2,}\w\b")
+
+
+def match_text(text: str | None) -> str:
+    """Text prepared for pattern matching only (never for numbers): Unicode NFKC (fullwidth < becomes <),
+    zero-width characters removed, lower case, and spaced-out letters joined ("i g n o r e" becomes "ignore").
+    Line breaks are kept so patterns anchored at a line start still work."""
+    t = _ZERO_WIDTH.sub("", unicodedata.normalize("NFKC", str(text or ""))).lower()
+    return _SPACED.sub(lambda m: re.sub(r"[ \t]", "", m.group(0)), t)

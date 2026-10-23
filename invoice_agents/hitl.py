@@ -1,6 +1,7 @@
 """Human-in-the-loop review queue, persisted in SQLite (table review_queue)."""
 from __future__ import annotations
 
+import math
 import sqlite3
 
 from .agents.payment import PaymentAgent, log_rejection
@@ -8,6 +9,29 @@ from .db import log_audit
 from .models import Decision, DecisionStatus, InvoiceState, TraceEvent
 from .normalize import normalize_invoice_number
 from .validation import document_id, fingerprint, local_stamp
+
+MATH_FLAGS = ("LINE_AMOUNT_MISMATCH", "SUBTOTAL_MISMATCH", "TAX_MISMATCH", "TOTAL_MISMATCH")
+CONFIRM_OVER = 10_000.00   # decision 21: a human approval above this needs a second, explicit confirmation
+
+
+def computed_amount(st: InvoiceState) -> float | None:
+    """Lines (amount, or qty x unit price) + tax + shipping: the figure a reviewer is shown first on a mismatch."""
+    inv = st.invoice
+    if inv is None or not inv.items or (inv.currency or "USD") != "USD":
+        return None
+    lines = sum((li.amount if li.amount is not None else li.qty * (li.unit_price or 0)) for li in inv.items)
+    return round(lines + (inv.tax or 0) + (inv.shipping or 0), 2)
+
+
+def amount_entry_reason(st: InvoiceState) -> str | None:
+    """Why a person must type the amount to pay (decision 21), or None when the read total can be paid."""
+    math_codes = [f.code for f in st.flags if f.code in MATH_FLAGS]
+    if math_codes:
+        return f"the invoice's numbers do not add up ({', '.join(math_codes)})"
+    if st.invoice is not None and (st.invoice.currency or "USD") != "USD":
+        return f"the invoice is in {st.invoice.currency}, so the USD amount must come from a person, not a fixed rate"
+    return None
+
 
 HUMAN = {"approved": DecisionStatus.APPROVED, "rejected": DecisionStatus.REJECTED}
 
@@ -120,9 +144,14 @@ def resolve(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str
 
 
 def decide(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str | None,
-           chaos: float = 0.0, payments: PaymentAgent | None = None) -> InvoiceState:
+           chaos: float = 0.0, payments: PaymentAgent | None = None, amount: float | None = None,
+           confirm_large: bool = False) -> InvoiceState:
     """A person's decision, end to end: record it, then pay (approve) or log the rejection. Used by the
-    `review` command and the local review UI (`python main.py ui`), so both write the same tables."""
+    `review` command and the local review UI (`python main.py ui`), so both write the same tables.
+
+    Decision 21, enforced here and not only in the UI: when the numbers do not add up (or the currency is not
+    USD) the person must type the amount to pay; any approval paying over $10,000 needs confirm_large too."""
+    pay_amount = None
     if approve:
         st = InvoiceState.model_validate_json(row["state_json"])
         amt = st.total_usd if st.total_usd is not None else (st.invoice.total if st.invoice else None)
@@ -133,7 +162,26 @@ def decide(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str 
         if errs:
             raise ValueError(f"A step failed on this invoice ({errs[0]}), so its checks are incomplete; it cannot be "
                              "approved and paid. Re-run the file after the fix, or reject it")
+        need = amount_entry_reason(st)
+        if amount is not None and (not isinstance(amount, (int, float)) or not math.isfinite(amount) or amount <= 0):
+            raise ValueError(f"The amount to pay must be a number above zero, not {amount!r}")
+        if need and amount is None:
+            calc = computed_amount(st)
+            raise ValueError(f"Not paid: {need}. Type the amount to pay"
+                             + (f" (the lines add up to ${calc:,.2f})" if calc else "") + " and approve again")
+        if not need and amount is not None and abs(amount - amt) > 0.005:
+            raise ValueError(f"Not paid: the amount typed (${amount:,.2f}) is not the invoice total (${amt:,.2f})")
+        pay_amount = round(amount if amount is not None else amt, 2)
+        if pay_amount > CONFIRM_OVER and not confirm_large:
+            raise ValueError(f"Not paid: ${pay_amount:,.2f} is over ${CONFIRM_OVER:,.0f}, so it needs a second, "
+                             "explicit confirmation (tick the confirm box, or pass --confirm-large)")
     state = resolve(conn, row, approve, note)
     if state.decision.status == DecisionStatus.APPROVED:
+        if pay_amount is not None and amount is not None:
+            state.total_usd = pay_amount
+            state.decision.reasons.append(f"Amount to pay typed by the reviewer: ${pay_amount:,.2f}")
+            log_audit(conn, state.invoice.number if state.invoice else None, "hitl", "amount_entered",
+                      {"amount": pay_amount, "printed_total": state.invoice.total if state.invoice else None,
+                       "computed": computed_amount(state)})
         return (payments or PaymentAgent(conn, chaos=chaos)).pay(state)
     return log_rejection(conn, state)

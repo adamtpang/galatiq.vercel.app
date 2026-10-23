@@ -152,7 +152,7 @@ def write_artifacts(states: list[InvoiceState], run_dir: Path | None, mode: str,
         return
     rows = [row(s) for s in states]
     (run_dir / "summary.json").write_text(json.dumps({"mode": mode, "model": model, "commit": git_commit(),
-                                                      "grok": grok_ratio(states), "rows": rows}, indent=2, default=str))
+                                                      "grok": grok_ratio(states), "rows": rows}, indent=2, default=str), encoding="utf-8")
     lines = [f"# Run {run_dir.name} ({mode}{', ' + model if model else ''})", "",
              "| File | Invoice | Vendor | Total USD | Risk | Blocking flags | Decision | By | Rounds | Payment | Reason |",
              "|---|---|---|---|---|---|---|---|---|---|---|"]
@@ -162,7 +162,7 @@ def write_artifacts(states: list[InvoiceState], run_dir: Path | None, mode: str,
                      f"{', '.join(r['block_flags']) or '-'} | {r['decision']} | {r['decided_by_label']} | "
                      f"{r['critique_rounds']} | {r['payment']} | {reason} |")
     lines += ["", "## Decision memos", ""] + [f"- **{r['file']}** ({r['memo_by']}): {r['memo']}" for r in rows if r["memo"]]
-    (run_dir / "report.md").write_text("\n".join(lines) + "\n")
+    (run_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 # --- review: one queued invoice -------------------------------------------------------------

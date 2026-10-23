@@ -47,7 +47,8 @@ def parse_json(text: str, source: str | None = None) -> Invoice:
         inv.items.append(item(_name(scalar(name, f"line {n} item", errs)) or "",
                               scalar(_first(li, "quantity", "qty"), f"line {n} quantity", errs),
                               scalar(_first(li, "unit_price", "price", "rate"), f"line {n} unit_price", errs),
-                              scalar(li.get("amount"), f"line {n} amount", errs), free_text(li.get("note"))))
+                              scalar(li.get("amount"), f"line {n} amount", errs), free_text(li.get("note")),
+                              errs, n))
     inv.subtotal = parse_money(scalar(d.get("subtotal"), "subtotal", errs))
     inv.tax = parse_money(scalar(_first(d, "tax_amount", "tax"), "tax", errs))
     inv.tax_rate = parse_money(scalar(d.get("tax_rate"), "tax_rate", errs))
@@ -115,6 +116,7 @@ def _csv_table(header, rows, source) -> Invoice:
         return None
 
     meta: dict[str, str] = {}
+    errs: list[str] = []
     for r in rows:
         name = get(r, "item", "description", "sku")
         if name:
@@ -122,7 +124,7 @@ def _csv_table(header, rows, source) -> Invoice:
                 if get(r, k) and k not in meta:
                     meta[k] = get(r, k)
             inv.items.append(item(name, get(r, "qty", "quantity"), get(r, "unit price", "price"),
-                                  get(r, "line total", "amount")))
+                                  get(r, "line total", "amount"), errors=errs, line=len(inv.items) + 1))
             continue
         cells = [c.strip() for c in r if c.strip()]
         if len(cells) >= 2:
@@ -141,6 +143,7 @@ def _csv_table(header, rows, source) -> Invoice:
     inv.vendor = meta.get("vendor")
     inv.terms = meta.get("payment terms")
     inv.currency = (meta.get("currency") or "USD").upper()
+    inv.type_errors = errs
     return finish(inv, number=meta.get("invoice number"), date_raw=meta.get("date"), due_raw=meta.get("due date"))
 
 
@@ -154,9 +157,11 @@ def parse_xml(text: str, source: str | None = None) -> Invoice:
     inv = Invoice(source_file=source, source_format="xml")
     inv.vendor = t("header/vendor") or t("vendor")
     inv.currency = (t("header/currency") or t("currency") or "USD").upper()
-    for el in root.findall("line_items/item"):
+    errs: list[str] = []
+    for n, el in enumerate(root.findall("line_items/item"), 1):
         inv.items.append(item(el.findtext("name") or el.findtext("sku") or "", el.findtext("quantity"),
-                              el.findtext("unit_price"), el.findtext("amount")))
+                              el.findtext("unit_price"), el.findtext("amount"), errors=errs, line=n))
+    inv.type_errors = errs
     inv.subtotal = parse_money(t("totals/subtotal"))
     inv.tax_rate = parse_money(t("totals/tax_rate"))
     inv.tax = parse_money(t("totals/tax_amount"))

@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, quote, urlparse
 
 from . import hitl
 from .db import connect
+from .models import InvoiceState
 
 CSS = """body{font-family:system-ui,sans-serif;margin:2rem;max-width:1100px;color:#111}
 table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid #ddd;padding:.5rem;text-align:left;
@@ -51,7 +52,21 @@ def _money(st: dict) -> str:
 
 def _buttons(row: sqlite3.Row, st: dict, token: str) -> str:
     ok = payable(st)
-    approve = ('<button class="ok" name="action" value="approve">Approve and pay</button>' if ok else
+    extra = ""
+    if ok:
+        try:
+            s = InvoiceState.model_validate(st)
+            need, calc = hitl.amount_entry_reason(s), hitl.computed_amount(s)
+        except ValueError:
+            need, calc = "the saved invoice could not be read back", None
+        amt = st.get("total_usd") if st.get("total_usd") is not None else (st.get("invoice") or {}).get("total")
+        if need:   # decision 21: the reviewer types the amount; prefilled with the computed line sum
+            extra += (f'<br><span class="r">{e(need)}; amount to pay (USD):</span> <input name="amount" required '
+                      f'size="10" value="{"" if calc is None else f"{calc:.2f}"}"> ')
+        if need or (isinstance(amt, (int, float)) and amt > hitl.CONFIRM_OVER):
+            extra += (f'<br><label class="r"><input type="checkbox" name="confirm_large" value="1"> I confirm paying '
+                      f'over ${hitl.CONFIRM_OVER:,.0f} (needed above that amount)</label><br>')
+    approve = (f'{extra}<button class="ok" name="action" value="approve">Approve and pay</button>' if ok else
                '<span class="r">No payable amount was read, so it cannot be approved here; reject it or enter it by hand.</span><br>')
     return (f'<form method="post" action="/decide"><input type="hidden" name="token" value="{e(token)}">'
             f'<input type="hidden" name="id" value="{row["id"]}"><input name="note" placeholder="Note (optional)" size="28"> '
@@ -167,7 +182,13 @@ def make_server(db: str | Path | None = None, host: str = "127.0.0.1", port: int
                     msg = "That invoice is no longer in the queue."
                 else:
                     try:
-                        s = hitl.decide(conn, row, action == "approve", note, chaos=chaos)
+                        raw_amt = (form.get("amount") or "").replace("$", "").replace(",", "").strip()
+                        try:
+                            amount = float(raw_amt) if raw_amt else None
+                        except ValueError:
+                            raise ValueError(f"Not paid: {raw_amt!r} is not an amount")
+                        s = hitl.decide(conn, row, action == "approve", note, chaos=chaos, amount=amount,
+                                        confirm_large=form.get("confirm_large") == "1")
                         p = s.payment or {}
                         num = s.invoice.number if s.invoice else "invoice"
                         msg = (f"{num}: approved by a person and paid ${p['amount']:,.2f}." if p.get("status") == "paid"

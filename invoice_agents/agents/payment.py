@@ -42,9 +42,10 @@ def idempotency_key(number: str | None, vendor: str | None, amount: float, revis
 class PaymentAgent:
     def __init__(self, conn: sqlite3.Connection, chaos: float = 0.0, retries: int = 3, base_delay: float = 0.2,
                  seed: int | None = None, sleep: Callable[[float], None] = time.sleep,
-                 bank: Callable = mock_payment):
+                 bank: Callable | None = None):
         self.conn, self.chaos, self.retries, self.base_delay = conn, chaos, retries, base_delay
-        self.rng, self.sleep, self.bank = random.Random(seed), sleep, bank
+        # looked up at call time, so a patched or replaced mock_payment is the one called
+        self.rng, self.sleep, self.bank = random.Random(seed), sleep, bank or (lambda v, a: mock_payment(v, a))
 
     def _call_bank(self, vendor: str, amount: float) -> tuple[dict, str]:
         if self.chaos and self.rng.random() < self.chaos:
@@ -99,7 +100,7 @@ class PaymentAgent:
             state.payment = {"status": "already_paid", "amount": amount, "idempotency_key": key, "attempts": 0}
             state.trace.append(TraceEvent(agent=AGENT, step="idempotency_skip", detail=state.payment))
             return state
-        if row and row[0] == "in_progress":
+        if row and row[0] in ("in_progress", "unknown"):
             # an earlier run stopped between calling the bank and recording the result: the bank may have paid.
             # Paying again could pay twice, so a person checks the bank first (fail closed).
             return self._hold(state, "an earlier payment attempt for this invoice never recorded its result "
@@ -123,6 +124,16 @@ class PaymentAgent:
                 state.trace.append(TraceEvent(agent=AGENT, step="bank_error", detail={"attempt": attempt, "error": str(e)}))
                 if attempt <= self.retries:
                     self.sleep(self.base_delay * 2 ** (attempt - 1))
+            except Exception as e:  # noqa: BLE001 - review 3: an unexpected bank error; the money may have moved
+                self.conn.execute("UPDATE payments SET status='unknown' WHERE idempotency_key=?", (key,))
+                self.conn.commit()
+                state.errors.append(f"payment: the bank call raised {type(e).__name__}: {e}")
+                state.trace.append(TraceEvent(agent=AGENT, step="bank_exception", detail={"error": str(e)}))
+                held = self._hold(state, f"the bank call raised {type(e).__name__} ({str(e)[:120]}), so it is not "
+                                         "known whether money moved; check with the bank before paying")
+                held.payment = {"status": "unknown", "amount": amount, "idempotency_key": key, "attempts": attempt,
+                                "errors": errors + [f"attempt {attempt}: {type(e).__name__}: {e}"]}
+                return held
         self.conn.execute("UPDATE payments SET status='failed' WHERE idempotency_key=?", (key,))
         self.conn.commit()
         state.payment = {"status": "failed", "amount": amount, "idempotency_key": key,

@@ -1,0 +1,6 @@
+Bill from = Summit Manufacturing Co.
+Ref = INV-9301
+Issued = 20/01/2026
+Pay by = 20/02/2026
+2 x WidgetA @ 250 = 500
+Grand total due = 500

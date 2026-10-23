@@ -234,7 +234,8 @@ def test_init_db_is_idempotent(tmp_path):
 EXPECTED = {
     "invoice_1001.txt": {"TERMS_MISMATCH"},
     "invoice_1002.txt": {"STOCK_EXCEEDED", "TERMS_MISMATCH", "OVER_APPROVAL_THRESHOLD"},
-    "invoice_1003.txt": {"ZERO_STOCK", "INVALID_DUE_DATE", "UNKNOWN_VENDOR", "OVER_APPROVAL_THRESHOLD"},
+    "invoice_1003.txt": {"ZERO_STOCK", "INVALID_DUE_DATE", "UNKNOWN_VENDOR", "OVER_APPROVAL_THRESHOLD",
+                         "BANK_DETAILS_CHANGED"},   # decision 20: "Wire transfer preferred."
     "invoice_1004.json": {"SUPERSEDED_BY_REVISION", "ADDRESS_ON_FILE"},
     "invoice_1004_revised.json": {"REVISION_SUPERSEDES", "ADDRESS_ON_FILE"},
     "invoice_1005.json": {"STOCK_EXCEEDED", "UNKNOWN_VENDOR", "OVER_APPROVAL_THRESHOLD"},

@@ -15,7 +15,7 @@ SAME_KEYS = ("decision", "decided_by", "risk", "reason", "block_flags", "warn_fl
 def stats(run: Path) -> dict:
     calls = ticks = 0
     ts, hits, misses, models = [], 0, 0, set()
-    for line in open(run / "trace.jsonl"):
+    for line in open(run / "trace.jsonl", encoding="utf-8"):
         e = json.loads(line)
         ts.append(e["ts"])
         u = e.get("detail", {}).get("llm")
@@ -31,7 +31,7 @@ def stats(run: Path) -> dict:
 
 
 def main(a: str, b: str, json_out: str | None = None) -> int:
-    ra, rb = json.loads((Path(a) / "summary.json").read_text()), json.loads((Path(b) / "summary.json").read_text())
+    ra, rb = json.loads((Path(a) / "summary.json").read_text(encoding="utf-8")), json.loads((Path(b) / "summary.json").read_text(encoding="utf-8"))
     sa, sb = stats(Path(a)), stats(Path(b))
     rows = []
     same = 0
@@ -61,7 +61,7 @@ def main(a: str, b: str, json_out: str | None = None) -> int:
             "model": ra["model"], "runs": [Path(a).name, Path(b).name], "invoices": len(ra["rows"]), "identical": same,
             "compared": list(SAME_KEYS), "first": sa | {"approved_usd": round(paid, 2)}, "second": sb,
             "decisions": {k: [count(r["rows"], k) for r in (ra, rb)] for k in ("APPROVED", "REJECTED", "PENDING_HUMAN")},
-            "commit": [ra.get("commit"), rb.get("commit")], "recorded_at": "2026-10-22"}, indent=1))
+            "commit": [ra.get("commit"), rb.get("commit")], "recorded_at": "2026-10-22"}, indent=1), encoding="utf-8")
     else:
         print("\n".join(out))
     return 0 if same == len(ra["rows"]) else 1

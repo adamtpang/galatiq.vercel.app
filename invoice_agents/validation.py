@@ -20,7 +20,7 @@ from typing import Any
 
 from .db import Inventory
 from .models import Flag, Invoice, InvoiceState, Severity, TraceEvent
-from .normalize import terms_days
+from .normalize import match_text, terms_days
 
 B, W, I = Severity.BLOCK, Severity.WARN, Severity.INFO
 # ingestion records this error when a file carries NaN or infinity where a number belongs
@@ -296,13 +296,17 @@ def check_line_notes(inv: Invoice) -> list[Flag]:
 def check_bank_details(raw: str | None, inv: Invoice, policy: dict) -> list[Flag]:
     """An invoice that carries or changes payment details (IBAN, SWIFT, routing or account number, remit-to,
     updated bank details). The classic vendor-impersonation fraud: hold it for a person to confirm."""
-    pats = ((policy.get("bank_details") or {}).get("change_patterns")) or []
-    text = " ".join(str(x) for x in [raw, inv.notes, inv.terms, *(li.note for li in inv.items)] if x).lower()
+    cfg = policy.get("bank_details") or {}
+    pats = list(cfg.get("change_patterns") or [])
+    words = cfg.get("payment_keywords") or []
+    if words:   # decision 20: any payment-instruction keyword in the text is enough offline (no model reads it)
+        pats.append(r"(?<![a-z0-9])(" + "|".join(words) + r")(?![a-z0-9])")
+    text = match_text("\n".join(str(x) for x in [raw, inv.notes, inv.terms, *(li.note for li in inv.items)] if x))
     hits = list(dict.fromkeys(m.group(0).strip() for m in (re.search(p, text) for p in pats) if m))
     if not hits:
         return []
-    return [_f("BANK_DETAILS_CHANGED", W, f"Invoice gives or changes payment details ({', '.join(hits)}); confirm the "
-               "account with the vendor contact on file before paying", matched=hits)]
+    return [_f("BANK_DETAILS_CHANGED", W, f"Invoice mentions payment instructions or bank details ({', '.join(hits)}); "
+               "confirm where to pay with the vendor contact on file before paying", matched=hits)]
 
 
 # --- vendor -------------------------------------------------------------------------

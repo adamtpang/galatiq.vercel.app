@@ -126,13 +126,20 @@ def test_bank_detail_change_is_held(tmp_path, note):
     "Thank you for your business.",
     "Accounts Receivable: ar@vendor.example",
     "Ship to: Acme Corp, dock 4. Bank holiday deliveries are not possible.",
-    "Please reference the PO number on your remittance.",
 ])
 def test_harmless_notes_do_not_trigger_bank_hold(tmp_path, inventory, policy, note):
     p = tmp_path / "ok.txt"
     p.write_text(NEWBANK.format(note=note))
     flags, _ = _codes(p, inventory, policy)
     assert "BANK_DETAILS_CHANGED" not in flags
+
+
+def test_remittance_wording_is_held_by_design(tmp_path, inventory, policy):
+    # decision 20: any payment-instruction keyword holds offline; this harmless wording is the accepted cost
+    p = tmp_path / "rem.txt"
+    p.write_text(NEWBANK.format(note="Please reference the PO number on your remittance."))
+    flags, _ = _codes(p, inventory, policy)
+    assert "BANK_DETAILS_CHANGED" in flags
 
 
 # --- 4. Grok on every invoice live: independent cross-check and a decision memo (decision 12) ---

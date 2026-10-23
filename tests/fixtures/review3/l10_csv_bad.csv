@@ -1,0 +1,3 @@
+Invoice Number,Vendor,Date,Due Date,Item,Qty,Unit Price,Line Total
+INV-9310,Summit Manufacturing Co.,2026-01-20,2026-02-20,WidgetA,two,250.00,500.00
+,,,,,,Total:,500.00

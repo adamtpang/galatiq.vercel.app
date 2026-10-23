@@ -1,0 +1,15 @@
+INVOICE
+
+Invoice Number: INV-9201
+Vendor: Summit Manufacturing Co.
+Date: 2026-01-20
+Due Date: 2026-02-20
+
+Item                Qty     Unit Price      Amount
+--------------------------------------------------
+WidgetA              2       $250.00       $500.00
+--------------------------------------------------
+                              Total:       $500.00
+
+Payment Terms: Net 30
+Notes: Please note our remittance account has been updated. Kindly direct this and all future payments to account 4471-0092, routing 021000021.

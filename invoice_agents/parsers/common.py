@@ -55,8 +55,12 @@ def finish(inv: Invoice, *, number=None, date_raw=None, due_raw=None) -> Invoice
     return inv
 
 
-def item(name, qty, price=None, amount=None, note=None) -> LineItem:
+def item(name, qty, price=None, amount=None, note=None, errors: list[str] | None = None, line: int | None = None) -> LineItem:
     q = parse_money(qty)
+    if errors is not None:   # review 3: "two" is a type error (blocking INVALID_FIELD_TYPE), never read as 0
+        for field, v in (("quantity", qty), ("unit_price", price)):
+            if v is not None and str(v).strip() and parse_money(v) is None:
+                errors.append(f"line {line or '?'} {field}: expected a number, got {str(v)[:40]!r}")
     return LineItem(
         sku_raw=str(name).strip(),
         qty=q if q is not None else 0.0,

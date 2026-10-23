@@ -50,7 +50,7 @@ MIN_CONF = 0.85
 
 
 def load_yaml(name: str) -> dict:
-    return yaml.safe_load((EVALS / name).read_text())
+    return yaml.safe_load((EVALS / name).read_text(encoding="utf-8"))
 
 
 def rel(p: str | Path) -> str:
@@ -212,7 +212,7 @@ def trace_rows(*paths: str | Path) -> dict[str, dict]:
     """Per-invoice decision, reasons, risk, latency and LLM usage, read back from trace.jsonl files."""
     rows: dict[str, dict] = {}
     for path in paths:
-        for line in Path(ROOT / path if not Path(path).is_absolute() else path).read_text().splitlines():
+        for line in Path(ROOT / path if not Path(path).is_absolute() else path).read_text(encoding="utf-8").splitlines():
             e = json.loads(line)
             r = rows.setdefault(e["source"], {"file": e["source"], "invoice": e.get("invoice"), "decision": None,
                                               "ms": 0.0, "llm": {k: 0 for k in USAGE_KEYS} | {"cost_in_usd_ticks": 0,
@@ -588,7 +588,7 @@ def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Pa
 def _saved(name: str, pick):
     """A committed one-off result in evals/results (separate_run_live.json, cache_repeatability.json), or None."""
     p = RESULTS / name
-    return pick(json.loads(p.read_text())) if p.exists() else None
+    return pick(json.loads(p.read_text(encoding="utf-8"))) if p.exists() else None
 
 
 def web_summary(off: dict, live: dict | None) -> dict:
@@ -662,8 +662,8 @@ def separate_run_live(out: Path, write: bool = True) -> int:
     md = "\n".join(lines)
     if write:
         out.mkdir(parents=True, exist_ok=True)
-        (out / "separate_run_live.json").write_text(json.dumps(res, indent=1, default=str))
-        (out / "separate_run_live.md").write_text(md)
+        (out / "separate_run_live.json").write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
+        (out / "separate_run_live.md").write_text(md, encoding="utf-8")
     print(md)
     return 0 if not res["missed"] else 1
 
@@ -672,7 +672,7 @@ def latest_live(out: Path) -> dict | None:
     """The live results to compare against: this output dir's own live run if any, else the committed snapshot."""
     for d in (out, RESULTS):
         if (d / "live.json").exists():
-            return json.loads((d / "live.json").read_text())
+            return json.loads((d / "live.json").read_text(encoding="utf-8"))
     return None
 
 
@@ -694,21 +694,21 @@ def main(argv: list[str] | None = None) -> int:
     def finish(off: dict, live: dict | None) -> int:
         md = summary_md(off, live)
         if not args.no_write:
-            (out / "summary.md").write_text(md)
+            (out / "summary.md").write_text(md, encoding="utf-8")
             if args.write_snapshot:
-                (ROOT / "web" / "data" / "evals.json").write_text(json.dumps(web_summary(off, live), indent=1))
+                (ROOT / "web" / "data" / "evals.json").write_text(json.dumps(web_summary(off, live), indent=1), encoding="utf-8")
         print(md)
         return 0
 
     if args.report_only:
-        saved = {m: json.loads((out / f"{m}.json").read_text()) for m in ("offline", "live") if (out / f"{m}.json").exists()}
+        saved = {m: json.loads((out / f"{m}.json").read_text(encoding="utf-8")) for m in ("offline", "live") if (out / f"{m}.json").exists()}
         if "offline" not in saved:
             print(f"No saved results in {rel(out)}: run `python -m evals` first "
                   "(or add --write-snapshot to re-render the committed snapshot).", file=sys.stderr)
             return 2
         if not args.no_write:
             for m, r in saved.items():
-                (out / f"{m}.md").write_text(detail_md(r))
+                (out / f"{m}.md").write_text(detail_md(r), encoding="utf-8")
         return finish(saved["offline"], saved.get("live"))
     from dotenv import load_dotenv
     load_dotenv()
@@ -723,11 +723,11 @@ def main(argv: list[str] | None = None) -> int:
         traces = (out if not args.no_write else Path(tempfile.mkdtemp())) / "runs" / "live"
         res = evaluate("live", keep_traces=traces)
         if not args.no_write:
-            (out / "live.json").write_text(json.dumps(res, indent=1, default=str))
-            (out / "live.md").write_text(detail_md(res))
+            (out / "live.json").write_text(json.dumps(res, indent=1, default=str), encoding="utf-8")
+            (out / "live.md").write_text(detail_md(res), encoding="utf-8")
         live = res
     off = evaluate("offline", live_ref=live if args.live else latest_live(out))
     if not args.no_write:
-        (out / "offline.json").write_text(json.dumps(off, indent=1, default=str))
-        (out / "offline.md").write_text(detail_md(off))
+        (out / "offline.json").write_text(json.dumps(off, indent=1, default=str), encoding="utf-8")
+        (out / "offline.md").write_text(detail_md(off), encoding="utf-8")
     return finish(off, live if args.live else latest_live(out))

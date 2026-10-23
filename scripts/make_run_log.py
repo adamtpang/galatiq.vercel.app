@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def load(name: str) -> dict:
-    return json.loads((ROOT / "runs" / "demo" / name / "summary.json").read_text())
+    return json.loads((ROOT / "runs" / "demo" / name / "summary.json").read_text(encoding="utf-8"))
 
 
 def money(x: float) -> str:
@@ -98,7 +98,7 @@ def main() -> None:
             continue
         cond = "; ".join(l["conditions"]) or "none"
         out.append(f"| {l['file']} | {l['decision']} | {l['reason']} | {cond} |")
-    (ROOT / "docs" / "run_log.md").write_text("\n".join(out) + "\n")
+    (ROOT / "docs" / "run_log.md").write_text("\n".join(out) + "\n", encoding="utf-8")
     print("wrote docs/run_log.md")
 
 

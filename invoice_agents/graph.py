@@ -140,7 +140,12 @@ def build_graph(ctx: RunContext):
         return "reject" if d.status == DecisionStatus.REJECTED else "hold"
 
     def pay(s: InvoiceState) -> InvoiceState:
-        s = ctx.payments.pay(s)
+        try:
+            s = ctx.payments.pay(s)
+        except Exception as e:  # noqa: BLE001 - review 3: never leave an invoice APPROVED but unpaid
+            s.errors.append(f"payment: {type(e).__name__}: {e}")
+            s = ctx.payments._hold(s, f"the payment step raised {type(e).__name__} ({str(e)[:120]})")
+            return s
         if (s.payment or {}).get("status") == "failed":
             enqueue_failed_payment(ctx.conn, s)   # review 2: a failed payment is visible and queued for a person
         elif (s.payment or {}).get("status") in ("paid", "already_paid"):
@@ -162,7 +167,7 @@ def build_graph(ctx: RunContext):
             ctx.conn.commit()
         path = ctx.trace_path()
         if path:
-            with open(path, "a") as fh:
+            with open(path, "a", encoding="utf-8") as fh:
                 root = str(ROOT) + "/"  # traces are committed; keep paths repo-relative
                 for ev in s.trace:
                     fh.write(json.dumps({"run_id": ctx.run_id, "source": Path(s.source).name,
@@ -211,7 +216,7 @@ def make_context(llm: LLMClient | None = None, db: str | None = None, chaos: flo
     if runs_dir is not None:
         run_dir = Path(runs_dir) / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        (run_dir / "trace.jsonl").write_text("")
+        (run_dir / "trace.jsonl").write_text("", encoding="utf-8")
     return RunContext(conn=conn, inventory=Inventory(conn), policy=load_policy(), llm=llm or OfflineClient(),
                       payments=PaymentAgent(conn, chaos=chaos, seed=seed, base_delay=base_delay, sleep=sleep),
                       registry=DuplicateRegistry(conn=conn, run_id=run_id), run_id=run_id, run_dir=run_dir)

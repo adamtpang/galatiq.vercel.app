@@ -15,7 +15,7 @@ POLICY_PATH = ROOT / "config" / "policy.yaml"
 
 @lru_cache(maxsize=4)
 def _load(path: str | None) -> dict[str, Any]:
-    with open(Path(path) if path else POLICY_PATH) as fh:
+    with open(Path(path) if path else POLICY_PATH, encoding="utf-8") as fh:
         return yaml.safe_load(fh)
 
 

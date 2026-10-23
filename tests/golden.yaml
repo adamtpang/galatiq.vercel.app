@@ -5,7 +5,7 @@
 #   - 1012.pdf is a renamed vendor ("formerly FastShip Ltd."), so it is a hard hold for human verification
 #     (decision 9) before the VP or critic run. Before decision 9 it reached the same PENDING_HUMAN through a
 #     VP/critic deadlock. 1012.txt, 1011.txt and 1013.pdf stay duplicates of the earlier copy (same number).
-#   - approved amounts are paid in USD (1014 converted with the mock FX table)
+#   - approved amounts are paid in USD; a non-USD invoice (1014, EUR) is held for a person (decision 22)
 #   - offline VP/critic are deterministic; a live Grok run may differ (see docs/run_log.md)
 invoice_1001.txt:          {decision: APPROVED, paid: 5000.00}
 invoice_1002.txt:          {decision: REJECTED, must_flag: [STOCK_EXCEEDED]}
@@ -24,6 +24,6 @@ invoice_1012.pdf:          {decision: PENDING_HUMAN, by: hard_hold, must_flag: [
 invoice_1012.txt:          {decision: REJECTED, must_flag: [DUPLICATE_INVOICE]}
 invoice_1013.json:         {decision: REJECTED, must_flag: [STOCK_EXCEEDED, TOTAL_MISMATCH]}
 invoice_1013.pdf:          {decision: REJECTED, must_flag: [DUPLICATE_INVOICE, STOCK_EXCEEDED]}
-invoice_1014.xml:          {decision: APPROVED, paid: 4455.00}
+invoice_1014.xml:          {decision: PENDING_HUMAN, must_flag: [CURRENCY_CONVERTED]}
 invoice_1015.csv:          {decision: APPROVED, paid: 6500.00}
 invoice_1016.json:         {decision: REJECTED, must_flag: [UNKNOWN_ITEM]}

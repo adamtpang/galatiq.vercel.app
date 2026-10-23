@@ -24,6 +24,7 @@ approval:
     bank_details_changed: true       # decision 11: the invoice asks to pay a new or changed account (bank_details below)
     extraction_disagreement: true    # decision 12: live, Grok's independent reading differs from the parser's
     grok_check_failed: true          # decision 16: live, Grok's cross-check or risk review failed (GROK_CHECK_FAILED)
+    foreign_currency: true           # decision 22: any non-USD invoice (CURRENCY_CONVERTED) waits for a person
   # Decision 16: after a hard-rule rejection, one review (Grok live; a rules stand-in offline) may escalate the
   # rejection to a person. It can never approve or pay; if it fails, the rejection stands.
   rejection_review: true
@@ -51,6 +52,17 @@ bank_details:
     - '\b(pay|send|wire|remit|transfer)\s+(it\s+|payment\s+|funds\s+|the\s+balance\s+)?(to|into)\b[^.\n]{0,30}\d{6,}'
     - '\b(account|acct|a/c|routing|aba|iban|sort\s+code|beneficiary)\b\s*(number|no\.?|num|#)?\s*[:#]?\s*\d(?:[\s-]?\d){7,}'
     - '\d(?:[\s-]?\d){7,}\s*\(?\s*(account|acct|routing|aba)\b'
+  # Decision 20 (review 3): a pattern list cannot keep up with new wordings, so offline (no model reads the text)
+  # any payment-instruction keyword in the invoice text holds it. Matched as whole words after NFKC
+  # normalization, lower case and joining spaced-out letters. On the 20 case samples only 1003 matches
+  # ("Wire transfer preferred."), which is an instruction about how to pay; 1003 is rejected by hard rules anyway.
+  # Bare "account" is not a keyword ("Your account manager will call" is harmless); it counts when it names
+  # where money goes: "bank account", "account ending", "account number", "our new account" and similar.
+  payment_keywords: ['bank(?!\s+holidays?)', 'banks', 'banking', '(bank|checking|savings|business|deposit|new|our|the)\s+account',
+                     'account\s+(number|no|num|#|ending|details|info|information)', 'acct', 'routing', 'aba', 'iban', 'swift',
+                     'wire', 'wired', 'ach', 'zelle', 'venmo', 'paypal', 'crypto', 'cryptocurrency', 'bitcoin',
+                     'btc', 'usdt', 'escrow', 'remit', 'remit-to', 'remittance', 'pay\s+to', 'send\s+funds',
+                     'account\s+ending', 'new\s+details']
 
 # Decision 7: duplicates by content. An invoice with the same vendor (normalized name), line items,
 # quantities and total as an earlier one is a DUPLICATE_INVOICE (blocking) even under a new number.
@@ -115,6 +127,14 @@ risk:
     - '\btreat\s+(it\s+|this\s+(invoice\s+)?|the\s+invoice\s+)?as\s+(already\s+)?(verified|approved|cleared|trusted|legitimate|safe)\b'
     - '\bignore\s+(all\s+|any\s+)?(the\s+|your\s+)?(previous|prior|above|earlier)\b(?!\s+(invoice|bill|statement|version|revision|copy|order|shipment|delivery|po)\b)'
     - '\bfinal\s+answer\s*:'
+    # Review 3: invented wordings. The text is NFKC-normalized and spaced-out letters are joined first, so the
+    # fullwidth fence tag and "I g n o r e  p r e v i o u s" hit the patterns above.
+    - '\bapproval\s+(step|stage|process)\s+(can|should|may|must|will)\b|\balready\s+(reviewed|approved|cleared|verified)\s+by\b|\b(reviewed|approved|cleared|verified)\s+by\s+(acme|finance|the\s+cfo|accounts\s+payable)\b[^.\n]{0,20}\balready\b'
+    - '"(decision|risk_score|risk|role|approved)"\s*:'
+    - '\bsystem\s+override\b'
+    - '\bas\s+the\s+(language\s+model|ai|llm|assistant|model|reviewer)\b|\byour\s+(only\s+)?(job|task|role)\s+is\s+(only\s+)?to\b'
+    - '\b(output|respond|reply|answer|return)\s+(with\s+)?"?(approve|approved|approval)\b'
+    - '\bignor(er|ez)\s+(les|toutes\s+les)\s+(instructions|consignes|r[eè]gles)\b|\bignorier(en|e)?\b[^.\n]{0,30}\b(anweisungen|regeln)\b|\bignora(r)?\s+(las|todas\s+las)\s+(instrucciones|reglas)\b'
   # White House; the Simpsons' fictional address (found by Grok on 1004_revised). Decision 13: an entry does not
   # fire on the address the vendor master has on file for that vendor (Precision Parts Ltd. is on file at
   # 742 Evergreen Terrace in this mock data), only on another vendor using it (data/invoices_adversarial 3007).

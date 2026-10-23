@@ -1,0 +1,1 @@
+{"invoice_number":"INV-9121","vendor":{"name":"Summit Manufacturing Co."},"date":"2026-01-20","due_date":"2026-02-20","line_items":[{"item":"WidgetA","quantity":2,"unit_price":250.0}],"total":500.0,"total":50000.0,"currency":"USD"}

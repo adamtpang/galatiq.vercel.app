@@ -305,7 +305,9 @@ def hard_rules(state: InvoiceState) -> Decision | None:
 HOLD_FLAGS = {"vendor_renamed": "VENDOR_RENAMED", "vendor_lookalike": "VENDOR_LOOKALIKE",
               "bank_details_changed": "BANK_DETAILS_CHANGED",   # decision 11
               "extraction_disagreement": "EXTRACTION_DISAGREEMENT",   # decision 12
-              "grok_check_failed": "GROK_CHECK_FAILED"}   # decision 16: live, a Grok check that should have run failed
+              "grok_check_failed": "GROK_CHECK_FAILED",   # decision 16: live, a Grok check that should have run failed
+              "foreign_currency": "CURRENCY_CONVERTED"}   # decision 22: non-USD goes to a person, no fixed-rate payment
+HOLD_WHY = {"CURRENCY_CONVERTED": "hold for a person to confirm the USD amount; nothing is paid at a fixed rate"}
 
 
 def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
@@ -335,8 +337,8 @@ def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
                                             "reported is printed in the file, and the checks reconcile"))
     for key, code in HOLD_FLAGS.items():
         if cfg.get(key):
-            reasons += [f"{code}: {f.message}; hold for human verification of the vendor and bank details"
-                        for f in state.flags if f.code == code]
+            why = HOLD_WHY.get(code, "hold for human verification of the vendor and bank details")
+            reasons += [f"{code}: {f.message}; {why}" for f in state.flags if f.code == code]
     if not reasons:
         return None
     return Decision(status=DecisionStatus.PENDING_HUMAN, reasons=reasons, risk_score=(state.risk or {}).get("score"),
@@ -390,6 +392,8 @@ STATUS = {"approve": DecisionStatus.APPROVED, "reject": DecisionStatus.REJECTED,
 
 
 def decide(state: InvoiceState, vp: VP, critic: Critic, policy: dict[str, Any], reviewer: Any = None) -> Decision:
+    if any(f.code == "INTERNAL_ERROR" and (f.evidence or {}).get("stage") == "ingestion" for f in state.flags):
+        return error_hold(state)   # review 3: a crash while reading the file holds; its missing fields are not evidence
     hold = unreadable_hold(state, policy)
     if hold:
         return hold

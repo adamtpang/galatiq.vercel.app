@@ -24,9 +24,9 @@ SOURCE_DIRS = [ROOT / "data" / "invoices", ROOT / "data" / "invoices_extra"]
 
 def export_run(name: str) -> dict:
     d = RUNS / name
-    summary = json.loads((d / "summary.json").read_text())
+    summary = json.loads((d / "summary.json").read_text(encoding="utf-8"))
     by_file: "OrderedDict[str, list[dict]]" = OrderedDict()
-    for line in (d / "trace.jsonl").read_text().splitlines():
+    for line in (d / "trace.jsonl").read_text(encoding="utf-8").splitlines():
         ev = json.loads(line)
         by_file.setdefault(ev["source"], []).append(ev)
     rows = {r["file"]: r for r in summary["rows"]}
@@ -138,8 +138,8 @@ if __name__ == "__main__":
                        "critic_max_rounds": pol["approval"]["critic_max_rounds"]},
             "runs": {n: export_run(n) for n in ("offline", "live", "extra_offline", "extra_live", "critic_offline", "critic_live") if (RUNS / n / "summary.json").exists()}}
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(json.dumps(data, separators=(",", ":"), default=str))
+    OUT.write_text(json.dumps(data, separators=(",", ":"), default=str), encoding="utf-8")
     srcs = export_sources({i["file"] for r in data["runs"].values() for i in r["invoices"]})
-    SRC_OUT.write_text(json.dumps(srcs, separators=(",", ":")))
+    SRC_OUT.write_text(json.dumps(srcs, separators=(",", ":")), encoding="utf-8")
     print(f"wrote {SRC_OUT} and {len(srcs)} original files to {INV_DIR}")
     print(f"wrote {OUT} ({OUT.stat().st_size // 1024} KB): " + ", ".join(f"{k}={len(v['invoices'])}" for k, v in data["runs"].items()))
