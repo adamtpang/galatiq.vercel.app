@@ -1,6 +1,6 @@
 {
  "source": "evals/results (python -m evals)",
- "offline_generated_at": "2026-10-22 22:06 CDT",
+ "offline_generated_at": "2026-10-23 09:25 CDT",
  "live_generated_at": "2026-10-22 20:28 CDT",
  "model": "grok-4.7",
  "extraction": {
@@ -129,10 +129,10 @@
   {
    "label": "committed demo runs (runs/demo/offline vs runs/demo/live), 20 samples",
    "invoices": 20,
-   "agree": 17,
-   "rate": 0.85,
+   "agree": 16,
+   "rate": 0.8,
    "disagreement_routing": {
-    "to_human": 3,
+    "to_human": 4,
     "paid_on_one_side": [
      {
       "file": "invoice_1001.txt",
@@ -159,6 +159,12 @@
      "offline": "APPROVED",
      "live": "PENDING_HUMAN",
      "live_reason": "Vendor Widgets Inc. is on file and the invoice total is 5000.0 USD."
+    },
+    {
+     "file": "invoice_1004.json",
+     "offline": "SUPERSEDED",
+     "live": "REJECTED",
+     "live_reason": "SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json"
     },
     {
      "file": "invoice_1004_revised.json",
@@ -328,7 +334,7 @@
     "PAST_DUE",
     "DUPLICATE_INVOICE"
    ],
-   "reason": "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-22 10:06 PM CDT) under a different number (INV-1101)"
+   "reason": "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-23 9:25 AM CDT) under a different number (INV-1101)"
   }
  },
  "separate_run_live": {
@@ -807,20 +813,20 @@
  },
  "offline_latency": {
   "samples": {
-   "latency_mean_ms": 5.4,
-   "wall_s": 0.25
+   "latency_mean_ms": 4.9,
+   "wall_s": 0.24
   },
   "adversarial": {
-   "latency_mean_ms": 2.4,
-   "wall_s": 0.1
+   "latency_mean_ms": 2.0,
+   "wall_s": 0.09
   },
   "extra": {
-   "latency_mean_ms": 2.3,
+   "latency_mean_ms": 1.7,
    "wall_s": 0.04
   },
   "unseen": {
-   "latency_mean_ms": 3.1,
-   "wall_s": 0.04
+   "latency_mean_ms": 1.6,
+   "wall_s": 0.03
   }
  }
 }

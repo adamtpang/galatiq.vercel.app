@@ -1,0 +1,32 @@
+{
+  "mode": "grok",
+  "model": "grok-4.7",
+  "commit": "bb2e6a8",
+  "grok": "Grok worked on 1 of 1 invoices (6 API calls this run; reused cached answers are not counted as calls). Hard rules rejected 0 of them; Grok cannot turn those into a payment: it cross-checked the reading, reviewed each rejection (it can only escalate one to a person) and wrote the memo.",
+  "rows": [
+    {
+      "file": "invoice_2007_quarter_close.txt",
+      "invoice": "INV-2007",
+      "vendor": "Reliable Components Inc.",
+      "total_usd": 11000.0,
+      "risk": 30,
+      "block_flags": [],
+      "warn_flags": [],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "vp",
+      "engine": "grok",
+      "decided_by_label": "the VP agent (Grok)",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "Amount is over the $10,000 approval threshold and needs extra scrutiny.",
+      "conditions": [
+        "Do not pay before the Net 30 due date of 2026-11-19.",
+        "Release only after a human confirms the over-threshold amount."
+      ],
+      "errors": [],
+      "memo": "Invoice INV-2007 from Reliable Components Inc. is for $11,000.00, with a Net 30 due date of 2026-11-19. The decision is PENDING_HUMAN: the amount is over the $10,000 approval threshold and needs extra scrutiny (flag: OVER_APPROVAL_THRESHOLD, $11,000.00 is over $10,000.00). The vendor is known and the line math matches catalog prices, but a vendor note pressures early collection contrary to Net 30 and the stated due date. Do not pay before 2026-11-19, and release payment only after a human confirms the over-threshold amount.",
+      "memo_by": "grok",
+      "grok_calls": 6
+    }
+  ]
+}

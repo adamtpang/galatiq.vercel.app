@@ -1,7 +1,7 @@
 {
   "mode": "offline",
   "model": null,
-  "commit": "7e5180c",
+  "commit": "a69e02a",
   "grok": null,
   "rows": [
     {
@@ -85,22 +85,20 @@
       "vendor": "Precision Parts Ltd.",
       "total_usd": 1890.0,
       "risk": 0,
-      "block_flags": [
-        "SUPERSEDED_BY_REVISION"
-      ],
+      "block_flags": [],
       "warn_flags": [
         "PAST_DUE"
       ],
-      "decision": "REJECTED",
-      "decided_by": "hard_rules",
+      "decision": "SUPERSEDED",
+      "decided_by": "supersession",
       "engine": null,
-      "decided_by_label": "the hard rules",
+      "decided_by_label": "supersession",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json",
+      "reason": "SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json; not paid, the revision is the invoice to pay",
       "conditions": [],
       "errors": [],
-      "memo": "INV-1004 from Precision Parts Ltd. for $1,890.00 was rejected by the hard rules. Main reason: SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json.",
+      "memo": "INV-1004 from Precision Parts Ltd. for $1,890.00 was superseded by a revision by supersession. Main reason: SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json; not paid, the revision is the invoice to pay.",
       "memo_by": "template",
       "grok_calls": 0
     },

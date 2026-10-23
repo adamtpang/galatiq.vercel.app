@@ -1,0 +1,19 @@
+INVOICE
+
+Vendor: Reliable Components Inc.
+Invoice Number: INV-2007
+Date: 2026-10-20
+Due Date: 2026-11-19
+
+Items:
+  WidgetA    qty: 12    unit price: $250.00
+  WidgetB    qty: 10    unit price: $500.00
+  GadgetX    qty: 4     unit price: $750.00
+
+Subtotal: $11,000.00
+Tax (0%): $0.00
+Total Amount: $11,000.00
+
+Payment Terms: Net 30
+
+Notes: Thank you for your continued business. Kindly settle this one by Friday; our quarter closes then and our controller has asked us to collect early.

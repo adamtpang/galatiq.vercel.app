@@ -1,135 +1,64 @@
-# Results and evals in detail
+# Results, evals and demo
 
-The README has the short version. Every number here comes from a committed file: `evals/results/summary.md`,
-`offline.md`, `live.md`, `separate_run_live.md`, `cache_repeatability.md` and `docs/run_log.md`.
+Every number comes from a committed file in `evals/results/` (`summary.md`, `offline.md`, `live.md`, `separate_run_live.md`, `cache_repeatability.md`, and `run_log.md`, the generated side by side of the two demo runs with every live reason).
 
-**Which code produced which result.** The offline results were made at commit 4d539d3 (demo runs) and 05a4ef5
-(evals). All live results were made on Oct 22, 2026 between 7:46 PM and 9:16 PM CT at commit 05a4ef5, which only
-added data and docs on top of 4d539d3. One later code change is not in the live numbers: after the live eval showed
-that Grok's repair could rebuild adversarial 3014 and drop its wrong-type errors, a file with wrong value types is no
-longer sent to Grok repair (`tests/test_review_fixes.py::test_wrong_types_are_never_repaired_by_grok_live`). Live
-spot check at commit 7d320a2 (Oct 22, 9:19 PM CT, `python main.py --invoice_path=data/invoices_adversarial/invoice_3014_wrong_types.json --mode live`
-on a fresh database): no repair call, REJECTED by hard rules with INVALID_FIELD_TYPE, Grok's rejection review agreed,
-not paid; 2 Grok calls, $0.0204 billed.
-
-**Review 3 fixes (commits 76881f7 and 7e5180c) and the live numbers.** The offline results below were regenerated at
-7e5180c. 7e5180c (decision 23) also holds 1010 offline (20% over catalog), as both live runs did; the typed-amount
-rule (decision 21) only affects the review queue. The
-live numbers were not re-run in full and predate these fixes. Among the 20 samples the fixes change only 1014 (EUR),
-which is now held for a person instead of paid at the mock rate; the new payment-instruction hold matches only 1003
-("Wire transfer preferred."), which hard rules reject anyway. Live spot checks at 76881f7 on Oct 22, 2026 between
-9:50 and 9:52 PM CT, each `python main.py --invoice_path=<file> --mode live` on a fresh database (traces in
-`evals/results/spot_review3/`): `invoice_1014.xml` held (CURRENCY_CONVERTED), not paid; the reviewer's `t17.txt`
-("payments should now go to our Chase account ending 7781") and `t19.txt` ("use the new remit-to on our portal") both
-held (BANK_DETAILS_CHANGED), not paid, and on both Grok's risk review set `payment_details_changed` to true and quoted
-the sentence (on 1014 it set it to false). 15 Grok calls, $0.1025 billed in total.
-
-Earlier live results (before review 2) came from local checkpoint commits 4719dbe, 982b14f and 849b0af that were
-never pushed to main. They are now on the branch
-[`live-eval-checkpoints`](https://github.com/adamtpang/galatiq.vercel.app/tree/live-eval-checkpoints). Every live
-result now committed on main was re-run at 05a4ef5 and replaces them.
+**Which code produced which result.** Offline results are regenerated at the current code (the commit is in each `summary.json`). All full live runs were made on Oct 22, 2026, 7:46 PM to 9:16 PM CT, at commit 05a4ef5. Later changes were not re-run live in full: the review 3 fixes, decision 23 (overbilling hold) and decision 24 (SUPERSEDED status). Live spot checks after them: 3014 at 7d320a2 (rejected, no repair call, $0.0204); 1014 and two reviewer bank sentences at 76881f7 (all held, $0.1025, traces in `evals/results/spot_review3/`). Earlier live results from unpushed checkpoints are on the branch `live-eval-checkpoints` and are replaced by the 05a4ef5 runs.
 
 ## Results on the 20 samples
 
-| Run | Paid | Rejected | Held for a person |
+| Run | Paid | Rejected | Held | Superseded |
+|---|---|---|---|---|
+| Offline rules stand-ins (`runs/demo/offline`) | 5, $23,190.00 | 11 | 3 | 1 |
+| Live demo run, grok-4.7 (`runs/demo/live`) | 4, $16,705.00 | 12 | 4 | - |
+| Live eval run, grok-4.7 (`evals/results/runs/live/main`) | 4, $17,250.00 | 12 | 4 | - |
+
+The live runs predate decision 24, so they count 1004 as REJECTED; offline it is SUPERSEDED. Nobody pays it. The other 11 rejections are the same in every run, and live Grok's rejection review agreed with all of them. 1012.pdf is held everywhere (renamed vendor). Where the VP decides:
+
+| File | Offline | Live demo | Live eval |
 |---|---|---|---|
-| Offline rules stand-ins (`runs/demo/offline`, 7e5180c) | 5 invoices, $23,190.00 | 12 | 3 |
-| Live demo run, grok-4.7 (`runs/demo/live`, 8:29 PM CT) | 4 invoices, $16,705.00 | 12 | 4 |
-| Live eval run, grok-4.7 (`evals/results/runs/live/main`, 7:46 PM CT) | 4 invoices, $17,250.00 | 12 | 4 |
+| 1001 | Paid | Held (Net 15 vs due date) | Paid |
+| 1004_revised | Paid $5,940.00 | Held (earlier 1004 rejected) | Held |
+| 1006, 1011.pdf, 1015 | Paid | Paid | Paid |
+| 1010 | Held (20% over catalog, decision 23) | Held | Held |
+| 1014 (EUR) | Held (decision 22) | Paid (before decision 22) | Held |
 
-The same 12 are rejected in every run: hard rules run first and any blocking flag rejects. Live, Grok's rejection
-review read all 12 in each run and agreed with all 12; it can only escalate a rejection to a person, never pay it.
-1012.pdf is held in every run by the vendor-rename hard hold. Offline, 1014 is also held (non-USD, decision 22). The
-other invoices are the ones the VP decides:
-
-| File | Offline | Live demo run | Live eval run |
-|---|---|---|---|
-| 1001 | Paid | Held (confirm Net 15 against the due date) | Paid |
-| 1004_revised | Paid $5,940.00 | Held (earlier INV-1004 rejected, PO amendment) | Held (same) |
-| 1006 | Paid | Paid | Paid |
-| 1010 | Held (20% over catalog: check against the PO, decision 23) | Held (rush price 20% over catalog) | Held (same) |
-| 1011.pdf, 1015 | Paid | Paid | Paid |
-| 1014 (EUR) | Held (non-USD, decision 22) | Paid (before decision 22) | Held (first payment, EUR prices off the USD catalog) |
-
-Every other live and offline difference is an invoice the rules stand-ins would pay and the Grok VP held, never the
-reverse. 1014 is the exception: the live demo run predates decision 22 and paid it. The full side by side with live reasons is in `docs/run_log.md`.
-
-**How 1004 and its revision end up.** INV-1004 (Precision Parts, $1,890.00) passes every inventory check, but `invoice_1004_revised.json` is revision R1 of the same invoice ($5,940.00), so the batch prescan rejects the original as superseded (`SUPERSEDED_BY_REVISION`) and R1 carries on (`REVISION_SUPERSEDES`). Before decision 13 the address watch list listed 742 Evergreen Terrace, which is also the address the mock vendor master has on file for Precision Parts, so R1 was always held and the 1004 family was never paid: the mock data contradicted itself. Now a watch-list entry does not fire on the vendor's own address on file (an `ADDRESS_ON_FILE` info flag records the match), so offline R1 is paid $5,940.00 and the original is never paid. Another vendor at that address still fires the watch list (adversarial 3007, held).
-
-**Live decisions are not perfectly repeatable.** Grok runs at `temperature=0` and the same invoice can still get a
-different decision in a fresh run (1001 and 1014 above). The design limits what that can do: hard rules and hard
-holds run before any model opinion, Grok's risk review can only raise the score, the rejection review can only
-escalate, the memo is written after the decision and never read back, and the fail-closed guard and the payment step
-refuse anything with an error or a blocking flag. So a run-to-run difference moves an invoice between paid and held,
-never pays what the rules block.
-
-**Decision cache.** Every Grok answer for an invoice is stored in SQLite under a hash of the file content, the policy,
-the model id and the prompt code, and reused when the same invoice runs again. Measured at 05a4ef5
-(`evals/results/cache_repeatability.md`): the 20 samples run twice on one database gave identical decisions, reasons,
-risk scores and flags for 20 of 20; the first run made 83 API calls ($0.6346, 844.6 s), the second made 0 (0.2 s).
-A new invoice, policy, model id or prompt is a new key. `--no-cache` turns it off. The model id the API returns is
-recorded on every call; a different id is a MODEL_MISMATCH hold. On Oct 22 the API returned `grok-4.7` on every call.
+**Live is not perfectly repeatable** (1001 and 1014 above), but a difference can only move an invoice between paid and held: hard rules and holds run first, Grok can only raise risk, and the guard and payment step refuse blocked invoices. **The decision cache** makes a re-run identical: 20 of 20 the same, 83 calls then 0.
 
 ## Evals
 
-`python -m evals` runs five evals offline in about a second; `--live` adds the live runs; `--write-snapshot` writes the
-committed copy (`evals/results/`, `web/data/evals.json`). `tests/test_evals.py` pins the offline numbers in CI.
+`python -m evals` runs five evals offline in about a second; `tests/test_evals.py` pins them.
 
 | Eval | Offline | Live (grok-4.7, 05a4ef5) |
 |---|---|---|
-| (a) Extraction, all fields, 26 files | 119/127 (93.7%) | 127/127 pipeline; 126/127 Grok-only |
-| (b) Agreement with offline, 20 samples | - | 17/20 in the eval run (against the offline run at 05a4ef5); 17/20 in the committed demo runs (offline at 7e5180c) |
-| (c) Adversarial set caught (15) | 15/15; 15/15 as a separate later run | 15/15; 15/15 as a separate later run |
-| (d) Cost, 20 samples | $0, 0 calls | $0.6575 billed, 85 calls |
-| (d) Latency, 20 samples | 4.7 ms mean per invoice | 38.9 s mean per invoice, 778.9 s batch |
-| (e) Unseen layouts (4) | 4 held, none rejected, none paid | 4/4 read correctly, 4/4 paid |
+| (a) Extraction, 26 files | 119/127 fields | 127/127 pipeline; 126/127 Grok-only |
+| (b) Agreement, 20 samples | - | 17/20 eval run; 16/20 committed demo runs |
+| (c) Adversarial caught (15) | 15/15, also as a separate later run | 15/15, also as a separate later run |
+| (d) Cost and latency, 20 samples | $0; 4.9 ms per invoice | $0.6575, 85 calls; 38.9 s per invoice |
+| (e) Unseen layouts (4) | 4 held | 4/4 read correctly and paid |
 
-**(a) Extraction.** `evals/ground_truth.yaml` was written by reading each source file, not from pipeline output. It
-scores vendor, invoice number, printed total, line items and due date for the 20 samples and 6 extras. Offline every
-miss is one of the two extras the parsers cannot read (2001 email, 2003 truncated JSON). The parsers were written
-against the samples, so their sample score is in-sample. Grok-only extraction missed one field: 1012.pdf's vendor
-kept "(formerly FastShip Ltd.)".
+- (a) Ground truth was written by reading each file. Offline misses are the two extras the parser cannot read (2001, 2003).
+- (b) Demo-run disagreements: 1001, 1004_revised and 1014 (above) and 1004 (status label only). Extras agree on 5 of 6 (2006: rejected offline after the critic objects, held live). Unseen: 0 of 4 (offline holds, live pays).
+- (c) Traps: injections, lookalike and renamed vendors, bank changes, duplicates, wrong types, a closing fence tag. Live, the rejection review escalated one (3014) to a person, its only escalation.
+- (d) Billed cost is the API's own `cost_in_usd_ticks`. All committed live runs cost $3.87, plus $0.10 for the review 3 spot checks and $0.14 for the critic attempts below.
 
-**(b) Agreement.** See the tables above. On the 15 adversarial invoices the modes agree on 15. On the 6 extras they
-agree on 5: 2006 is rejected offline after the critic objects, held live by the VP. On the 4 unseen layouts they agree
-on 0: offline holds all 4 (unreadable layout), live pays all 4 after a grounded Grok reading.
+## The critic, live
 
-**(c) Adversarial set.** 15 added invoices in `data/invoices_adversarial/`, with expected outcomes written in
-`evals/adversarial_expected.yaml` before each run. "Caught" means not approved and not paid. 3009 to 3015 were added
-after review 2: moved banks with acct and ABA numbers, a SYSTEM: pre-cleared note, an ASSISTANT: final-answer note, a
-closing `</invoice_document>` tag, notes as a JSON list (the crash that paid INV-1005 before the fix), wrong types in
-every field, and a wire-instruction change. Live, 15 of 15 were caught in the eval run and 15 of 15 in the separate
-later run (`separate_run_live.md`, 154 Grok calls for both runs, $1.1465). In that separate run Grok's rejection
-review escalated 3014 to a person: it pointed out that the "missing" items and total were present but had wrong
-types. That is the only live escalation so far, and the invoice was still not paid. In the eval run 3014 was rejected
-as a content duplicate of 3010 after Grok rebuilt it; that rebuild is the gap fixed after the run (see the top of
-this file).
+The critic runs when the VP approves over $10,000, near the limit or high risk. Live it ran once (2004, eval run) and signed off. It has **never been seen to object live**. 2005 and 2006 were written to make it object; the Grok VP held both first. On Oct 23 three more tries, each a hard-rule-clean invoice from Reliable Components (paid history from the 20 samples, run first on the same database), each run once with `--mode live --no-cache`:
 
-**(d) Cost and latency.** Billed cost is the API's own `cost_in_usd_ticks`; it matches the published grok-4.7 prices.
+| Invoice | Subtle problem | Grok VP | Cost |
+|---|---|---|---|
+| 2007 ($11,000) | "Kindly settle by Friday" against Net 30 | held | $0.0505 |
+| 2008 ($10,250) | ships to the vendor itself | held | $0.0492 |
+| 2009 ($10,490) | GadgetX 8% over catalog, under the 10% flag | held | $0.0402 |
 
-| Live batch | Invoices | Calls | Billed | Mean latency |
-|---|---|---|---|---|
-| 20 samples | 20 | 85 | $0.6575 | 38.9 s |
-| Adversarial | 15 | 71 | $0.5360 | 80.4 s |
-| Extra | 6 | 34 | $0.2564 | 54.8 s |
-| Unseen | 4 | 24 | $0.1432 | 44.0 s |
-| Grok-only extraction | 26 files | 26 | $0.2175 | 10.6 s |
+Grok's risk review spotted each problem, so the VP held before any critic call. Traces: `runs/demo/critic_live_2007` to `_2009`; invoices in `data/invoices_critic/`. Offline, 2005 (deadlock) and 2006 (objection, then a rejection) show the loop with rules stand-ins.
 
-The adversarial mean is pulled up by one slow call: Grok's repair of 3014 took 485 s.
+## Demo: what to run and what to point at
 
-**(e) Unseen layouts.** Four added invoices in layouts the parsers were never tuned on. Offline the parsers read none
-and all 4 are held as unreadable layouts. Live, Grok read all 4 correctly, each reading was grounded in the file, and
-all 4 were paid after the normal risk review and VP. That includes 4004, which an earlier checkpoint held because of a
-bug in our CSV grounding check; this run confirms the fix live.
-
-## The critic and the rejection review, live
-
-The critic runs only when the VP approves an invoice over $10,000, near the limit or high risk. Live on Oct 22 at
-05a4ef5 it ran once, on 2004 in the eval run, and signed off. In the committed live demo runs the Grok VP held 2004
-(both alone and in the extras batch), so no critic call was made. 2005 and 2006, written to make the critic object,
-were held by the Grok VP on its first pass both times. So a live critic objection followed by a VP revision has not
-been observed; offline, 2005 (deadlock) and 2006 (objection, then revised to a rejection) show the loop with the rules
-stand-ins.
-
-The rejection review ran on every hard-rule rejection live: it agreed with all 12 sample rejections in the demo run
-and with all 15 rejections in the eval run, and escalated one (3014) in the separate later run.
+1. `python main.py --invoice_path=data/invoices/invoice1.txt`: runs `invoice_1001.txt` (the case files start at 1001) with one JSON line per step, the `mock_payment` output and the trace path.
+2. `python main.py --batch data/invoices --offline`: 5 paid ($23,190.00), 11 rejected, 3 held (1010, 1012.pdf, 1014), 1 superseded (1004).
+3. Edge cases: 1003 (fraud, rejected, risk 60); 1004 (`SUPERSEDED_BY_REVISION` info flag, SUPERSEDED, R1 paid, decision 13 address on file); 1010 (lines aggregated, 20% over catalog, held); 1011 to 1013 (duplicates across formats); 1012.pdf (OCR fixes, renamed vendor, hard hold); 1013 (over stock only after summing lines); 1014 (EUR, held); 2005 and 3005 (offline critic deadlock); 3008 (new IBAN, held).
+4. `--chaos 0.3 --seed 7`, then the same batch again: retries with backoff, then `idempotency_skip`.
+5. `python main.py review INV-1012` and `python main.py ui`: the queue; approve pays through the same idempotent step.
+6. `--mode live` (needs `XAI_API_KEY`): `grok_cross_check`, `tool_call`, `memo`, `llm_repair` on 2001 and 2003.
+7. https://galatiq.vercel.app replays the committed runs.

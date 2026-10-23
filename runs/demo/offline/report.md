@@ -5,7 +5,7 @@
 | invoice_1001.txt | INV-1001 | Widgets Inc. | $5,000.00 | 0 | - | APPROVED | the VP rules stand-in | 0 | paid $5,000.00 | Vendor is on file |
 | invoice_1002.txt | INV-1002 | Gadgets Co. | $15,000.00 | 0 | STOCK_EXCEEDED | REJECTED | the hard rules | 0 | not_paid | STOCK_EXCEEDED: GadgetX: requested 20, only 5 in stock |
 | invoice_1003.txt | INV-1003 | Fraudster LLC | $100,000.00 | 60 | ZERO_STOCK, INVALID_DUE_DATE | REJECTED | the hard rules | 0 | not_paid | ZERO_STOCK: FakeItem has zero stock (requested 100) |
-| invoice_1004.json | INV-1004 | Precision Parts Ltd. | $1,890.00 | 0 | SUPERSEDED_BY_REVISION | REJECTED | the hard rules | 0 | not_paid | SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json |
+| invoice_1004.json | INV-1004 | Precision Parts Ltd. | $1,890.00 | 0 | - | SUPERSEDED | supersession | 0 | not_paid | SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json; not paid, the revision is the invoice to pay |
 | invoice_1004_revised.json | INV-1004 R1 | Precision Parts Ltd. | $5,940.00 | 0 | - | APPROVED | the VP rules stand-in | 0 | paid $5,940.00 | Vendor is on file |
 | invoice_1005.json | INV-1005 | Global Supply Chain Partners | $15,225.00 | 50 | STOCK_EXCEEDED | REJECTED | the hard rules | 0 | not_paid | STOCK_EXCEEDED: GadgetX: requested 8, only 5 in stock |
 | invoice_1006.csv | INV-1006 | Acme Industrial Supplies | $2,750.00 | 0 | - | APPROVED | the VP rules stand-in | 0 | paid $2,750.00 | Vendor is on file |
@@ -28,7 +28,7 @@
 - **invoice_1001.txt** (template): INV-1001 from Widgets Inc. for $5,000.00 was approved for payment by the VP rules stand-in (offline: no model was called). Main reason: Vendor is on file.
 - **invoice_1002.txt** (template): INV-1002 from Gadgets Co. for $15,000.00 was rejected by the hard rules. Main reason: STOCK_EXCEEDED: GadgetX: requested 20, only 5 in stock.
 - **invoice_1003.txt** (template): INV-1003 from Fraudster LLC for $100,000.00 was rejected by the hard rules. Main reason: ZERO_STOCK: FakeItem has zero stock (requested 100).
-- **invoice_1004.json** (template): INV-1004 from Precision Parts Ltd. for $1,890.00 was rejected by the hard rules. Main reason: SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json.
+- **invoice_1004.json** (template): INV-1004 from Precision Parts Ltd. for $1,890.00 was superseded by a revision by supersession. Main reason: SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json; not paid, the revision is the invoice to pay.
 - **invoice_1004_revised.json** (template): INV-1004 from Precision Parts Ltd. for $5,940.00 was approved for payment by the VP rules stand-in (offline: no model was called). Main reason: Vendor is on file.
 - **invoice_1005.json** (template): INV-1005 from Global Supply Chain Partners for $15,225.00 was rejected by the hard rules. Main reason: STOCK_EXCEEDED: GadgetX: requested 8, only 5 in stock.
 - **invoice_1006.csv** (template): INV-1006 from Acme Industrial Supplies for $2,750.00 was approved for payment by the VP rules stand-in (offline: no model was called). Main reason: Vendor is on file.

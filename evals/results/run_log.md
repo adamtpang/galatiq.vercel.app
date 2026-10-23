@@ -1,11 +1,11 @@
 # Run log: all 20 sample invoices
 
-Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026: offline at commit 7e5180c, live at commit 05a4ef5. The live run predates the review 3 fixes (76881f7 and 7e5180c). Among the samples they change 1014, which the offline run now holds (non-USD, decision 22) and the live run paid, and 1010, which the offline run now holds (20% over catalog, decision 23) as the live VP did.
+Two committed runs of `python main.py --batch data/invoices`, each on a fresh database, Oct 22 2026: offline at commit a69e02a, live at commit 05a4ef5. The live run predates the review 3 fixes and decision 24. Among the samples they change 1014, which the offline run now holds (non-USD, decision 22) and the live run paid; 1010, which the offline run now holds (20% over catalog, decision 23) as the live VP did; and 1004, which the offline run now marks SUPERSEDED (decision 24) where the live run logged it as REJECTED. Neither run pays 1004.
 
 - **Offline** (`--offline`): no model is called; the risk review, VP, critic and rejection review are rules stand-ins (fixed rules written from the agents' prompts), and a template writes the memo: `runs/demo/offline/`
 - **Live** (`--mode live`, grok-4.7 via the xAI API for the cross-check, risk review, VP, critic and memo): `runs/demo/live/`
 
-Each folder has `trace.jsonl` (every agent step), `summary.json` and `report.md`. Hard rules (any blocking flag) reject 12 of 20 before any Grok opinion, so both runs agree on those by construction (live, Grok still cross-checks and writes their memo); a hard hold rule holds 1012.pdf (renamed vendor) before the VP. Regenerate this file with `python scripts/make_run_log.py`.
+Each folder has `trace.jsonl` (every agent step), `summary.json` and `report.md`. Hard rules (any blocking flag) reject 11 of 20 before any Grok opinion, so both runs agree on those by construction (live, Grok still cross-checks and writes their memo); a hard hold rule holds 1012.pdf (renamed vendor) before the VP. Regenerate this file with `python scripts/make_run_log.py`.
 
 ## Side by side
 
@@ -14,7 +14,7 @@ Each folder has `trace.jsonl` (every agent step), `summary.json` and `report.md`
 | invoice_1001.txt | $5,000.00 | 0 / 12 | APPROVED (vp, rules stand-in) | PENDING_HUMAN (vp, Grok) **differs** | paid $5,000.00 / not_paid |
 | invoice_1002.txt | $15,000.00 | 0 / 0 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1003.txt | $100,000.00 | 60 / 60 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
-| invoice_1004.json | $1,890.00 | 0 / 0 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
+| invoice_1004.json | $1,890.00 | 0 / 0 | SUPERSEDED (supersession) | REJECTED (hard_rules) **differs** | not_paid / not_paid |
 | invoice_1004_revised.json | $5,940.00 | 0 / 42 | APPROVED (vp, rules stand-in) | PENDING_HUMAN (vp, Grok) **differs** | paid $5,940.00 / not_paid |
 | invoice_1005.json | $15,225.00 | 50 / 50 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 | invoice_1006.csv | $2,750.00 | 0 / 15 | APPROVED (vp, rules stand-in) | APPROVED (vp, Grok) | paid $2,750.00 / paid $2,750.00 |
@@ -32,7 +32,7 @@ Each folder has `trace.jsonl` (every agent step), `summary.json` and `report.md`
 | invoice_1015.csv | $6,500.00 | 0 / 5 | APPROVED (vp, rules stand-in) | APPROVED (vp, Grok) | paid $6,500.00 / paid $6,500.00 |
 | invoice_1016.json | $3,233.00 | 0 / 0 | REJECTED (hard_rules) | REJECTED (hard_rules) | not_paid / not_paid |
 
-Offline: 5 paid ($23,190.00), 12 rejected, 3 held for a human.
+Offline: 5 paid ($23,190.00), 11 rejected, 3 held for a human, 1 superseded by a revision.
 
 Live: 4 paid ($16,705.00), 12 rejected, 4 held for a human.
 
@@ -41,6 +41,7 @@ Live: 4 paid ($16,705.00), 12 rejected, 4 held for a human.
 Both runs use the same code and policy. Each line says which way the decision went; the reasons are the live VP's own, from `runs/demo/live/summary.json`.
 
 - **invoice_1001.txt**: offline APPROVED (paid $5,000.00), live PENDING_HUMAN (risk 12, not_paid). Live reason: Vendor Widgets Inc. is on file and the invoice total is 5000.0 USD. Conditions: Confirm whether payment is Net 15 or due 2026-02-01 before release.
+- **invoice_1004.json**: offline SUPERSEDED (not_paid), live REJECTED (risk 0, not_paid). Live reason: SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json
 - **invoice_1004_revised.json**: offline APPROVED (paid $5,940.00), live PENDING_HUMAN (risk 42, not_paid). Live reason: Vendor is on file and catalog prices match, but prior INV-1004 was rejected at $1,890.00. Conditions: Do not pay until a human confirms the PO amendment and that the prior rejection is cleared.
 - **invoice_1014.xml**: offline PENDING_HUMAN (not_paid), live APPROVED (risk 18, paid $4,455.00). Live reason: Vendor TechParts International is on file and approved with bank details. Conditions: Pay only to the bank on file.; Settle the EUR invoice amount, or convert only at the recorded rate.
 

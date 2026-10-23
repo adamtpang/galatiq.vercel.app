@@ -1,0 +1,31 @@
+{
+  "mode": "grok",
+  "model": "grok-4.7",
+  "commit": "bb2e6a8",
+  "grok": "Grok worked on 1 of 1 invoices (6 API calls this run; reused cached answers are not counted as calls). Hard rules rejected 0 of them; Grok cannot turn those into a payment: it cross-checked the reading, reviewed each rejection (it can only escalate one to a person) and wrote the memo.",
+  "rows": [
+    {
+      "file": "invoice_2008_ship_to_vendor.txt",
+      "invoice": "INV-2008",
+      "vendor": "Reliable Components Inc.",
+      "total_usd": 10250.0,
+      "risk": 35,
+      "block_flags": [],
+      "warn_flags": [],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "vp",
+      "engine": "grok",
+      "decided_by_label": "the VP agent (Grok)",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "Vendor Reliable Components Inc. is on file",
+      "conditions": [
+        "Do not pay until a human confirms why Ship To is Reliable Components Inc. Receiving Dock 3 and matches a valid PO or return authorization"
+      ],
+      "errors": [],
+      "memo": "Invoice INV-2008 from Reliable Components Inc. bills Acme $10,250.00. The decision is PENDING_HUMAN: the vendor is on file and the authoritative total of $10,250.00 has clean line math, but the ship-to is Reliable Components Inc. Receiving Dock 3, not Acme, so the goods are not directed to the payer. The flag OVER_APPROVAL_THRESHOLD notes that $10,250.00 is over $10,000.00 and needs extra scrutiny. Do not pay until a person confirms why the shipment goes to the vendor and matches a valid purchase order or return authorization.",
+      "memo_by": "grok",
+      "grok_calls": 6
+    }
+  ]
+}

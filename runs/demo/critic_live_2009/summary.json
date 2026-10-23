@@ -1,0 +1,31 @@
+{
+  "mode": "grok",
+  "model": "grok-4.7",
+  "commit": "bb2e6a8",
+  "grok": "Grok worked on 1 of 1 invoices (6 API calls this run; reused cached answers are not counted as calls). Hard rules rejected 0 of them; Grok cannot turn those into a payment: it cross-checked the reading, reviewed each rejection (it can only escalate one to a person) and wrote the memo.",
+  "rows": [
+    {
+      "file": "invoice_2009_price_creep.txt",
+      "invoice": "INV-2009",
+      "vendor": "Reliable Components Inc.",
+      "total_usd": 10490.0,
+      "risk": 40,
+      "block_flags": [],
+      "warn_flags": [],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "vp",
+      "engine": "grok",
+      "decided_by_label": "the VP agent (Grok)",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "Vendor is on file and line math matches the $10,490.00 total.",
+      "conditions": [
+        "Do not pay until the GadgetX unit-price variance is confirmed or corrected."
+      ],
+      "errors": [],
+      "memo": "Invoice INV-2009 from Reliable Components Inc. totals $10,490.00. The decision is PENDING_HUMAN: the vendor is on file and the line math matches the $10,490.00 total, but GadgetX is billed at $810.00 versus the $750.00 catalog price, and the total is over the $10,000.00 approval threshold. Flag info OVER_APPROVAL_THRESHOLD notes that $10,490.00 is over $10,000.00 and needs extra scrutiny. Do not pay until the GadgetX unit-price variance is confirmed or corrected.",
+      "memo_by": "grok",
+      "grok_calls": 6
+    }
+  ]
+}
