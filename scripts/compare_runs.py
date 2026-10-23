@@ -53,7 +53,7 @@ def main(a: str, b: str, json_out: str | None = None) -> int:
            f"| Grok answers stored / reused | {sa['cache_misses']} / {sa['cache_hits']} | {sb['cache_misses']} / {sb['cache_hits']} |",
            f"| Billed | ${sa['billed_usd']} | ${sb['billed_usd']} |",
            f"| Trace span | {sa['span_s']} s | {sb['span_s']} s |",
-           f"| Model ids recorded (a cached answer keeps the id of its original call) | {', '.join(sa['models']) or 'none'} | {', '.join(sb['models']) or "none"} |", "",
+           f"| Model ids recorded (a cached answer keeps the id of its original call) | {', '.join(sa['models']) or 'none'} | {', '.join(sb['models']) or 'none'} |", "",
            "| file | decision 1 | decision 2 | risk 1 | risk 2 | payment 1 | payment 2 | identical |",
            "|---|---|---|---|---|---|---|---|", *rows, ""]
     if json_out:
