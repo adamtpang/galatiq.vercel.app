@@ -1,6 +1,6 @@
 # Results, evals and demo
 
-Every number comes from a committed file in `evals/results/` (`summary.md`, `offline.md`, `live.md`, `separate_run_live.md`, `cache_repeatability.md`, and `run_log.md`, the generated side by side of the two demo runs with every live reason).
+Every number comes from a committed file in `evals/results/` (`summary.md`, `offline.md` with every demo-run disagreement and its live reasons, `live.md`, `separate_run_live.md`, `cache_repeatability.md`) or in `runs/demo/*/summary.json`.
 
 **Which code produced which result.** Offline results are regenerated at the current code (the commit is in each `summary.json`). All full live runs were made on Oct 22, 2026, 7:46 PM to 9:16 PM CT, at commit 05a4ef5. Later changes were not re-run live in full: the review 3 fixes, decision 23 (overbilling hold) and decision 24 (SUPERSEDED status). Live spot checks after them: 3014 at 7d320a2 (rejected, no repair call, $0.0204); 1014 and two reviewer bank sentences at 76881f7 (all held, $0.1025, traces in `evals/results/spot_review3/`). Earlier live results from unpushed checkpoints are on the branch `live-eval-checkpoints` and are replaced by the 05a4ef5 runs.
 
