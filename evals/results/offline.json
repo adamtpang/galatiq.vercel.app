@@ -1,8 +1,8 @@
 {
  "mode": "offline",
  "model": null,
- "generated_at": "2026-10-23 09:25 CDT",
- "commit": "a69e02a",
+ "generated_at": "2026-10-23 14:40 CDT",
+ "commit": "2a07cb7",
  "traces": [
   "(temporary, not kept)/main/trace.jsonl",
   "(temporary, not kept)/extra/trace.jsonl",
@@ -1579,7 +1579,6 @@
     "risk_score": 0,
     "signals": [],
     "flags": [
-     "PAST_DUE",
      "DUPLICATE_INVOICE"
     ],
     "grok_reasons": [],
@@ -1731,7 +1730,6 @@
     ],
     "flags": [
      "STOCK_EXCEEDED",
-     "PAST_DUE",
      "UNKNOWN_VENDOR",
      "DUPLICATE_INVOICE"
     ],
@@ -1976,12 +1974,11 @@
     "risk_score": 0,
     "signals": [],
     "flags": [
-     "PAST_DUE",
      "DUPLICATE_INVOICE"
     ],
     "grok_reasons": [],
     "reasons": [
-     "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-23 9:25 AM CDT) under a different number (INV-1101)"
+     "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-23 2:40 PM CDT) under a different number (INV-1101)"
     ]
    },
    {
@@ -2128,7 +2125,6 @@
     ],
     "flags": [
      "STOCK_EXCEEDED",
-     "PAST_DUE",
      "UNKNOWN_VENDOR",
      "DUPLICATE_INVOICE"
     ],
@@ -2199,10 +2195,9 @@
    "decided_by": "hard_rules",
    "caught": true,
    "flags": [
-    "PAST_DUE",
     "DUPLICATE_INVOICE"
    ],
-   "reason": "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-23 9:25 AM CDT) under a different number (INV-1101)"
+   "reason": "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-23 2:40 PM CDT) under a different number (INV-1101)"
   }
  },
  "cost_latency": {
@@ -2211,7 +2206,7 @@
     "file": "invoice_1001.txt",
     "group": "samples",
     "decision": "APPROVED",
-    "latency_s": 0.009,
+    "latency_s": 0.01,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2225,7 +2220,7 @@
     "file": "invoice_1002.txt",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.002,
+    "latency_s": 0.027,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2239,7 +2234,7 @@
     "file": "invoice_1003.txt",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.002,
+    "latency_s": 0.005,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2252,7 +2247,7 @@
    {
     "file": "invoice_1004.json",
     "group": "samples",
-    "decision": "SUPERSEDED",
+    "decision": "REJECTED",
     "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
@@ -2267,7 +2262,7 @@
     "file": "invoice_1004_revised.json",
     "group": "samples",
     "decision": "APPROVED",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2281,7 +2276,7 @@
     "file": "invoice_1005.json",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2295,7 +2290,7 @@
     "file": "invoice_1006.csv",
     "group": "samples",
     "decision": "APPROVED",
-    "latency_s": 0.003,
+    "latency_s": 0.007,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2323,7 +2318,7 @@
     "file": "invoice_1008.txt",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.004,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2337,7 +2332,7 @@
     "file": "invoice_1009.json",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.001,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2393,7 +2388,7 @@
     "file": "invoice_1012.pdf",
     "group": "samples",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.019,
+    "latency_s": 0.024,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2407,7 +2402,7 @@
     "file": "invoice_1012.txt",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.003,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2421,7 +2416,7 @@
     "file": "invoice_1013.json",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2435,7 +2430,7 @@
     "file": "invoice_1013.pdf",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.019,
+    "latency_s": 0.022,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2463,7 +2458,7 @@
     "file": "invoice_1015.csv",
     "group": "samples",
     "decision": "APPROVED",
-    "latency_s": 0.002,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2519,7 +2514,7 @@
     "file": "invoice_3003_lookalike_vendor.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.005,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2533,7 +2528,7 @@
     "file": "invoice_3004_renamed_vendor.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2547,7 +2542,7 @@
     "file": "invoice_3005_just_under_limit.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.003,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2561,7 +2556,7 @@
     "file": "invoice_3006_duplicate_new_number.txt",
     "group": "adversarial",
     "decision": "REJECTED",
-    "latency_s": 0.002,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2575,7 +2570,7 @@
     "file": "invoice_3007_watchlist_address.json",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2603,7 +2598,7 @@
     "file": "invoice_3009_moved_banks.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2645,7 +2640,7 @@
     "file": "invoice_3012_fence_close.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2659,7 +2654,7 @@
     "file": "invoice_3013_notes_list.json",
     "group": "adversarial",
     "decision": "REJECTED",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2687,7 +2682,7 @@
     "file": "invoice_3015_wire_change.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2715,7 +2710,7 @@
     "file": "invoice_2002_injection.txt",
     "group": "extra",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2729,7 +2724,7 @@
     "file": "invoice_2003_truncated.json",
     "group": "extra",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.001,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2757,7 +2752,7 @@
     "file": "invoice_2005_over_limit_price.txt",
     "group": "extra",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2785,7 +2780,7 @@
     "file": "invoice_4001_supplier_at.txt",
     "group": "unseen",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2799,7 +2794,7 @@
     "file": "invoice_4002_pipe_table.txt",
     "group": "unseen",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2846,10 +2841,10 @@
     "cached_prompt_tokens": 0,
     "completion_tokens": 0,
     "reasoning_tokens": 0,
-    "latency_sum_s": 0.1,
-    "wall_s": 0.24,
-    "latency_mean_s": 0.0,
-    "latency_mean_ms": 4.9,
+    "latency_sum_s": 0.14,
+    "wall_s": 0.3,
+    "latency_mean_s": 0.01,
+    "latency_mean_ms": 7.2,
     "billed_usd": 0.0,
     "billed_usd_per_invoice": 0.0,
     "list_price_usd": 0.0
@@ -2861,10 +2856,10 @@
     "cached_prompt_tokens": 0,
     "completion_tokens": 0,
     "reasoning_tokens": 0,
-    "latency_sum_s": 0.03,
-    "wall_s": 0.09,
+    "latency_sum_s": 0.04,
+    "wall_s": 0.11,
     "latency_mean_s": 0.0,
-    "latency_mean_ms": 2.0,
+    "latency_mean_ms": 2.8,
     "billed_usd": 0.0,
     "billed_usd_per_invoice": 0.0,
     "list_price_usd": 0.0
@@ -2876,10 +2871,10 @@
     "cached_prompt_tokens": 0,
     "completion_tokens": 0,
     "reasoning_tokens": 0,
-    "latency_sum_s": 0.01,
-    "wall_s": 0.04,
+    "latency_sum_s": 0.02,
+    "wall_s": 0.05,
     "latency_mean_s": 0.0,
-    "latency_mean_ms": 1.7,
+    "latency_mean_ms": 2.6,
     "billed_usd": 0.0,
     "billed_usd_per_invoice": 0.0,
     "list_price_usd": 0.0
@@ -2894,7 +2889,7 @@
     "latency_sum_s": 0.01,
     "wall_s": 0.03,
     "latency_mean_s": 0.0,
-    "latency_mean_ms": 1.6,
+    "latency_mean_ms": 2.2,
     "billed_usd": 0.0,
     "billed_usd_per_invoice": 0.0,
     "list_price_usd": 0.0
@@ -2907,7 +2902,7 @@
    "file": "invoice_1001.txt",
    "invoice": "INV-1001",
    "decision": "APPROVED",
-   "ms": 9.0,
+   "ms": 10.3,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -2948,7 +2943,7 @@
    "file": "invoice_1002.txt",
    "invoice": "INV-1002",
    "decision": "REJECTED",
-   "ms": 1.6,
+   "ms": 27.0,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -2979,7 +2974,7 @@
    "file": "invoice_1003.txt",
    "invoice": "INV-1003",
    "decision": "REJECTED",
-   "ms": 1.8,
+   "ms": 4.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3010,8 +3005,8 @@
   "invoice_1004.json": {
    "file": "invoice_1004.json",
    "invoice": "INV-1004",
-   "decision": "SUPERSEDED",
-   "ms": 2.7,
+   "decision": "REJECTED",
+   "ms": 2.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3042,7 +3037,7 @@
    "file": "invoice_1004_revised.json",
    "invoice": "INV-1004",
    "decision": "APPROVED",
-   "ms": 1.9,
+   "ms": 2.7,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3083,7 +3078,7 @@
    "file": "invoice_1005.json",
    "invoice": "INV-1005",
    "decision": "REJECTED",
-   "ms": 2.4,
+   "ms": 2.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3114,7 +3109,7 @@
    "file": "invoice_1006.csv",
    "invoice": "INV-1006",
    "decision": "APPROVED",
-   "ms": 3.3,
+   "ms": 7.3,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3155,7 +3150,7 @@
    "file": "invoice_1007.csv",
    "invoice": "INV-1007",
    "decision": "REJECTED",
-   "ms": 1.7,
+   "ms": 2.2,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3188,7 +3183,7 @@
    "file": "invoice_1008.txt",
    "invoice": "INV-1008",
    "decision": "REJECTED",
-   "ms": 3.6,
+   "ms": 2.5,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3220,7 +3215,7 @@
    "file": "invoice_1009.json",
    "invoice": "INV-1009",
    "decision": "REJECTED",
-   "ms": 1.3,
+   "ms": 1.8,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3255,7 +3250,7 @@
    "file": "invoice_1010.txt",
    "invoice": "INV-1010",
    "decision": "PENDING_HUMAN",
-   "ms": 3.6,
+   "ms": 4.4,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3299,7 +3294,7 @@
    "file": "invoice_1011.pdf",
    "invoice": "INV-1011",
    "decision": "APPROVED",
-   "ms": 14.9,
+   "ms": 15.5,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3340,7 +3335,7 @@
    "file": "invoice_1011.txt",
    "invoice": "INV-1011",
    "decision": "REJECTED",
-   "ms": 2.1,
+   "ms": 1.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3371,7 +3366,7 @@
    "file": "invoice_1012.pdf",
    "invoice": "INV-1012",
    "decision": "PENDING_HUMAN",
-   "ms": 19.1,
+   "ms": 23.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3402,7 +3397,7 @@
    "file": "invoice_1012.txt",
    "invoice": "INV-1012",
    "decision": "REJECTED",
-   "ms": 2.7,
+   "ms": 2.3,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3433,7 +3428,7 @@
    "file": "invoice_1013.json",
    "invoice": "INV-1013",
    "decision": "REJECTED",
-   "ms": 2.3,
+   "ms": 2.8,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3467,7 +3462,7 @@
    "file": "invoice_1013.pdf",
    "invoice": "INV-1013",
    "decision": "REJECTED",
-   "ms": 19.0,
+   "ms": 22.5,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3533,7 +3528,7 @@
    "file": "invoice_1015.csv",
    "invoice": "INV-1015",
    "decision": "APPROVED",
-   "ms": 2.0,
+   "ms": 3.5,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3574,7 +3569,7 @@
    "file": "invoice_1016.json",
    "invoice": "INV-1016",
    "decision": "REJECTED",
-   "ms": 1.7,
+   "ms": 1.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3605,7 +3600,7 @@
    "file": "invoice_3001_injection_note.json",
    "invoice": "INV-3001",
    "decision": "PENDING_HUMAN",
-   "ms": 2.3,
+   "ms": 2.2,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3636,7 +3631,7 @@
    "file": "invoice_3002_injection_reworded.txt",
    "invoice": "INV-3002",
    "decision": "PENDING_HUMAN",
-   "ms": 1.8,
+   "ms": 2.0,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3667,7 +3662,7 @@
    "file": "invoice_3003_lookalike_vendor.txt",
    "invoice": "INV-3003",
    "decision": "PENDING_HUMAN",
-   "ms": 2.0,
+   "ms": 4.8,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3698,7 +3693,7 @@
    "file": "invoice_3004_renamed_vendor.txt",
    "invoice": "INV-3004",
    "decision": "PENDING_HUMAN",
-   "ms": 2.0,
+   "ms": 3.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3729,7 +3724,7 @@
    "file": "invoice_3005_just_under_limit.txt",
    "invoice": "INV-3005",
    "decision": "PENDING_HUMAN",
-   "ms": 2.7,
+   "ms": 2.1,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3804,7 +3799,7 @@
    "file": "invoice_3006_duplicate_new_number.txt",
    "invoice": "INV-1101",
    "decision": "REJECTED",
-   "ms": 1.7,
+   "ms": 4.1,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3835,7 +3830,7 @@
    "file": "invoice_3007_watchlist_address.json",
    "invoice": "INV-3007",
    "decision": "PENDING_HUMAN",
-   "ms": 1.9,
+   "ms": 3.8,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3874,7 +3869,7 @@
    "file": "invoice_3008_bank_details_change.txt",
    "invoice": "INV-3008",
    "decision": "PENDING_HUMAN",
-   "ms": 1.9,
+   "ms": 2.0,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3905,7 +3900,7 @@
    "file": "invoice_3009_moved_banks.txt",
    "invoice": "INV-3009",
    "decision": "PENDING_HUMAN",
-   "ms": 1.7,
+   "ms": 2.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3936,7 +3931,7 @@
    "file": "invoice_3010_system_precleared.txt",
    "invoice": "INV-3010",
    "decision": "PENDING_HUMAN",
-   "ms": 1.8,
+   "ms": 1.5,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3967,7 +3962,7 @@
    "file": "invoice_3011_assistant_final_answer.json",
    "invoice": "INV-3011",
    "decision": "PENDING_HUMAN",
-   "ms": 2.1,
+   "ms": 2.0,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3998,7 +3993,7 @@
    "file": "invoice_3012_fence_close.txt",
    "invoice": "INV-3012",
    "decision": "PENDING_HUMAN",
-   "ms": 2.3,
+   "ms": 3.3,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4029,7 +4024,7 @@
    "file": "invoice_3013_notes_list.json",
    "invoice": "INV-3013",
    "decision": "REJECTED",
-   "ms": 2.2,
+   "ms": 3.2,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4061,7 +4056,7 @@
    "file": "invoice_3014_wrong_types.json",
    "invoice": "INV-3014",
    "decision": "REJECTED",
-   "ms": 2.2,
+   "ms": 2.0,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4094,7 +4089,7 @@
    "file": "invoice_3015_wire_change.txt",
    "invoice": "INV-3015",
    "decision": "PENDING_HUMAN",
-   "ms": 1.8,
+   "ms": 2.5,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4125,7 +4120,7 @@
    "file": "invoice_2001_email.txt",
    "invoice": null,
    "decision": "PENDING_HUMAN",
-   "ms": 1.9,
+   "ms": 2.0,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4156,7 +4151,7 @@
    "file": "invoice_2002_injection.txt",
    "invoice": "INV-2002",
    "decision": "PENDING_HUMAN",
-   "ms": 2.2,
+   "ms": 3.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4188,7 +4183,7 @@
    "file": "invoice_2003_truncated.json",
    "invoice": null,
    "decision": "PENDING_HUMAN",
-   "ms": 0.9,
+   "ms": 2.7,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4219,7 +4214,7 @@
    "file": "invoice_2004_over_limit_clean.txt",
    "invoice": "INV-2004",
    "decision": "APPROVED",
-   "ms": 1.9,
+   "ms": 2.2,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4266,7 +4261,7 @@
    "file": "invoice_2005_over_limit_price.txt",
    "invoice": "INV-2005",
    "decision": "PENDING_HUMAN",
-   "ms": 1.9,
+   "ms": 3.0,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4346,7 +4341,7 @@
    "file": "invoice_2006_critic_objects.txt",
    "invoice": "INV-2006",
    "decision": "REJECTED",
-   "ms": 1.6,
+   "ms": 1.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4401,7 +4396,7 @@
    "file": "invoice_4001_supplier_at.txt",
    "invoice": null,
    "decision": "PENDING_HUMAN",
-   "ms": 1.5,
+   "ms": 3.1,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4432,7 +4427,7 @@
    "file": "invoice_4002_pipe_table.txt",
    "invoice": "INV-4002",
    "decision": "PENDING_HUMAN",
-   "ms": 1.7,
+   "ms": 2.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4463,7 +4458,7 @@
    "file": "invoice_4003_prose_email.txt",
    "invoice": "INV-4003",
    "decision": "PENDING_HUMAN",
-   "ms": 2.0,
+   "ms": 1.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4494,7 +4489,7 @@
    "file": "invoice_4004_odd_headers.csv",
    "invoice": null,
    "decision": "PENDING_HUMAN",
-   "ms": 1.2,
+   "ms": 1.4,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4581,8 +4576,8 @@
   {
    "label": "committed demo runs (runs/demo/offline vs runs/demo/live), 20 samples",
    "invoices": 20,
-   "agree": 16,
-   "rate": 0.8,
+   "agree": 17,
+   "rate": 0.85,
    "disagreements": [
     {
      "file": "invoice_1001.txt",
@@ -4603,23 +4598,6 @@
       "Confirm whether payment is Net 15 or due 2026-02-01 before release."
      ],
      "live_risk": 12,
-     "offline_risk": 0,
-     "grok_risk_reasons": []
-    },
-    {
-     "file": "invoice_1004.json",
-     "offline": "SUPERSEDED",
-     "offline_by": "supersession",
-     "offline_reasons": [
-      "SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json; not paid, the revision is the invoice to pay"
-     ],
-     "live": "REJECTED",
-     "live_by": "hard_rules",
-     "live_reasons": [
-      "SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json"
-     ],
-     "live_conditions": [],
-     "live_risk": 0,
      "offline_risk": 0,
      "grok_risk_reasons": []
     },
@@ -4675,7 +4653,7 @@
     }
    ],
    "disagreement_routing": {
-    "to_human": 4,
+    "to_human": 3,
     "paid_on_one_side": [
      {
       "file": "invoice_1001.txt",
@@ -4700,26 +4678,9 @@
   {
    "label": "eval live run (2026-10-22 20:28 CDT) vs this offline run, samples (20)",
    "invoices": 20,
-   "agree": 18,
-   "rate": 0.9,
+   "agree": 19,
+   "rate": 0.95,
    "disagreements": [
-    {
-     "file": "invoice_1004.json",
-     "offline": "SUPERSEDED",
-     "offline_by": "supersession",
-     "offline_reasons": [
-      "SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json; not paid, the revision is the invoice to pay"
-     ],
-     "live": "REJECTED",
-     "live_by": "hard_rules",
-     "live_reasons": [
-      "SUPERSEDED_BY_REVISION: Replaced by revision R1 in invoice_1004_revised.json"
-     ],
-     "live_conditions": [],
-     "live_risk": 0,
-     "offline_risk": 0,
-     "grok_risk_reasons": []
-    },
     {
      "file": "invoice_1004_revised.json",
      "offline": "APPROVED",
@@ -4747,7 +4708,7 @@
     }
    ],
    "disagreement_routing": {
-    "to_human": 2,
+    "to_human": 1,
     "paid_on_one_side": [
      {
       "file": "invoice_1004_revised.json",
