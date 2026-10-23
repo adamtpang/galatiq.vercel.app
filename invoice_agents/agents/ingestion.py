@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import re
+from collections import Counter
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -135,6 +136,15 @@ def compare_readings(parsed: Invoice, grok: Invoice) -> list[str]:
         diffs.append(f"vendor: parser {parsed.vendor!r}, Grok {grok.vendor!r}")
     if _num_key(parsed.number) != _num_key(grok.number):
         diffs.append(f"invoice number: parser {parsed.number!r}, Grok {grok.number!r}")
+    for field in ("currency", "revision"):
+        a, b = getattr(parsed, field), getattr(grok, field)
+        if (a or "").strip().casefold() != (b or "").strip().casefold():
+            diffs.append(f"{field}: parser {a!r}, Grok {b!r}")
+    for field in ("date", "due_date"):
+        a = getattr(parsed, field) or (getattr(parsed, field + "_raw") or "").strip().casefold()
+        b = getattr(grok, field) or (getattr(grok, field + "_raw") or "").strip().casefold()
+        if a != b:
+            diffs.append(f"{field}: parser {a!s}, Grok {b!s}")
     if (parsed.total is None) != (grok.total is None) or (
             parsed.total is not None and grok.total is not None and abs(parsed.total - grok.total) > 0.01):
         diffs.append(f"total: parser {parsed.total}, Grok {grok.total}")
@@ -144,12 +154,11 @@ def compare_readings(parsed: Invoice, grok: Invoice) -> list[str]:
     if lines(parsed) != lines(grok):
         diffs.append(f"line items: parser {lines(parsed)}, Grok {lines(grok)}")
     else:
-        pp = sorted((li.sku or li.sku_raw.lower(), li.unit_price) for li in parsed.items)
-        gp = sorted((li.sku or li.sku_raw.lower(), li.unit_price) for li in grok.items)
-        bad = [f"{a[0]} parser {a[1]}, Grok {b[1]}" for a, b in zip(pp, gp)
-               if a[1] is not None and b[1] is not None and abs(a[1] - b[1]) > 0.01]
-        if bad:
-            diffs.append("unit prices: " + "; ".join(bad))
+        def prices(inv: Invoice):
+            return Counter((li.sku or li.sku_raw.lower(), round(li.qty, 4),
+                            round(li.unit_price, 2) if li.unit_price is not None else None) for li in inv.items)
+        if prices(parsed) != prices(grok):
+            diffs.append(f"unit prices: parser {list(prices(parsed).elements())}, Grok {list(prices(grok).elements())}")
     return diffs
 
 

@@ -6,6 +6,10 @@ Every number comes from a committed file in `evals/results/` (`summary.md`, `off
 
 ## Results on the 20 samples
 
+The later boundary audit tightened numeric parsing, preserved compound invoice IDs, added currency/date/revision/unit-price disagreement checks,
+and prevented changed amounts or revisions from bypassing an existing paid or uncertain bank attempt.
+These changes have offline and scripted regression evidence only. The historical live results below are unchanged.
+
 | Run | Paid | Rejected | Held | Superseded |
 |---|---|---|---|---|
 | Offline rules stand-ins (`runs/demo/offline`) | 5, $23,190.00 | 11 | 3 | 1 |

@@ -31,6 +31,15 @@ def scalar(value, field: str, errors: list[str]):
     return None
 
 
+def number(value, field: str, errors: list[str]) -> float | None:
+    """Keep absent numeric fields distinct from present but unreadable values."""
+    value = scalar(value, field, errors)
+    parsed = parse_money(value)
+    if value is not None and str(value).strip() and parsed is None:
+        errors.append(f"{field}: expected a number, got {str(value)[:40]!r}")
+    return parsed
+
+
 def finish(inv: Invoice, *, number=None, date_raw=None, due_raw=None) -> Invoice:
     """Normalize number and dates, fill line amounts. Never invents totals."""
     if number is not None:
@@ -56,15 +65,12 @@ def finish(inv: Invoice, *, number=None, date_raw=None, due_raw=None) -> Invoice
 
 
 def item(name, qty, price=None, amount=None, note=None, errors: list[str] | None = None, line: int | None = None) -> LineItem:
-    q = parse_money(qty)
-    if errors is not None:   # review 3: "two" is a type error (blocking INVALID_FIELD_TYPE), never read as 0
-        for field, v in (("quantity", qty), ("unit_price", price)):
-            if v is not None and str(v).strip() and parse_money(v) is None:
-                errors.append(f"line {line or '?'} {field}: expected a number, got {str(v)[:40]!r}")
+    errors = errors if errors is not None else []
+    q = number(qty, f"line {line or '?'} quantity", errors)
     return LineItem(
         sku_raw=str(name).strip(),
         qty=q if q is not None else 0.0,
-        unit_price=parse_money(price),
-        amount=parse_money(amount),
+        unit_price=number(price, f"line {line or '?'} unit_price", errors),
+        amount=number(amount, f"line {line or '?'} amount", errors),
         note=(str(note).strip() or None) if note else None,
     )

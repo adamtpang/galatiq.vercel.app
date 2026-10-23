@@ -7,8 +7,7 @@ import json
 import xml.etree.ElementTree as ET
 
 from ..models import Invoice
-from ..normalize import parse_money
-from .common import finish, free_text, item, scalar
+from .common import finish, free_text, item, number, scalar
 
 
 def _first(d: dict, *keys):
@@ -49,21 +48,21 @@ def parse_json(text: str, source: str | None = None) -> Invoice:
                               scalar(_first(li, "unit_price", "price", "rate"), f"line {n} unit_price", errs),
                               scalar(li.get("amount"), f"line {n} amount", errs), free_text(li.get("note")),
                               errs, n))
-    inv.subtotal = parse_money(scalar(d.get("subtotal"), "subtotal", errs))
-    inv.tax = parse_money(scalar(_first(d, "tax_amount", "tax"), "tax", errs))
-    inv.tax_rate = parse_money(scalar(d.get("tax_rate"), "tax_rate", errs))
-    inv.shipping = parse_money(scalar(d.get("shipping"), "shipping", errs))
+    inv.subtotal = number(d.get("subtotal"), "subtotal", errs)
+    inv.tax = number(_first(d, "tax_amount", "tax"), "tax", errs)
+    inv.tax_rate = number(d.get("tax_rate"), "tax_rate", errs)
+    inv.shipping = number(d.get("shipping"), "shipping", errs)
     total = scalar(d.get("total"), "total", errs)
-    inv.total = parse_money(total)
+    inv.total = number(total, "total", errs)
     inv.terms = free_text(d.get("payment_terms") or d.get("terms"))
     inv.notes = free_text(d.get("notes"))
-    number = scalar(_first(d, "invoice_number", "number", "id"), "invoice_number", errs)
+    invoice_number = scalar(_first(d, "invoice_number", "number", "id"), "invoice_number", errs)
     date_raw = _name(scalar(d.get("date"), "date", errs))
     due_raw = _name(scalar(d.get("due_date"), "due_date", errs))
-    for k, v in {"vendor": inv.vendor, "number": number, "due": due_raw, "total": total}.items():
+    for k, v in {"vendor": inv.vendor, "number": invoice_number, "due": due_raw, "total": total}.items():
         inv.field_confidence[k] = 1.0 if v not in (None, "") else 0.0
     inv.type_errors = errs
-    return finish(inv, number=number, date_raw=date_raw, due_raw=due_raw)
+    return finish(inv, number=invoice_number, date_raw=date_raw, due_raw=due_raw)
 
 
 def _name(v) -> str | None:
@@ -88,17 +87,17 @@ def _csv_key_value(rows, source) -> Invoice:
         k, v = r[0].strip().lower(), (r[1].strip() if len(r) > 1 else "")
         if k in ("item", "name", "sku"):
             if cur:
-                inv.items.append(item(cur.get("item", ""), cur.get("quantity"), cur.get("unit_price"), cur.get("amount")))
+                inv.items.append(item(cur.get("item", ""), cur.get("quantity"), cur.get("unit_price"), cur.get("amount"), errors=inv.type_errors))
             cur = {"item": v}
         elif k in ("quantity", "qty", "unit_price", "price", "amount") and cur is not None and "item" in cur:
             cur[{"qty": "quantity", "price": "unit_price"}.get(k, k)] = v
         else:
             kv.setdefault(k, v)
     if cur:
-        inv.items.append(item(cur.get("item", ""), cur.get("quantity"), cur.get("unit_price"), cur.get("amount")))
+        inv.items.append(item(cur.get("item", ""), cur.get("quantity"), cur.get("unit_price"), cur.get("amount"), errors=inv.type_errors))
     inv.vendor = kv.get("vendor")
-    inv.subtotal, inv.tax = parse_money(kv.get("subtotal")), parse_money(kv.get("tax"))
-    inv.shipping, inv.total = parse_money(kv.get("shipping")), parse_money(kv.get("total"))
+    inv.subtotal, inv.tax = number(kv.get("subtotal"), "subtotal", inv.type_errors), number(kv.get("tax"), "tax", inv.type_errors)
+    inv.shipping, inv.total = number(kv.get("shipping"), "shipping", inv.type_errors), number(kv.get("total"), "total", inv.type_errors)
     inv.terms = kv.get("payment_terms")
     inv.currency = (kv.get("currency") or "USD").upper()
     return finish(inv, number=kv.get("invoice_number"), date_raw=kv.get("date"), due_raw=kv.get("due_date"))
@@ -130,16 +129,16 @@ def _csv_table(header, rows, source) -> Invoice:
         if len(cells) >= 2:
             label, value = cells[-2].rstrip(":").lower(), cells[-1]
             if label.startswith("subtotal"):
-                inv.subtotal = parse_money(value)
+                inv.subtotal = number(value, "subtotal", errs)
             elif label.startswith("tax"):
-                inv.tax = parse_money(value)
+                inv.tax = number(value, "tax", errs)
                 if "(" in label:
-                    rate = parse_money(label.split("(")[1].replace("%", "").rstrip(")"))
+                    rate = number(label.split("(")[1].replace("%", "").rstrip(")"), "tax_rate", errs)
                     inv.tax_rate = rate / 100 if rate is not None else None
             elif label.startswith("shipping"):
-                inv.shipping = parse_money(value)
+                inv.shipping = number(value, "shipping", errs)
             elif "total" in label:
-                inv.total = parse_money(value)
+                inv.total = number(value, "total", errs)
     inv.vendor = meta.get("vendor")
     inv.terms = meta.get("payment terms")
     inv.currency = (meta.get("currency") or "USD").upper()
@@ -161,12 +160,12 @@ def parse_xml(text: str, source: str | None = None) -> Invoice:
     for n, el in enumerate(root.findall("line_items/item"), 1):
         inv.items.append(item(el.findtext("name") or el.findtext("sku") or "", el.findtext("quantity"),
                               el.findtext("unit_price"), el.findtext("amount"), errors=errs, line=n))
+    inv.subtotal = number(t("totals/subtotal"), "subtotal", errs)
+    inv.tax_rate = number(t("totals/tax_rate"), "tax_rate", errs)
+    inv.tax = number(t("totals/tax_amount"), "tax", errs)
+    inv.shipping = number(t("totals/shipping"), "shipping", errs)
+    inv.total = number(t("totals/total"), "total", errs)
     inv.type_errors = errs
-    inv.subtotal = parse_money(t("totals/subtotal"))
-    inv.tax_rate = parse_money(t("totals/tax_rate"))
-    inv.tax = parse_money(t("totals/tax_amount"))
-    inv.shipping = parse_money(t("totals/shipping"))
-    inv.total = parse_money(t("totals/total"))
     inv.terms = t("payment_terms") or t("header/payment_terms")
     return finish(inv, number=t("header/invoice_number") or t("invoice_number"),
                   date_raw=t("header/date"), due_raw=t("header/due_date"))

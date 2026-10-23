@@ -149,7 +149,7 @@ from invoice_agents.llm import LLMResult  # noqa: E402
 
 from .conftest import INVOICES  # noqa: E402
 
-READ_1001 = ExtractedInvoice(invoice_number="INV-1001", vendor="Widgets Inc.", due_date="2026-02-01", total=5000.0,
+READ_1001 = ExtractedInvoice(invoice_number="INV-1001", vendor="Widgets Inc.", date="2026-01-15", due_date="2026-02-01", total=5000.0,
                              items=[ExtractedItem(name="WidgetA", qty=10, unit_price=250.0),
                                     ExtractedItem(name="WidgetB", qty=5, unit_price=500.0)])
 

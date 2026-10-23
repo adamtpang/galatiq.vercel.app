@@ -34,7 +34,7 @@ def fix_ocr_digits(text: str) -> tuple[str, list[str]]:
 
 
 # --- money --------------------------------------------------------------------------
-_MONEY = re.compile(r"-?\$?\s*-?[\d,]*\.?\d+")
+_MONEY = re.compile(r"(?P<sign>[+-]?)\s*\$?\s*(?P<number>(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)")
 
 
 def parse_money(value) -> float | None:
@@ -43,16 +43,21 @@ def parse_money(value) -> float | None:
     if isinstance(value, (int, float)):
         return float(value)
     s, _ = fix_ocr_digits(str(value).strip())
-    m = _MONEY.search(s)
+    # Accounting parentheses mean negative. Never read an arbitrary numeric substring:
+    # '(500)' is not +500, '2e2' is not 2, and an unknown tax is not zero.
+    accounting = s.startswith("(") and s.endswith(")")
+    if accounting:
+        s = s[1:-1].strip()
+    m = _MONEY.fullmatch(s)
     if not m:
         return None
-    raw = m.group(0).replace("$", "").replace(",", "").replace(" ", "")
-    neg = raw.count("-") % 2 == 1
+    if accounting and m.group("sign"):
+        return None
     try:
-        v = float(raw.replace("-", ""))
+        v = float(m.group("number").replace(",", ""))
     except ValueError:
         return None
-    return -v if neg else v
+    return -v if accounting or m.group("sign") == "-" else v
 
 
 # --- dates --------------------------------------------------------------------------
@@ -93,7 +98,9 @@ def normalize_invoice_number(raw) -> str | None:
     if raw is None:
         return None
     s, _ = fix_ocr_digits(str(raw).strip())
-    m = re.search(r"(\d+)", s)
+    # Canonicalize the case's simple invoice labels, preserving compound and supplier-specific IDs.
+    # Taking only the first digit group merges INV-2026-001 with INV-2026-002.
+    m = re.fullmatch(r"(?:INV(?:OICE)?(?:\s*(?:NO\.?|NUMBER))?[\s:#.-]*)?(\d+)", s, re.I)
     if not m:
         return s or None
     return f"INV-{m.group(1)}"

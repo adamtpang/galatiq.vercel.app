@@ -50,6 +50,17 @@ the deliberately difficult email and truncated JSON examples. These results do n
 
 ## Interpretation and limits
 
+The subsequent boundary audit found cases outside the previous suite: accounting negatives and numeric substrings
+could be misread, unreadable optional numbers could disappear, extraction comparison omitted currency and dates,
+compound invoice identifiers could collide, and a changed revision could bypass an uncertain payment. The repairs live in the shared parser, comparison and
+payment boundaries, with regressions in `tests/test_boundary_audit.py`. Current public CI must include these repairs
+before the updated submission is considered verified. Earlier passing CI does not cover them.
+
+The final local boundary-audit suite passed 490 offline tests with one live test deselected, including the lint,
+type, localhost UI and concurrent review checks. Its 33 added regression cases cover the new boundary findings.
+The supplied sample outcomes and offline evaluation expectations remain unchanged. This is local evidence until
+the repaired revision is published and its CI completes.
+
 - The brief does not define an exclusive list of outcome labels. `SUPERSEDED` records why an otherwise valid original is not payable after a revision arrives; it is audited and never paid. Relabeling it is not an acceptance requirement.
 - The critique and schema-retry loops are implemented and tested with offline/scripted inputs. No live critic objection or live schema-retry event has been observed. Those are unverified live behaviors, not fabricated demonstrations.
 - Full live runs predate later policy changes. Their results, commit and later spot checks are distinguished in `docs/evals.md`. A fresh full live run would provide stronger evidence but requires explicit spending authorization.

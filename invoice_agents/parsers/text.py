@@ -11,8 +11,8 @@ import re
 from dataclasses import dataclass, field
 
 from ..models import Invoice
-from ..normalize import fix_ocr_digits, parse_money
-from .common import finish, item
+from ..normalize import fix_ocr_digits
+from .common import finish, item, number
 
 LABELS: dict[str, list[str]] = {
     "vendor": ["vendor", "vndr", "supplier", "from", "seller", "remit to"],
@@ -128,15 +128,15 @@ def _scan_line(line: str, inv: Invoice, scan: _Scan) -> None:
 def _apply_fields(inv: Invoice, scan: _Scan) -> None:
     found = scan.found
     inv.vendor = found.get("vendor")
-    inv.subtotal = parse_money(found.get("subtotal"))
-    inv.tax = parse_money(found.get("tax"))
-    inv.shipping = parse_money(found.get("shipping"))
-    inv.total = parse_money(found.get("total"))
+    inv.subtotal = number(found.get("subtotal"), "subtotal", inv.type_errors)
+    inv.tax = number(found.get("tax"), "tax", inv.type_errors)
+    inv.shipping = number(found.get("shipping"), "shipping", inv.type_errors)
+    inv.total = number(found.get("total"), "total", inv.type_errors)
     inv.terms = found.get("terms")
     if found.get("currency"):
         inv.currency = found["currency"].strip().upper()
     if scan.tax_rate_raw:
-        r = parse_money(scan.tax_rate_raw.replace("%", ""))
+        r = number(scan.tax_rate_raw.replace("%", ""), "tax_rate", inv.type_errors)
         inv.tax_rate = r / 100 if r is not None else None
     inv.notes = " ".join(scan.notes) or None
     for k in ("vendor", "number", "date", "due", "total", "subtotal", "tax", "terms"):

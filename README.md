@@ -71,7 +71,7 @@ The [acceptance checklist](docs/acceptance.md) maps the brief to the implementat
 - Live cost on the 20 samples: 85 Grok calls, $0.6575, 38.9 s per invoice. A cached re-run gave identical decisions
   with 0 calls.
 
-The full live runs were made on Oct 22, 2026 at commit 05a4ef5, before the review 3 fixes, decisions 22 to 24, and submission-audit payment and condition guards;
+The full live runs were made on Oct 22, 2026 at commit 05a4ef5, before the review 3 fixes, decisions 22 to 24, and the submission and boundary audit repairs;
 see [docs/evals.md](docs/evals.md) for the spot checks since.
 
 ## Design
@@ -82,7 +82,7 @@ file ─▶ Ingest ─▶ Validate ─▶ Risk ─▶ Approve ─▶ Memo ─▶
                                                                 └─▶ Hold (human review queue)
 ```
 
-- **Code owns the math.** Grok never computes or changes an amount. Any blocking flag rejects, whatever a model says.
+- **Code owns the math.** Code computes and validates payable amounts. Model opinions cannot override a blocking flag.
 - **Hard holds before any opinion:** prompt injection, renamed or lookalike vendor, any payment-instruction wording,
   non-USD, Grok and the parser disagreeing, an ungrounded Grok reading, an unreadable layout, an internal error, and
   (live) a Grok check that failed. Overbilling (over 10% above catalog, shipping or tax over 15%) holds after the VP.
@@ -94,6 +94,10 @@ file ─▶ Ingest ─▶ Validate ─▶ Risk ─▶ Approve ─▶ Memo ─▶
   check and bind the approved USD amount, so stale or competing requests cannot authorize another amount.
 - **Payment recovery is shared.** Automatic and human approvals use the same payment path. Failed attempts remain
   queued for retry; unknown outcomes remain queued for bank reconciliation and cannot be approved again blindly.
+  A changed amount or revision also stops if the same invoice and vendor has a paid or uncertain bank attempt.
+- **Numeric inputs are checked in full.** Accounting negatives retain their sign. Unreadable supplied numeric
+  fields block payment instead of silently becoming zero or a partial number.
+  Compound and supplier-specific invoice identifiers are preserved instead of reduced to their first digit group.
 - **Conditions block payment.** Unresolved VP prerequisites go to a person. Human approval confirms them and records
   them in the audit log. Nonblocking explanations belong in the decision's reasons.
 - **Prompt hygiene.** Invoice text is fenced as data. **Offline, injection detection is pattern-based**: it catches
@@ -116,9 +120,12 @@ architecture, assumptions and the production plan: [docs/design.md](docs/design.
 - **The extraction retry** is proven only with a scripted model; Grok's first answer has always passed live.
 - **The live rejection review escalated once** (3014); otherwise it agreed with every rejection.
 - **Newer than the full live runs:** the review 3 fixes and decisions 22 to 24 had limited live spot checks.
-  Submission-audit payment and condition guards are verified offline/scripted only.
+  Submission and boundary audit repairs are verified offline/scripted only, including the expanded extraction
+  comparison of currency, dates, revision and unit prices. Saved live runs do not validate these newer checks.
 - **Overfitting.** Parsers, vendor master, watch list and patterns were written while looking at these files. The
   adversarial and unseen sets test generalization, and they are small.
+- **Extraction has limits.** PDF parsing uses text layers, not OCR of image-only scans. Repair grounding checks
+  whether numeric values appear in the document; it does not prove each value belongs to the correct field.
 - **Known, not fixed:** stock is not decremented across a batch; `vendor_history` shows earlier rejections without the
   reason; the review UI shows the original text only for unreadable or Grok-rebuilt files.
 - **Cut:** a real inbox, ERP and vendor master, live FX, a production review UI with auth, and any real bank call.

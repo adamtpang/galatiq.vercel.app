@@ -34,9 +34,14 @@ class BankError(RuntimeError):
     pass
 
 
+def payment_identity(number: str | None, vendor: str | None) -> tuple[str, str]:
+    num, supplier = (re.sub(r"[^a-z0-9]", "", (s or "").lower()) for s in (number, vendor))
+    return num, supplier
+
+
 def idempotency_key(number: str | None, vendor: str | None, amount: float, revision: str | None) -> str:
-    norm = lambda s: re.sub(r"[^a-z0-9]", "", (s or "").lower())  # noqa: E731
-    raw = f"{norm(number)}|{norm(vendor)}|{amount:.2f}|{revision or ''}"
+    num, supplier = payment_identity(number, vendor)
+    raw = f"{num}|{supplier}|{amount:.2f}|{revision or ''}"
     return hashlib.sha256(raw.encode()).hexdigest()[:24]
 
 
@@ -132,6 +137,15 @@ class PaymentAgent:
         state.payment = {"status": "not_paid", "reason": "review authorization required"}
         return False
 
+    def _other_payment(self, state: InvoiceState, key: str) -> sqlite3.Row | None:
+        """Called under the write lock: a revision or changed amount cannot bypass settlement history."""
+        assert state.invoice is not None
+        identity = payment_identity(state.invoice.number, state.invoice.vendor)
+        rows = self.conn.execute(
+            "SELECT invoice_number, vendor, idempotency_key, status FROM payments "
+            "WHERE status IN ('paid', 'in_progress', 'unknown') AND idempotency_key != ?", (key,))
+        return next((r for r in rows if payment_identity(r["invoice_number"], r["vendor"]) == identity), None)
+
     def _pay(self, state: InvoiceState) -> InvoiceState:
         d, inv = state.decision, state.invoice
         assert d is not None and inv is not None
@@ -162,11 +176,19 @@ class PaymentAgent:
             self.conn.execute("BEGIN IMMEDIATE")
             if not self._review_gate(state, amount):
                 return state
-            claim = self.conn.execute(
-                "INSERT INTO payments (invoice_number, vendor, amount, currency, idempotency_key, status) "
-                "VALUES (?,?,?,?,?, 'in_progress') "
-                "ON CONFLICT(idempotency_key) DO UPDATE SET status='in_progress' WHERE payments.status='failed'",
-                (inv.number, inv.vendor, amount, "USD", key))
+            other = self._other_payment(state, key)
+            if other is None:
+                claim = self.conn.execute(
+                    "INSERT INTO payments (invoice_number, vendor, amount, currency, idempotency_key, status) "
+                    "VALUES (?,?,?,?,?, 'in_progress') "
+                    "ON CONFLICT(idempotency_key) DO UPDATE SET status='in_progress' WHERE payments.status='failed'",
+                    (inv.number, inv.vendor, amount, "USD", key))
+        if other is not None:
+            why = f"another amount or revision of this invoice has bank status {other['status']}; reconcile it with the bank"
+            held = self._hold(state, why)
+            held.payment = {"status": "unknown", "amount": amount, "idempotency_key": key, "attempts": 0,
+                            "conflicting_payment_key": other["idempotency_key"], "errors": [why]}
+            return held
         if claim.rowcount != 1:
             row = self.conn.execute("SELECT status FROM payments WHERE idempotency_key=?", (key,)).fetchone()
             if row and row[0] == "paid":
