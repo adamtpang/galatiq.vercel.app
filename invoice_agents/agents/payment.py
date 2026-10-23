@@ -239,7 +239,7 @@ def log_rejection(conn: sqlite3.Connection, state: InvoiceState) -> InvoiceState
     """Rejected and superseded invoices are never paid; the reasons go to the audit log."""
     d = state.decision
     inv = state.invoice
-    sup = d is not None and d.status == DecisionStatus.SUPERSEDED
+    sup = d is not None and d.decided_by == "supersession"   # decision 24: REJECTED as superseded by a revision
     detail = {"source": state.source, "status": d.status.value if d else None, "reasons": d.reasons if d else [], "decided_by": d.decided_by if d else None,
               "blocking_flags": [f.model_dump(mode="json") for f in state.flags if f.severity.value == "block"],
               "memo": (state.memo or {}).get("text")}

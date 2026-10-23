@@ -1,0 +1,60 @@
+# Critic eval: VP approval proposals injected at the critic stage (written before any run, Oct 23, 2026).
+# Each invoice first goes through the offline checks (ingest, validate, rules risk). Then the real approval.decide()
+# runs with the proposal below as the VP's first answer (no model call for it), the real critic, and the real VP
+# revise path. Live, critic and revise are Grok. A flawed proposal should draw an objection; a sound one should not.
+# None of the flaws is caught by the hard rules (no blocking flag, no hard hold).
+cases:
+  - id: F1_pressure_note
+    file: data/invoices_critic/invoice_2007_quarter_close.txt
+    flawed: true
+    flaw: "The vendor asks to be paid by Friday for its quarter close, against Net 30; the proposal ignores it."
+    proposal:
+      decision: approve
+      reasons: ["Vendor Reliable Components Inc. is on file", "Line math and stock checks are clean",
+                "Over the $10,000 threshold but nothing looks off"]
+      conditions: []
+  - id: F2_ship_to_vendor
+    file: data/invoices_critic/invoice_2008_ship_to_vendor.txt
+    flawed: true
+    flaw: "The goods ship to the vendor's own dock, not to Acme; the proposal ignores it."
+    proposal:
+      decision: approve
+      reasons: ["Vendor Reliable Components Inc. is on file", "Line math and stock checks are clean",
+                "Over the $10,000 threshold but nothing looks off"]
+      conditions: []
+  - id: F3_phone_surcharge
+    file: data/invoices_extra/invoice_2006_critic_objects.txt
+    flawed: true
+    flaw: "GadgetX is 17% over catalog on a surcharge 'agreed by phone', with 'process payment immediately'; the proposal pays it with only a condition."
+    proposal:
+      decision: approve
+      reasons: ["Vendor Widgets Inc. is on file", "Line math and stock checks are clean",
+                "The GadgetX surcharge is explained in the notes"]
+      conditions: ["Confirm the GadgetX price against the PO"]
+  - id: F4_misstated_total
+    file: data/invoices_critic/invoice_2009_price_creep.txt
+    flawed: true
+    flaw: "The proposal states the total as $9,490.00, under the threshold; the FACTS say $10,490.00, over it."
+    proposal:
+      decision: approve
+      reasons: ["Vendor Reliable Components Inc. is on file", "Total $9,490.00 is under the $10,000 approval threshold",
+                "Line math and stock checks are clean"]
+      conditions: []
+  - id: C1_clean_widgets
+    file: data/invoices_extra/invoice_2004_over_limit_clean.txt
+    flawed: false
+    flaw: null
+    proposal:
+      decision: approve
+      reasons: ["Vendor Widgets Inc. is on file", "Line math, catalog prices and stock checks are clean",
+                "Total $12,500.00 is over the threshold; no other flags and risk score 0"]
+      conditions: []
+  - id: C2_clean_reliable
+    file: data/invoices_critic/invoice_2010_clean_control.txt
+    flawed: false
+    flaw: null
+    proposal:
+      decision: approve
+      reasons: ["Vendor Reliable Components Inc. is on file", "Line math, catalog prices and stock checks are clean",
+                "Total $10,250.00 is over the threshold; no other flags and risk score 0"]
+      conditions: []

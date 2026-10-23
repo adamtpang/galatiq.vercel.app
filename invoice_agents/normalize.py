@@ -35,6 +35,36 @@ def fix_ocr_digits(text: str) -> tuple[str, list[str]]:
 
 # --- money --------------------------------------------------------------------------
 _MONEY = re.compile(r"(?P<sign>[+-]?)\s*\$?\s*(?P<number>(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)")
+# Currency markers written before or after an amount. USD markers are read; any other marker is recognized only
+# so the amount is never read as dollars (validation routes the invoice to a person or rejects it).
+_ISO_CODES = ("EUR|GBP|JPY|CNY|CAD|AUD|CHF|INR|MXN|BRL|KRW|SEK|NOK|DKK|PLN|ZAR|SGD|HKD|NZD|RUB|TRY")
+_USD_MARKER = r"USD|US\$|U\.S\.\s?\$"
+_FOREIGN_MARKER = rf"{_ISO_CODES}|(?:AU|CA|NZ|HK|MX|A|C|R|S)\$|[€£¥₹₩₽₺₱]"
+_LEADING = re.compile(rf"^(?P<m>{_USD_MARKER}|{_FOREIGN_MARKER})\s*(?P<rest>.*)$", re.I)
+_TRAILING = re.compile(rf"^(?P<rest>.*?)\s*(?<![A-Za-z])(?P<m>{_USD_MARKER}|{_ISO_CODES}|[€£¥₹₩₽₺₱])$", re.I)
+_NOTE = re.compile(r"\s*\((?=[^()]*[A-Za-z])[^()]*\)$")   # a trailing note such as "(exempt)", never "(500)"
+
+
+def split_currency(text: str) -> tuple[str | None, str]:
+    """Return (marker currency or None, the amount without its marker and any trailing note in brackets)."""
+    s = text.strip()
+    if not (s.startswith("(") and s.endswith(")") and not re.search(r"[A-Za-z]", s)):
+        s = _NOTE.sub("", s).strip()
+    for rx in (_LEADING, _TRAILING):
+        m = rx.match(s)
+        if m and m.group("rest").strip():
+            mark = m.group("m").upper().replace(" ", "")
+            code = "USD" if re.fullmatch(_USD_MARKER, mark, re.I) else mark
+            return code, m.group("rest").strip()
+    return None, s
+
+
+def foreign_currency_marker(value) -> str | None:
+    """The non-USD currency marker on a money string ('A$500.00' -> 'A$'), else None."""
+    if not isinstance(value, str):
+        return None
+    code, _ = split_currency(value)
+    return code if code not in (None, "USD") else None
 
 
 def parse_money(value) -> float | None:
@@ -42,7 +72,10 @@ def parse_money(value) -> float | None:
         return None   # true is not 1 and ["8"] is not 8: only numbers and strings are amounts
     if isinstance(value, (int, float)):
         return float(value)
-    s, _ = fix_ocr_digits(str(value).strip())
+    code, s = split_currency(str(value))
+    if code not in (None, "USD"):
+        return None   # a foreign amount is never read as dollars
+    s, _ = fix_ocr_digits(s)
     # Accounting parentheses mean negative. Never read an arbitrary numeric substring:
     # '(500)' is not +500, '2e2' is not 2, and an unknown tax is not zero.
     accounting = s.startswith("(") and s.endswith(")")

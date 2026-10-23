@@ -137,8 +137,7 @@ def build_graph(ctx: RunContext):
         if d.status == DecisionStatus.APPROVED:
             # only a clean approval reaches the bank (guard has normally converted anything else already)
             return "pay" if not s.pipeline_errors() and not s.has_blocking() else "hold"
-        # a superseded original (decision 24) is logged as not paid, like a rejection, with its own status
-        return "reject" if d.status in (DecisionStatus.REJECTED, DecisionStatus.SUPERSEDED) else "hold"
+        return "reject" if d.status == DecisionStatus.REJECTED else "hold"
 
     def report(s: InvoiceState) -> InvoiceState:
         inv = s.invoice

@@ -31,10 +31,9 @@ MEMO_PROMPT = (
 NEXT = {DecisionStatus.APPROVED: "Payment goes out through the mock payment function (paid once, idempotent).",
         DecisionStatus.REJECTED: "Not paid. The reasons are in the audit log; ask the vendor for a corrected invoice "
                                  "if the order is real.",
-        DecisionStatus.PENDING_HUMAN: "A person reviews it: python main.py review {num} (or python main.py ui).",
-        DecisionStatus.SUPERSEDED: "Not paid. A later revision replaces it; the revision is the invoice to pay."}
+        DecisionStatus.PENDING_HUMAN: "A person reviews it: python main.py review {num} (or python main.py ui)."}
 WORDS = {DecisionStatus.APPROVED: "approved for payment", DecisionStatus.REJECTED: "rejected",
-         DecisionStatus.PENDING_HUMAN: "held for a person", DecisionStatus.SUPERSEDED: "superseded by a revision"}
+         DecisionStatus.PENDING_HUMAN: "held for a person"}
 class DecisionMemo(BaseModel):
     memo: str = Field(description="2 to 4 plain sentences explaining the decision that was made")
     next_step: str = Field(description="One concrete next step for a person")

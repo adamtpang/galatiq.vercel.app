@@ -61,7 +61,8 @@ def test_single_file_reruns(db):
     f = next(f for f in st.flags if f.code == "DUPLICATE_INVOICE")
     assert st.decision.status == DecisionStatus.REJECTED and f.evidence["match"] == "history"
     st = run(db, [INVOICES / "invoice_1004.json"], "r4")["invoice_1004.json"]   # its revision is on file
-    assert "SUPERSEDED_BY_REVISION" in codes(st) and st.decision.status == DecisionStatus.SUPERSEDED
+    assert "SUPERSEDED_BY_REVISION" in codes(st) and st.decision.status == DecisionStatus.REJECTED \
+        and st.decision.decided_by == "supersession"
     assert st.payment["status"] == "not_paid"
 
 

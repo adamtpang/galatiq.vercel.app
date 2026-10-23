@@ -67,7 +67,6 @@ class DecisionStatus(str, Enum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
     PENDING_HUMAN = "PENDING_HUMAN"
-    SUPERSEDED = "SUPERSEDED"   # decision 24: replaced by a later revision; never paid, the revision is paid instead
 
 
 class Decision(BaseModel):

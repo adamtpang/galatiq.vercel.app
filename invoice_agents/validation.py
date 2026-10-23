@@ -247,6 +247,19 @@ def check_currency_text(raw: str | None, inv: Invoice) -> list[Flag]:
                currencies=seen, invoice_currency=inv.currency)]
 
 
+_DOLLAR_VARIANT = re.compile(r"(?<![A-Za-z])(AU|CA|NZ|HK|MX|A|C|R|S)\$\s?\d")
+
+
+def check_dollar_variants(raw: str | None) -> list[Flag]:
+    """A$, CA$, R$ and similar are not US dollars. The parsers do not read such amounts as dollars; this warning
+    holds the invoice for a person (hard hold foreign_currency_marker) even if a USD total was also read."""
+    found = sorted({m.upper() + "$" for m in _DOLLAR_VARIANT.findall(raw or "")})
+    if not found:
+        return []
+    return [_f("FOREIGN_CURRENCY_MARKER", W, f"Amounts are written as {', '.join(found)}, which are not US dollars; "
+               "a person confirms the currency and the USD amount", markers=found)]
+
+
 def check_currency(inv: Invoice, policy: dict) -> tuple[list[Flag], float | None]:
     rate = fx_rate(inv.currency, policy)
     if rate is None:
@@ -612,6 +625,7 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
     if any(f.code == "UNSUPPORTED_CURRENCY" for f in cur_flags):
         total_usd = None
     flags += cur_flags
+    flags += check_dollar_variants(state.raw_text)
     flags += check_prices(inv, inventory, policy)
     flags += check_overbilling(inv, inventory, policy)
     flags += check_line_notes(inv)

@@ -291,11 +291,12 @@ def review_rejection(state: InvoiceState, rejection: Decision, reviewer: Any, po
 
 def superseded(state: InvoiceState) -> Decision | None:
     """Decision 24: an original replaced by a later revision passes validation (SUPERSEDED_BY_REVISION is info) but is
-    never paid: its outcome is SUPERSEDED, not REJECTED. The revision is the invoice that may be paid."""
+    never paid. The case defines three outcomes, so it is REJECTED with reason SUPERSEDED_BY_REVISION and decided_by
+    supersession (not hard_rules: no blocking flag). The revision is the invoice that may be paid."""
     sup = [f for f in state.flags if f.code == "SUPERSEDED_BY_REVISION"]
     if not sup:
         return None
-    return Decision(status=DecisionStatus.SUPERSEDED, decided_by="supersession", risk_score=(state.risk or {}).get("score"),
+    return Decision(status=DecisionStatus.REJECTED, decided_by="supersession", risk_score=(state.risk or {}).get("score"),
                     reasons=[f"SUPERSEDED_BY_REVISION: {sup[0].message}; not paid, the revision is the invoice to pay"])
 
 
@@ -324,8 +325,10 @@ HOLD_FLAGS = {"vendor_renamed": "VENDOR_RENAMED", "vendor_lookalike": "VENDOR_LO
               "bank_details_changed": "BANK_DETAILS_CHANGED",   # decision 11
               "extraction_disagreement": "EXTRACTION_DISAGREEMENT",   # decision 12
               "grok_check_failed": "GROK_CHECK_FAILED",   # decision 16: live, a Grok check that should have run failed
-              "foreign_currency": "CURRENCY_CONVERTED"}   # decision 22: non-USD goes to a person, no fixed-rate payment
-HOLD_WHY = {"CURRENCY_CONVERTED": "hold for a person to confirm the USD amount; nothing is paid at a fixed rate"}
+              "foreign_currency": "CURRENCY_CONVERTED",   # decision 22: non-USD goes to a person, no fixed-rate payment
+              "foreign_currency_marker": "FOREIGN_CURRENCY_MARKER"}   # A$, CA$, R$ ...: not US dollars
+HOLD_WHY = {"CURRENCY_CONVERTED": "hold for a person to confirm the USD amount; nothing is paid at a fixed rate",
+            "FOREIGN_CURRENCY_MARKER": "hold for a person to confirm the currency and the USD amount"}
 
 
 def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
@@ -519,8 +522,7 @@ def pin_check(state: InvoiceState, llm: Any, policy: dict[str, Any]) -> InvoiceS
                             evidence={"configured": info["configured_model"], "returned": sorted(set(other))}))
     cfg = policy.get("approval", {}).get("hard_holds", {}) or {}
     d = state.decision
-    if cfg.get("model_mismatch", True) and d is not None and d.status not in (DecisionStatus.REJECTED,
-                                                                              DecisionStatus.SUPERSEDED):
+    if cfg.get("model_mismatch", True) and d is not None and d.status != DecisionStatus.REJECTED:
         state.decision = Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="model_pin",
                                   risk_score=d.risk_score, reasons=[f"MODEL_MISMATCH: {msg}; hold for a human"] + d.reasons,
                                   arguments={"decision_before_pin": d.model_dump(mode="json")})

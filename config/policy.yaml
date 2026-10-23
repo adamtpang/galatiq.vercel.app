@@ -25,6 +25,7 @@ approval:
     extraction_disagreement: true    # decision 12: live, Grok's independent reading differs from the parser's
     grok_check_failed: true          # decision 16: live, Grok's cross-check or risk review failed (GROK_CHECK_FAILED)
     foreign_currency: true           # decision 22: any non-USD invoice (CURRENCY_CONVERTED) waits for a person
+    foreign_currency_marker: true    # A$, CA$, R$ and similar amounts (FOREIGN_CURRENCY_MARKER) wait for a person
   # Decision 16: after a hard-rule rejection, one review (Grok live; a rules stand-in offline) may escalate the
   # rejection to a person. It can never approve or pay; if it fails, the rejection stands.
   rejection_review: true

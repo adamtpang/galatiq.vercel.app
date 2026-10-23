@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from ..models import Invoice, LineItem
-from ..normalize import normalize_invoice_number, parse_date, parse_money
+from ..normalize import foreign_currency_marker, normalize_invoice_number, parse_date, parse_money
 
 
 def free_text(value) -> str | None:
@@ -35,7 +35,8 @@ def number(value, field: str, errors: list[str]) -> float | None:
     """Keep absent numeric fields distinct from present but unreadable values."""
     value = scalar(value, field, errors)
     parsed = parse_money(value)
-    if value is not None and str(value).strip() and parsed is None:
+    # A foreign amount (A$, EUR, ...) is not a type error: it stays unread, and validation routes the invoice.
+    if value is not None and str(value).strip() and parsed is None and not foreign_currency_marker(value):
         errors.append(f"{field}: expected a number, got {str(value)[:40]!r}")
     return parsed
 
