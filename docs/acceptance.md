@@ -16,7 +16,7 @@ For tracking submission readiness, each of the 20 checks is worth 5 points. A ch
 | 08 | Unknown items and invalid quantities are flagged, including INV-1008, INV-1016 and INV-1009. | `tests/test_validation.py`; `tests/golden.yaml` |
 | 09 | VP review uses explicit policy and extra scrutiny above $10,000. | `config/policy.yaml`; `tests/test_approval.py::test_critic_runs_over_threshold_and_can_sign_off` |
 | 10 | The critic can object, the VP can revise, and unresolved disagreement reaches a human after a bounded loop. | `tests/test_approval.py::test_vp_can_concede`; `test_loop_stops_after_two_rounds_and_deadlocks`; offline extras 2005 and 2006 |
-| 11 | Only approved invoices reach the supplied mock payment function; retries and repeat runs do not create repeat payments in the supported sequential workflow. | `invoice_agents/agents/payment.py`; `tests/test_payment.py`; `tests/test_history.py` |
+| 11 | Only approved invoices reach the supplied mock payment function; repeat runs skip paid invoices and interrupted retries are held for reconciliation. | `invoice_agents/agents/payment.py`; `tests/test_payment.py`, including `test_interrupted_retry_does_not_pay_again_after_restart`; `tests/test_history.py` |
 | 12 | Rejections record reasons, and results and agent steps are available as structured output. | `tests/test_golden.py::test_trace_written`; `tests/test_review2.py::test_every_step_log_line_is_valid_json` |
 | 13 | Grok performs extraction cross-checks and risk/approval reasoning in live mode; offline stand-ins are labeled accurately. | `invoice_agents/llm.py`; `invoice_agents/agents/`; recorded live traces and provenance in `docs/evals.md` |
 | 14 | Multiple stages are orchestrated with explicit state and conditional routes. | `invoice_agents/graph.py` uses LangGraph and Pydantic; `tests/test_golden.py` |
@@ -32,6 +32,8 @@ For tracking submission readiness, each of the 20 checks is worth 5 points. A ch
 The October 23 Windows continuation verified 440 offline tests passing with one live test deselected, including ruff and mypy. This was commit `3187839` plus the four portability changes in `invoice_agents/graph.py`, `tests/test_history.py`, `tests/test_review2.py` and `tests/test_validation.py`. Fresh offline evaluation caught 15/15 bundled adversarial cases, caught 15/15 in a separate later run, and held all four unseen layouts. That evidence can be reused while those implementation files are unchanged; documentation edits do not require repeating the entire suite.
 
 To reproduce when relevant: `python -m pytest -q -rx` and `python -m evals --no-write`. Neither command enables live tests. Install `requirements.txt` first so lint and type checks are available. A saved result is evidence for its recorded revision, not every future revision.
+
+A subsequent recovery review found that retrying a previously failed payment did not mark it in progress before calling the mock bank. An interruption could therefore leave it eligible for another payment. The retry now commits an atomic claim before the bank call; a regression test verifies that a restarted process holds the uncertain attempt. The updated Windows suite passed 441 offline tests with one live test deselected, including lint and type checks. Publication and CI must still be verified for the revision containing this fix.
 
 ## Interpretation and limits
 

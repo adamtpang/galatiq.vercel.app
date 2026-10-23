@@ -45,7 +45,7 @@ python main.py review                                          # the human revie
 python main.py ui                                              # the review queue in the browser (127.0.0.1:8765)
 python main.py --batch data/invoices --mode live               # Grok agents (needs XAI_API_KEY)
 python -m evals                                                # five evals offline, about a second
-pytest                                                         # 440 offline tests, about 25 seconds
+pytest                                                         # 441 offline tests, including lint and types
 make check                                                     # ruff, mypy and the tests (scripts/check.sh)
 ```
 
@@ -100,8 +100,10 @@ architecture, assumptions and the production plan: [docs/design.md](docs/design.
 
 ## Honest limits
 
-- **Live is not perfectly repeatable** (1001 and 1014 differ between live runs). The decision cache makes a re-run
-  identical.
+- **Live is not perfectly repeatable** (1001 and 1014 differ between live runs). The decision cache reproduced
+  all 20 recorded sample decisions on a repeat run.
+- **Cached reasoning uses earlier context.** Cached tool results are snapshots too. Use `--no-cache` for fresh
+  reasoning after inventory, vendor data or history changes; deterministic validation still runs on every pass.
 - **The critic has never been seen to object live.** It ran once live and signed off. Five invoices written to make it
   object (2005 to 2009, the last three on Oct 23 for $0.14) were each held by the Grok VP first. The loop is shown
   only offline, with rules stand-ins (2005, 2006).

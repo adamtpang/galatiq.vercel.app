@@ -55,6 +55,29 @@ def test_gives_up_after_three_retries_and_can_resume(conn):
     assert PaymentAgent(conn).pay(approved()).payment["status"] == "paid"   # same key, next run succeeds
 
 
+def test_interrupted_retry_does_not_pay_again_after_restart(conn):
+    PaymentAgent(conn, chaos=1.0, retries=0).pay(approved())
+    calls = []
+
+    def interrupted_bank(vendor, amount):
+        calls.append((vendor, amount))
+        raise KeyboardInterrupt("stopped after the bank accepted the payment")
+
+    with pytest.raises(KeyboardInterrupt):
+        PaymentAgent(conn, bank=interrupted_bank).pay(approved())
+
+    assert conn.execute("SELECT status FROM payments").fetchone()[0] == "in_progress"
+    db_path = conn.execute("PRAGMA database_list").fetchone()[2]
+    restarted = connect(db_path)
+    try:
+        result = PaymentAgent(restarted, bank=lambda v, a: calls.append((v, a)) or {"status": "success"}).pay(approved())
+        assert result.decision.status == DecisionStatus.PENDING_HUMAN
+        assert len(calls) == 1
+        assert "check with the bank" in result.decision.reasons[0]
+    finally:
+        restarted.close()
+
+
 @pytest.mark.parametrize("status", [DecisionStatus.REJECTED, DecisionStatus.PENDING_HUMAN])
 def test_never_pays_unless_approved(conn, status):
     with pytest.raises(ValueError):

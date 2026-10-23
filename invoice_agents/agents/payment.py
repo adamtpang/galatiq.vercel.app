@@ -1,8 +1,8 @@
 """Payment agent: pays approved invoices once, logs everything else.
 
 - `mock_payment` is the case's function, unchanged.
-- Idempotency: a key over (invoice number, vendor, amount, revision) is checked in the
-  `payments` table before calling the bank. A key already marked paid is never paid again.
+- Idempotency: atomically claim a key over (invoice number, vendor, amount, revision)
+  before calling the bank. Paid or uncertain attempts cannot be claimed again.
 - Retries: up to 3 retries with exponential backoff on bank errors.
 - Chaos: `chaos=p` makes each bank call fail with probability p (to demo retries).
 """
@@ -97,20 +97,24 @@ class PaymentAgent:
             return self._refuse(state, raw_amount)   # last guard: validation should have stopped this already
         amount = round(raw_amount, 2)
         key = idempotency_key(inv.number, inv.vendor, amount, inv.revision)
-        row = self.conn.execute("SELECT status FROM payments WHERE idempotency_key=?", (key,)).fetchone()
-        if row and row[0] == "paid":
-            state.payment = {"status": "already_paid", "amount": amount, "idempotency_key": key, "attempts": 0}
-            state.trace.append(TraceEvent(agent=AGENT, step="idempotency_skip", detail=state.payment))
-            return state
-        if row and row[0] in ("in_progress", "unknown"):
-            # an earlier run stopped between calling the bank and recording the result: the bank may have paid.
-            # Paying again could pay twice, so a person checks the bank first (fail closed).
-            return self._hold(state, "an earlier payment attempt for this invoice never recorded its result "
-                                     "(status in_progress); check with the bank before paying again")
-        self.conn.execute(
-            "INSERT OR IGNORE INTO payments (invoice_number, vendor, amount, currency, idempotency_key, status) "
-            "VALUES (?,?,?,?,?, 'in_progress')", (inv.number, inv.vendor, amount, "USD", key))
+        # Commit the claim before every bank attempt, including a retry of a failed payment.
+        # One SQL statement prevents two connections from both claiming the same key.
+        claim = self.conn.execute(
+            "INSERT INTO payments (invoice_number, vendor, amount, currency, idempotency_key, status) "
+            "VALUES (?,?,?,?,?, 'in_progress') "
+            "ON CONFLICT(idempotency_key) DO UPDATE SET status='in_progress' WHERE payments.status='failed'",
+            (inv.number, inv.vendor, amount, "USD", key))
         self.conn.commit()
+        if claim.rowcount != 1:
+            row = self.conn.execute("SELECT status FROM payments WHERE idempotency_key=?", (key,)).fetchone()
+            if row and row[0] == "paid":
+                state.payment = {"status": "already_paid", "amount": amount, "idempotency_key": key, "attempts": 0}
+                state.trace.append(TraceEvent(agent=AGENT, step="idempotency_skip", detail=state.payment))
+                return state
+            # The owner may still be running or may have stopped after money moved.
+            status = row[0] if row else "unknown"
+            return self._hold(state, "another payment attempt for this invoice is not confirmed safe to retry "
+                                     f"(status {status}); check with the bank before paying again")
         errors: list[str] = []
         for attempt in range(1, self.retries + 2):
             try:

@@ -22,7 +22,9 @@ The live runs predate decision 24, so they count 1004 as REJECTED; offline it is
 | 1010 | Held (20% over catalog, decision 23) | Held | Held |
 | 1014 (EUR) | Held (decision 22) | Paid (before decision 22) | Held |
 
-**Live is not perfectly repeatable** (1001 and 1014 above), but a difference can only move an invoice between paid and held: hard rules and holds run first, Grok can only raise risk, and the guard and payment step refuse blocked invoices. **The decision cache** makes a re-run identical: 20 of 20 the same, 83 calls then 0.
+**Live is not perfectly repeatable** (1001 and 1014 above). In these recorded runs, the model differences changed which otherwise valid invoices were paid or held. Future model outputs can also reject an invoice or escalate a rejection to a person. Hard rules and holds prevent automatic payment of blocked invoices.
+
+**The decision cache** reproduced all 20 recorded decisions with 83 calls on the first run and 0 on the repeat. It reuses model answers and tool results from the earlier context, while deterministic checks run again. Use `--no-cache` for fresh reasoning after inventory, vendor data or history changes. The replay result does not establish that cached reasoning reflects updated business data.
 
 ## Evals
 
