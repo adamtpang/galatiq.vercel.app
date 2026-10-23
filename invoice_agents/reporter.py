@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import textwrap
 from pathlib import Path
 
 from rich.console import Console
@@ -35,7 +36,28 @@ def row(s: InvoiceState) -> dict:
         "reason": (d.reasons[0] if d and d.reasons else ""),
         "conditions": d.conditions if d else [],
         "errors": s.errors,
+        "memo": (s.memo or {}).get("text"),
+        "memo_by": (s.memo or {}).get("by"),
+        "grok_calls": grok_calls(s),
     }
+
+
+def grok_calls(s: InvoiceState) -> int:
+    """Grok API calls made for this invoice (live; 0 offline or when every answer came from the cache)."""
+    return sum((e.detail.get("llm") or {}).get("calls", 0) for e in s.trace if e.step == "node_done")
+
+
+def grok_ratio(states: list[InvoiceState]) -> str | None:
+    """Live: how many invoices Grok worked on, and how many the hard rules decided whatever Grok said."""
+    used = [s for s in states if any(e.step in ("grok_cross_check", "llm_repair", "memo") and
+                                     (e.detail.get("by") == "grok" or e.step != "memo") for e in s.trace)]
+    if not used:
+        return None
+    hard = sum(1 for s in states if s.decision and s.decision.decided_by == "hard_rules")
+    calls = sum(grok_calls(s) for s in states)
+    return (f"Grok worked on {len(used)} of {len(states)} invoices ({calls} API calls this run; reused cached answers "
+            f"are not counted as calls). Hard rules rejected {hard} of them; Grok cannot override those, it only "
+            f"cross-checked the reading and wrote the memo.")
 
 
 WIDE = 140   # below this terminal width the table drops the Vendor, Risk, Flags and By columns
@@ -44,22 +66,25 @@ WIDE = 140   # below this terminal width the table drops the Vendor, Risk, Flags
 def print_summary(states: list[InvoiceState], console: Console, mode: str, run_dir: Path | None) -> None:
     wide = console.width >= WIDE
     cols = ["File", "Invoice", "Vendor", "Total USD", "Risk", "Flags", "Decision", "By", "Payment", "Reason"]
-    if not wide:
-        cols = ["File", "Total USD", "Decision", "Payment", "Reason"]
+    if not wide:   # 80 columns: total and payment go under the decision so the reason gets the room
+        cols = ["File", "Decision", "Reason"]
     t = Table(title=f"Run summary ({mode})", show_lines=False)
     for c in cols:
         if c == "Reason":
             t.add_column(c, overflow="fold", ratio=1)
         else:
-            t.add_column(c, no_wrap=True, overflow="ellipsis", max_width=None if wide else 18)
+            t.add_column(c, no_wrap=True, overflow="ellipsis", max_width=None if wide else 17)
     for s in states:
         r = row(s)
         flags = ", ".join(r["block_flags"][:3]) or (", ".join(r["warn_flags"][:2]) and "warn: " + ", ".join(r["warn_flags"][:2])) or "-"
         decision = f"[{STATUS_STYLE.get(r['decision'], '')}]{r['decision'].replace('PENDING_HUMAN', 'HELD')}[/]"
+        if not wide:
+            pay = r["payment"] if r["payment"].startswith(("paid", "already")) else money(r["total_usd"])
+            decision += f"\n{pay}"
         cells = {"File": r["file"].removeprefix("invoice_"), "Invoice": r["invoice"], "Vendor": r["vendor"],
                  "Total USD": money(r["total_usd"]), "Risk": "-" if r["risk"] is None else str(r["risk"]),
                  "Flags": flags, "Decision": decision, "By": r["decided_by"], "Payment": r["payment"],
-                 "Reason": r["reason"][:90 if wide else 70]}
+                 "Reason": textwrap.shorten(r["reason"], width=160 if wide else 100, placeholder=" ...")}
         t.add_row(*(cells[c] for c in cols))
     console.print(t)
     if not wide:
@@ -72,6 +97,9 @@ def print_summary(states: list[InvoiceState], console: Console, mode: str, run_d
     if late:
         console.print(f"[yellow]Past due[/] when processed (warning only, changes no decision): {len(late)} of "
                       f"{len(states)}: {', '.join(late[:8])}{', ...' if len(late) > 8 else ''}")
+    ratio = grok_ratio(states)
+    if ratio:
+        console.print(ratio)
     if run_dir:
         console.print(f"Trace: {run_dir / 'trace.jsonl'}")
 
@@ -80,7 +108,8 @@ def write_artifacts(states: list[InvoiceState], run_dir: Path | None, mode: str,
     if not run_dir:
         return
     rows = [row(s) for s in states]
-    (run_dir / "summary.json").write_text(json.dumps({"mode": mode, "model": model, "rows": rows}, indent=2, default=str))
+    (run_dir / "summary.json").write_text(json.dumps({"mode": mode, "model": model, "grok": grok_ratio(states),
+                                                      "rows": rows}, indent=2, default=str))
     lines = [f"# Run {run_dir.name} ({mode}{', ' + model if model else ''})", "",
              "| File | Invoice | Vendor | Total USD | Risk | Blocking flags | Decision | By | Rounds | Payment | Reason |",
              "|---|---|---|---|---|---|---|---|---|---|---|"]
@@ -89,6 +118,7 @@ def write_artifacts(states: list[InvoiceState], run_dir: Path | None, mode: str,
         lines.append(f"| {r['file']} | {r['invoice']} | {r['vendor']} | {money(r['total_usd'])} | {r['risk']} | "
                      f"{', '.join(r['block_flags']) or '-'} | {r['decision']} | {r['decided_by']} | "
                      f"{r['critique_rounds']} | {r['payment']} | {reason} |")
+    lines += ["", "## Decision memos", ""] + [f"- **{r['file']}** ({r['memo_by']}): {r['memo']}" for r in rows if r["memo"]]
     (run_dir / "report.md").write_text("\n".join(lines) + "\n")
 
 
@@ -120,6 +150,8 @@ def print_review(s: InvoiceState, reason: str | None, console: Console | None = 
     shown = [f for f in s.flags if f.severity != Severity.INFO]
     if shown:
         console.print("Flags: " + "; ".join(f"{f.severity.value} {f.code}" for f in shown))
+    if s.memo:
+        console.print(f"Memo ({s.memo.get('by')}): {s.memo.get('text')}")
     if s.extraction_mode == "llm_repair":
         raw = s.raw_text or "(the original text was not stored)"
         cut = f"\n... ({len(raw) - RAW_SHOWN:,} more characters in {s.source})" if len(raw) > RAW_SHOWN else ""

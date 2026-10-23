@@ -32,7 +32,7 @@
     <div class="hero">
       <p class="eyebrow">Galatiq FDE case</p>
       <h1 id="ov-h">Grok works Acme's invoice inbox.</h1>
-      <p class="lede">20 invoices in five formats. Four agents read, check and pay them, or hold them for a person.</p>
+      <p class="lede">20 invoices in five formats. Five Grok agents (extractor, risk reviewer, VP, critic, memo writer) work around deterministic checks to pay them, reject them or hold them for a person.</p>
       <p class="replay" id="honesty" role="note">Loading run data...</p>
     </div>
 
@@ -54,11 +54,12 @@
       <div class="card">
         <h2 class="card-h">Pipeline</h2>
         <ol class="pipe">
-          <li><b>Ingest</b><span>Read the file</span></li>
+          <li><b>Ingest</b><span>Parser reads it, Grok cross-checks</span></li>
           <li><b>Validate</b><span>Stock, math, duplicates</span></li>
           <li><b>Risk</b><span>Fraud score, tool checks</span></li>
           <li><b>VP</b><span>Approve, hold or reject</span></li>
           <li><b>Critic</b><span>Challenges risky approvals</span></li>
+          <li><b>Memo</b><span>Grok explains every decision</span></li>
           <li><b>Outcome</b><span>Pay, reject or hold</span></li>
         </ol>
         <div class="statuses">
@@ -144,6 +145,7 @@
       <div class="seg" role="group" aria-label="Invoice set">
         <button class="seg-btn on" data-set="case" type="button">Case samples</button>
         <button class="seg-btn" data-set="extra" type="button">Extra tests</button>
+        <button class="seg-btn" data-set="critic" type="button">Critic loop</button>
       </div>
     </div>
     <p class="showing small" id="showing"></p>

@@ -1,4 +1,4 @@
-"""LangGraph orchestration: ingest -> validate -> risk -> approval -> pay | reject | hold -> report.
+"""LangGraph orchestration: ingest -> validate -> risk -> approval -> memo -> pay | reject | hold -> report.
 
 Each node catches its own exceptions, records them on the state and lets the invoice
 continue to a safe outcome (never a payment), so one bad file never crashes a batch.
@@ -16,7 +16,7 @@ from typing import Any, Callable, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from . import ROOT
-from .agents import approval, risk
+from .agents import approval, memo, risk
 from .agents.ingestion import ingest
 from .agents.payment import PaymentAgent, log_rejection
 from .config import load_policy
@@ -122,6 +122,7 @@ def build_graph(ctx: RunContext):
     g.add_node("validate", _safe("validation", lambda s: validate(s, ctx.inventory, ctx.policy, ctx.registry)))
     g.add_node("risk", _safe("risk", lambda s: risk.assess(s, ctx.policy, ctx.llm, risk.risk_tools(ctx.inventory, ctx.conn)), ctx.llm))
     g.add_node("approve", _safe("approval", lambda s: approval.approve(s, ctx.llm, ctx.policy), ctx.llm))
+    g.add_node("memo", _safe("memo", lambda s: memo.write_memo(s, ctx.llm), ctx.llm))
     g.add_node("pay", _safe("payment", ctx.payments.pay))
     g.add_node("reject", _safe("payment", lambda s: log_rejection(ctx.conn, s)))
     g.add_node("hold", _safe("hitl", lambda s: enqueue(ctx.conn, s)))
@@ -130,7 +131,8 @@ def build_graph(ctx: RunContext):
     g.add_edge("ingest", "validate")
     g.add_edge("validate", "risk")
     g.add_edge("risk", "approve")
-    g.add_conditional_edges("approve", route, {"pay": "pay", "reject": "reject", "hold": "hold"})
+    g.add_edge("approve", "memo")   # decision 12: the memo is written after the decision and cannot change it
+    g.add_conditional_edges("memo", route, {"pay": "pay", "reject": "reject", "hold": "hold"})
     for n in ("pay", "reject", "hold"):
         g.add_edge(n, "report")
     g.add_edge("report", END)

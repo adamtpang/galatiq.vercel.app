@@ -18,8 +18,26 @@ approval:
     prompt_injection: true           # risk signal prompt_injection fired (risk.injection_patterns), or live Grok risk review set prompt_injection
     vendor_renamed: true             # VENDOR_RENAMED flag ("formerly X")
     vendor_lookalike: true           # VENDOR_LOOKALIKE flag (name close to a vendor on file, see vendor_lookalike)
-    llm_repaired: true               # decision 10: Grok rebuilt the invoice from raw text because the parser could not read it
+    llm_repaired: true               # decisions 10 and 14: Grok rebuilt the invoice from raw text and its reading is not confirmed (damaged file, a number not printed in the file, or vendor not on file)
+    unreadable_layout: true          # decision 14: an invoice-like file the parser cannot read (and no Grok) is held, not rejected
     model_mismatch: true             # live: the API reported a model other than the configured one (model pin, README Repeatability)
+    bank_details_changed: true       # decision 11: the invoice asks to pay a new or changed account (bank_details below)
+    extraction_disagreement: true    # decision 12: live, Grok's independent reading differs from the parser's
+
+# Decision 11: payment-detail changes. Any match gives a BANK_DETAILS_CHANGED warning and a hard hold, so
+# a person confirms the account with the vendor contact on file before anything is paid. A plain
+# "Remit to" line also matches: the case samples carry no bank details at all, so any is worth a look.
+bank_details:
+  change_patterns:
+    - '\biban\b'
+    - '\bswift\b|\bbic\b'
+    - '\b(routing|aba|sort)\s*(number|no\.?|#|code)'
+    - '\bnew\s+(bank\s+)?account\b'
+    - '\baccount\s+(number|no\.?|#)'
+    - '\bremit(tance)?\s+to\b'
+    - '\bbank(ing)?\s+(details|information|info|instructions)\b'
+    - '\b(updated?|changed?|new)\s+(bank|banking|payment|remittance)\s+(account|details|information|info|instructions)\b'
+    - '\b(updated?|changed?|new)\s+bank\b|\bchange\s+of\s+bank\b'
 
 # Decision 7: duplicates by content. An invoice with the same vendor (normalized name), line items,
 # quantities and total as an earlier one is a DUPLICATE_INVOICE (blocking) even under a new number.
@@ -76,7 +94,10 @@ risk:
     - '\b(skip|bypass|without)\b[^.\n]{0,20}\b(human|manual)\s+(review|approval|check|verification)\b'                              # skip the human
     - '\bmark\s+(it|this(\s+invoice)?|the\s+invoice)\s+(as\s+)?(approved|paid|verified|low[\s-]risk)\b'                             # dictate the outcome
     - '\b(report|set|assign|give|rate)\b[^.\n]{0,20}\b(a\s+)?(low|zero)\s+risk\b'                                                    # dictate the score
-  suspicious_addresses: ['1600 pennsylvania ave', '742 evergreen terrace']   # White House; the Simpsons' fictional address (found by Grok on 1004_revised)
+  # White House; the Simpsons' fictional address (found by Grok on 1004_revised). Decision 13: an entry does not
+  # fire on the address the vendor master has on file for that vendor (Precision Parts Ltd. is on file at
+  # 742 Evergreen Terrace in this mock data), only on another vendor using it (data/invoices_adversarial 3007).
+  suspicious_addresses: ['1600 pennsylvania ave', '742 evergreen terrace']
   llm_review: true             # live mode: Grok may add reasons and raise the score, never lower it
 
 # Mock FX table (units of USD per 1 unit of currency). Fixed so runs are deterministic.

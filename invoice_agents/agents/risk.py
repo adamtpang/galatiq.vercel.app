@@ -102,6 +102,9 @@ def signals(state: InvoiceState, policy: dict[str, Any]) -> list[dict]:
     if "UNKNOWN_VENDOR" in codes:
         add("unknown_vendor", "Vendor is not in the vendor master", inv.vendor if inv else None)
     addr = ((inv.vendor_address or "") + " " + text).lower() if inv else text
+    on_file = [f.evidence.get("address", "").lower() for f in state.flags if f.code == "ADDRESS_ON_FILE"]
+    for a in on_file:   # decision 13: a vendor's own address on file is not a watch-list hit
+        addr = addr.replace(a, " ").replace((inv.vendor_address or "").lower(), " ")
     hits = [a for a in cfg.get("suspicious_addresses", []) if a in addr]
     if hits:
         add("suspicious_address", "Vendor address is on the watch list", hits)

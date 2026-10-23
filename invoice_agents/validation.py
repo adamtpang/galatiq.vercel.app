@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import re
 import sqlite3
@@ -22,6 +23,8 @@ from .models import Flag, Invoice, InvoiceState, Severity, TraceEvent
 from .normalize import terms_days
 
 B, W, I = Severity.BLOCK, Severity.WARN, Severity.INFO
+# ingestion records this error when a file carries NaN or infinity where a number belongs
+NON_FINITE_ERROR = "non-finite number"
 
 
 def _f(code: str, sev: Severity, msg: str, **ev: Any) -> Flag:
@@ -57,12 +60,33 @@ def check_quantities(inv: Invoice) -> list[Flag]:
                           line=n, item=li.sku_raw, qty=li.qty))
         elif li.qty == 0:
             out.append(_f("ZERO_QTY", W, f"Line {n} ({li.sku_raw}) has zero quantity", line=n, item=li.sku_raw))
+        elif li.qty != int(li.qty):
+            out.append(_f("FRACTIONAL_QTY", B, f"Line {n} ({li.sku_raw}) has fractional quantity {li.qty:g}; "
+                          "inventory items are whole units", line=n, item=li.sku_raw, qty=li.qty))
+        if li.amount is not None and li.amount < 0:
+            out.append(_f("NEGATIVE_AMOUNT", B, f"Line {n} ({li.sku_raw}) has a negative amount {_money(li.amount)}",
+                          line=n, item=li.sku_raw, amount=li.amount))
         if li.unit_price is not None and li.unit_price < 0:
             out.append(_f("NEGATIVE_PRICE", B, f"Line {n} ({li.sku_raw}) has a negative unit price",
                           line=n, item=li.sku_raw, unit_price=li.unit_price))
     if inv.total is not None and inv.total < 0:
         out.append(_f("NEGATIVE_TOTAL", B, f"Invoice total is negative ({_money(inv.total)})", total=inv.total))
+    elif inv.total is not None and inv.total == 0:
+        out.append(_f("ZERO_TOTAL", B, "Invoice total is $0.00; there is nothing to pay", total=inv.total))
     return out
+
+
+def non_finite_fields(inv: Invoice, total_usd: float | None = None) -> list[str]:
+    """Fields holding NaN or infinity. The models refuse them on construction; this also catches values
+    set later (an overflowing currency conversion, for example)."""
+    bad = [k for k in ("subtotal", "tax", "tax_rate", "shipping", "total")
+           if isinstance(getattr(inv, k), float) and not math.isfinite(getattr(inv, k))]
+    for n, li in enumerate(inv.items, 1):
+        bad += [f"line {n} {k}" for k in ("qty", "unit_price", "amount")
+                if isinstance(getattr(li, k), float) and not math.isfinite(getattr(li, k))]
+    if isinstance(total_usd, float) and not math.isfinite(total_usd):
+        bad.append("total_usd")
+    return bad
 
 
 # --- inventory ----------------------------------------------------------------------
@@ -243,6 +267,20 @@ def check_line_notes(inv: Invoice) -> list[Flag]:
     return out
 
 
+# --- payment details (decision 11) ---------------------------------------------------
+def check_bank_details(raw: str | None, inv: Invoice, policy: dict) -> list[Flag]:
+    """An invoice that carries or changes payment details (IBAN, SWIFT, routing or account number, remit-to,
+    updated bank details). The classic vendor-impersonation fraud: hold it for a person to confirm."""
+    pats = ((policy.get("bank_details") or {}).get("change_patterns")) or []
+    text = " ".join(filter(None, [raw or "", inv.notes or "", inv.terms or ""]
+                           + [li.note or "" for li in inv.items])).lower()
+    hits = list(dict.fromkeys(m.group(0).strip() for m in (re.search(p, text) for p in pats) if m))
+    if not hits:
+        return []
+    return [_f("BANK_DETAILS_CHANGED", W, f"Invoice gives or changes payment details ({', '.join(hits)}); confirm the "
+               "account with the vendor contact on file before paying", matched=hits)]
+
+
 # --- vendor -------------------------------------------------------------------------
 def closest_vendor(name: str, inventory: Inventory) -> tuple[str | None, float]:
     """Most similar vendor-master name or alias (normalized), with its similarity 0..1."""
@@ -273,6 +311,10 @@ def check_vendor(inv: Invoice, inventory: Inventory, policy: dict | None = None)
             if near and sim >= min_sim:
                 out.append(_f("VENDOR_LOOKALIKE", W, f"'{inv.vendor}' is not on file but looks like vendor '{near}' "
                               f"(similarity {sim:.2f})", vendor=inv.vendor, lookalike_of=near, similarity=round(sim, 3)))
+    if v is not None and v.address and inv.vendor_address and _norm(v.address) == _norm(inv.vendor_address):
+        # decision 13: the risk agent does not apply the address watch list to the vendor's own address on file
+        out.append(_f("ADDRESS_ON_FILE", I, f"Vendor address matches the vendor master ({v.address})",
+                      address=v.address))
     if v is not None and not v.approved:
         out.append(_f("VENDOR_NOT_APPROVED", B, f"'{inv.vendor}' is not an approved vendor", vendor=inv.vendor))
     if re.search(r"\bacme\b", inv.vendor, re.I):
@@ -378,6 +420,8 @@ class DuplicateRegistry:
           or reused with different content (DUPLICATE_NUMBER_CONFLICT)
         - same content under another number (decision 7): DUPLICATE_INVOICE, match=content
         Codes in `have` (already raised within this run) are not repeated."""
+        if not (inv.number or (inv.vendor and inv.total is not None)):
+            return []   # nothing identifies it: two unreadable files are not duplicates of each other
         rows = self._history(inv)
         if not rows:
             return []
@@ -491,7 +535,12 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
              registry: DuplicateRegistry | None = None) -> InvoiceState:
     inv = state.invoice
     if inv is None:
-        state.flags.append(_f("EXTRACTION_FAILED", B, "Could not extract invoice data", errors=state.errors))
+        bad = [e for e in state.errors if NON_FINITE_ERROR in e]
+        if bad:
+            state.flags.append(_f("NON_FINITE_NUMBER", B, "The file has NaN or infinity where a number belongs, "
+                                  "so it cannot be paid", errors=bad))
+        else:
+            state.flags.append(_f("EXTRACTION_FAILED", B, "Could not extract invoice data", errors=state.errors))
         return state
     flags: list[Flag] = []
     flags += check_required_fields(inv)
@@ -509,6 +558,11 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
     flags += check_prices(inv, inventory, policy)
     flags += check_line_notes(inv)
     flags += check_vendor(inv, inventory, policy)
+    flags += check_bank_details(state.raw_text, inv, policy)
+    bad = non_finite_fields(inv, total_usd)
+    if bad:
+        flags.append(_f("NON_FINITE_NUMBER", B, f"Not a finite number: {', '.join(bad)}", fields=bad))
+        total_usd = None
     flags += check_amount_thresholds(total_usd, policy)
     if any("OCR" in c for c in inv.corrections):
         flags.append(_f("OCR_CORRECTED", I, "Fixed OCR look-alike characters",

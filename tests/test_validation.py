@@ -235,8 +235,8 @@ EXPECTED = {
     "invoice_1001.txt": {"TERMS_MISMATCH"},
     "invoice_1002.txt": {"STOCK_EXCEEDED", "TERMS_MISMATCH", "OVER_APPROVAL_THRESHOLD"},
     "invoice_1003.txt": {"ZERO_STOCK", "INVALID_DUE_DATE", "UNKNOWN_VENDOR", "OVER_APPROVAL_THRESHOLD"},
-    "invoice_1004.json": {"SUPERSEDED_BY_REVISION"},
-    "invoice_1004_revised.json": {"REVISION_SUPERSEDES"},
+    "invoice_1004.json": {"SUPERSEDED_BY_REVISION", "ADDRESS_ON_FILE"},
+    "invoice_1004_revised.json": {"REVISION_SUPERSEDES", "ADDRESS_ON_FILE"},
     "invoice_1005.json": {"STOCK_EXCEEDED", "UNKNOWN_VENDOR", "OVER_APPROVAL_THRESHOLD"},
     "invoice_1006.csv": {"VENDOR_NAME_LOOKALIKE"},
     "invoice_1007.csv": {"STOCK_EXCEEDED", "TOTAL_MISMATCH", "OVER_APPROVAL_THRESHOLD"},
@@ -249,12 +249,13 @@ EXPECTED = {
     "invoice_1012.pdf": {"SKU_NORMALIZED", "VENDOR_RENAMED", "NEAR_APPROVAL_THRESHOLD", "OCR_CORRECTED"},
     "invoice_1012.txt": {"SKU_NORMALIZED", "VENDOR_RENAMED", "NEAR_APPROVAL_THRESHOLD", "OCR_CORRECTED",
                          "DUPLICATE_INVOICE"},
-    "invoice_1013.json": {"STOCK_EXCEEDED", "TOTAL_MISMATCH", "SAMPLE_CHARGED", "OVER_APPROVAL_THRESHOLD"},
+    "invoice_1013.json": {"STOCK_EXCEEDED", "TOTAL_MISMATCH", "SAMPLE_CHARGED", "OVER_APPROVAL_THRESHOLD",
+                          "ADDRESS_ON_FILE"},
     "invoice_1013.pdf": {"STOCK_EXCEEDED", "TOTAL_MISMATCH", "SAMPLE_CHARGED", "OVER_APPROVAL_THRESHOLD",
                          "DUPLICATE_INVOICE"},
     "invoice_1014.xml": {"CURRENCY_CONVERTED"},
     "invoice_1015.csv": set(),
-    "invoice_1016.json": {"UNKNOWN_ITEM"},
+    "invoice_1016.json": {"UNKNOWN_ITEM", "ADDRESS_ON_FILE"},
 }
 
 

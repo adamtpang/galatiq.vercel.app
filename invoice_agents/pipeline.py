@@ -21,6 +21,15 @@ def run_files(paths: list[Path], llm: LLMClient | None = None, db: str | None = 
     return [validate(ingest(p, inventory, llm), inventory, policy, registry) for p in paths]
 
 
+def skipped(path: str | Path) -> list[Path]:
+    """Files in a batch folder that are not read because of their extension (shown to the user, not silent)."""
+    p = Path(path)
+    if not p.is_dir():
+        return []
+    return sorted(f for f in p.iterdir() if f.is_file() and f.suffix.lower() not in SUPPORTED
+                  and not f.name.startswith(".") and f.name.lower() != "readme.md")
+
+
 def collect(path: str | Path) -> list[Path]:
     p = Path(path)
     if p.is_dir():

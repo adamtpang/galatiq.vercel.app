@@ -19,6 +19,7 @@ def finish(inv: Invoice, *, number=None, date_raw=None, due_raw=None) -> Invoice
     inv.due_date, inv.due_date_raw = dd.value, dd.raw
     if dd.corrected:
         inv.corrections.append(f"due date '{dd.raw}' -> '{dd.corrected}'")
+    inv.currency = (inv.currency or "").strip().upper() or "USD"   # ' usd ' -> 'USD'
     if inv.vendor is not None:
         inv.vendor = inv.vendor.strip() or None
     if inv.terms is not None:

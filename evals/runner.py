@@ -1,4 +1,4 @@
-"""Four evals over the invoice agents.
+"""Five evals over the invoice agents.
 
   python -m evals            offline (default): no API key, no network, about 2 seconds
   python -m evals --live     also runs the pipeline and a Grok-only extraction live (needs XAI_API_KEY)
@@ -7,6 +7,7 @@
 (b) agreement    live vs offline decision agreement, disagreements with reasons from the traces
 (c) adversarial  catch rate on data/invoices_adversarial/ against evals/adversarial_expected.yaml
 (d) cost         tokens for every LLM call, billed cost, latency per invoice and per batch
+(e) unseen       legitimate invoices in layouts the parsers were never tuned on (data/invoices_unseen/)
 
 Results go to evals/out/ (git-ignored): offline.{json,md}, with --live also live.{json,md} and the live
 traces in runs/live/, and summary.md, which combines the fresh offline numbers with the latest live run
@@ -43,6 +44,7 @@ EVALS = Path(__file__).resolve().parent
 RESULTS = EVALS / "results"     # committed snapshot, written only with --write-snapshot
 OUT = EVALS / "out"             # default output, git-ignored
 SAMPLES, EXTRA, ADV = ROOT / "data" / "invoices", ROOT / "data" / "invoices_extra", ROOT / "data" / "invoices_adversarial"
+UNSEEN = ROOT / "data" / "invoices_unseen"   # layouts the parsers were never tuned on (decision 14)
 FIELDS = ["vendor", "invoice_number", "total", "line_items", "due_date"]
 MIN_CONF = 0.85
 
@@ -159,7 +161,7 @@ def grok_extract_all(gt: dict, workers: int = 4) -> tuple[dict, list[dict]]:
 # --- pipeline runs and trace rows ----------------------------------------------------
 def run_pipeline(llm, runs_dir: Path, db_dir: Path) -> dict:
     """Samples, then the adversarial set on the same database (so a copy of INV-1001 has an
-    original), then the 3 extra invoices on a fresh database."""
+    original), then the extra invoices on a fresh database."""
     out: dict[str, Any] = {"wall_s": {}}
     ctx = make_context(llm=llm, db=str(db_dir / "main.db"), runs_dir=runs_dir, run_id="main")
     for group, d in (("samples", SAMPLES), ("adversarial", ADV)):
@@ -170,8 +172,37 @@ def run_pipeline(llm, runs_dir: Path, db_dir: Path) -> dict:
     t0 = time.monotonic()
     out["extra"] = run_batch(collect(EXTRA), ctx2)
     out["wall_s"]["extra"] = round(time.monotonic() - t0, 2)
-    out["traces"] = [rel(runs_dir / "main" / "trace.jsonl"), rel(runs_dir / "extra" / "trace.jsonl")]
+    ctx3 = make_context(llm=llm, db=str(db_dir / "unseen.db"), runs_dir=runs_dir, run_id="unseen")
+    t0 = time.monotonic()
+    out["unseen"] = run_batch(collect(UNSEEN), ctx3)
+    out["wall_s"]["unseen"] = round(time.monotonic() - t0, 2)
+    out["traces"] = [rel(runs_dir / n / "trace.jsonl") for n in ("main", "extra", "unseen")]
     return out
+
+
+# --- (e) unseen layouts ----------------------------------------------------------------
+def unseen_eval(states: list[InvoiceState], expected: dict, mode: str) -> dict:
+    """Legitimate invoices in layouts nobody tuned the parsers for. Offline the bar is "not rejected" (held or
+    paid); live it is "read correctly and paid". Expectations are in evals/unseen_expected.yaml."""
+    cases = []
+    for s in states:
+        name = Path(s.source).name
+        exp = expected[name]
+        inv = s.invoice
+        status = s.decision.status.value if s.decision else "UNKNOWN"
+        got = predicted(inv)
+        read_ok = bool(got) and _t(got["vendor"]) == _t(exp["vendor"]) and got["total"] is not None \
+            and abs(got["total"] - float(exp["total"])) < 0.005 \
+            and Counter((_t(n), float(q)) for n, q in got["line_items"]) == Counter((_t(n), float(q)) for n, q in exp["line_items"])
+        cases.append({"file": name, "decision": status, "decided_by": s.decision.decided_by if s.decision else None,
+                      "extraction_mode": s.extraction_mode, "read_correctly": read_ok,
+                      "paid": (s.payment or {}).get("status") == "paid", "meets_expectation": status in exp[mode],
+                      "reason": (s.decision.reasons or [""])[0] if s.decision else ""})
+    n = len(cases)
+    return {"cases": cases, "total": n, "rejected": sum(c["decision"] == "REJECTED" for c in cases),
+            "held": sum(c["decision"] == "PENDING_HUMAN" for c in cases), "paid": sum(c["paid"] for c in cases),
+            "read_correctly": sum(c["read_correctly"] for c in cases),
+            "met": sum(c["meets_expectation"] for c in cases)}
 
 
 USAGE_KEYS = ("calls", "prompt_tokens", "cached_prompt_tokens", "completion_tokens", "reasoning_tokens")
@@ -376,6 +407,12 @@ def summary_md(off: dict, live: dict | None) -> str:
         d = sr["duplicate_3006"]
         L.append(f"| (c) Adversarial set as a separate later run (after the samples) | {sr['caught']}/{sr['total']} "
                  f"({pct(sr['catch_rate'])}); 3006 {d['decision']} | - (rules only; the duplicate checks run before any Grok call) |")
+    ou, lu = off.get("unseen"), (live or {}).get("unseen")
+    if ou:
+        L.append(f"| (e) Unseen layouts ({ou['total']}, never tuned for): not rejected; read correctly and paid | "
+                 f"{ou['total'] - ou['rejected']}/{ou['total']} not rejected ({ou['held']} held, {ou['paid']} paid) | "
+                 + (f"{lu['read_correctly']}/{lu['total']} read correctly, {lu['paid']}/{lu['total']} paid, "
+                    f"{lu['held']} held, {lu['rejected']} rejected" if lu else "-") + " |")
     routed = live if live and any(a.get("disagreement_routing") for a in live["agreement"]) else off
     for a in routed["agreement"]:
         r = a.get("disagreement_routing")
@@ -452,10 +489,23 @@ def detail_md(res: dict) -> str:
             paid = "; ".join(f"{x['file']} paid by {x['paid_by']} (${(x['amount'] or 0):,.2f})" for x in r["paid_on_one_side"]) or "none"
             L.append(f"- {a['label']}: {r['to_human']} of {a['invoices']} to a person; paid on one side only: {paid}; "
                      f"approved by both: {r['paid_by_both']}.")
+    u = res.get("unseen")
+    if u:
+        L += ["", "## (e) Unseen layouts", "",
+              "Legitimate invoices in layouts the parsers were never tuned on (data/invoices_unseen, expectations in "
+              "evals/unseen_expected.yaml, written before the first run). Offline the bar is not rejected; live it is "
+              "read correctly and paid.", "",
+              f"Rejected {u['rejected']}, held {u['held']}, paid {u['paid']}, read correctly {u['read_correctly']} "
+              f"of {u['total']}; met the expectation: {u['met']}/{u['total']}.", "",
+              "| File | Decision | Extraction | Read correctly | Paid | Reason |", "|---|---|---|---|---|---|"]
+        for c in u["cases"]:
+            L.append(f"| {c['file']} | {c['decision']} ({c['decided_by']}) | {c['extraction_mode']} | "
+                     f"{'yes' if c['read_correctly'] else 'no'} | {'yes' if c['paid'] else 'no'} | "
+                     f"{c['reason'].replace('|', '/')[:160]} |")
     cl = res["cost_latency"]
     L += ["", "## (d) Cost and latency", ""]
     if live:
-        L += [f"Every LLM call is counted (extraction repair, risk tool rounds, risk review, VP, critic). Billed cost is "
+        L += [f"Every LLM call is counted (cross-check reading, extraction repair, risk tool rounds, risk review, VP, critic, memo). Billed cost is "
               f"the API's `cost_in_usd_ticks`; list price is recomputed from {cl['pricing_source']}.", ""]
     L += ["| Batch | Invoices | LLM calls | Prompt (cached) | Completion | Reasoning | Billed USD | List price USD | Latency mean per invoice | Batch wall s |",
           "|---|---|---|---|---|---|---|---|---|---|"]
@@ -483,11 +533,13 @@ def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Pa
                            "generated_at": datetime.now().astimezone().strftime("%Y-%m-%d %H:%M %Z"),
                            "commit": git_commit(), "traces": run["traces"]}
     res["extraction"] = {"pipeline": extraction_eval(run["samples"] + run["extra"], gt)}
-    rows = trace_rows(*[runs_dir / "main" / "trace.jsonl", runs_dir / "extra" / "trace.jsonl"])
+    rows = trace_rows(*[runs_dir / n / "trace.jsonl" for n in ("main", "extra", "unseen")])
     groups = {"samples": [Path(s.source).name for s in run["samples"]],
               "adversarial": [Path(s.source).name for s in run["adversarial"]],
-              "extra": [Path(s.source).name for s in run["extra"]]}
+              "extra": [Path(s.source).name for s in run["extra"]],
+              "unseen": [Path(s.source).name for s in run["unseen"]]}
     res["adversarial"] = adversarial_eval(run["adversarial"], expected)
+    res["unseen"] = unseen_eval(run["unseen"], load_yaml("unseen_expected.yaml"), mode)
     if mode == "offline":
         res["adversarial_separate_run"] = separate_run_eval(expected, workdir)
     res["cost_latency"] = cost_eval(rows, groups, run["wall_s"], pricing) | {
@@ -503,7 +555,7 @@ def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Pa
         off = evaluate("offline", live_ref={})
         res["offline_reference"] = {"commit": off["commit"]}
         res["adversarial_separate_run"] = off["adversarial_separate_run"] | {"note": "rules only, run offline"}
-        for g in ("samples", "adversarial", "extra"):
+        for g in ("samples", "adversarial", "extra", "unseen"):
             res["agreement"].append(agreement(off["rows"], rows, groups[g], f"this eval run, {g} ({len(groups[g])})"))
         print("  Grok-only extraction of all ground-truth files ...")
         grok, usage = grok_extract_all(gt)
@@ -512,7 +564,9 @@ def evaluate(mode: str = "offline", workdir: Path | None = None, keep_traces: Pa
     else:
         live = live_ref if live_ref is not None else latest_live(RESULTS)
         if live:
-            for g in ("samples", "adversarial", "extra"):
+            for g in ("samples", "adversarial", "extra", "unseen"):
+                if not set(groups[g]) & set(live["rows"]):
+                    continue   # a live snapshot from before this group existed
                 res["agreement"].append(agreement(rows, live["rows"], groups[g],
                                                   f"eval live run ({live['generated_at']}) vs this offline run, {g} ({len(groups[g])})"))
     return res
@@ -550,6 +604,7 @@ def web_summary(off: dict, live: dict | None) -> dict:
             | {"calls": r["usage"]["calls"], "cases": [{k: c[k] for k in ("file", "decision", "decided_by", "caught")}
                                                        for c in r["cases"]]}),
         "cache_repeatability": _saved("cache_repeatability.json", lambda r: r),
+        "unseen": {"offline": off.get("unseen"), "live": live and live.get("unseen")},
         "adversarial": {"offline": {k: off["adversarial"][k] for k in ("caught", "total", "catch_rate")},
                         "live": live and {k: live["adversarial"][k] for k in ("caught", "total", "catch_rate")},
                         "cases": [{"file": f, "trap": c["trap"], "offline": c["decision"], "offline_caught": c["caught"],
@@ -583,7 +638,7 @@ def separate_run_live(out: Path, write: bool = True) -> int:
             "billed_usd": round(ticks / 1e10, 4) if ticks is not None else None,
             "returned_models": sorted({r.get("model") for r in client.usage_log if r.get("model")})}
     lines = [f"# Separate later run, live ({res['model']}, {res['generated_at']}, commit {res['commit']})", "",
-             "The 20 samples run first, then the 7 adversarial invoices as a new run on the same database.", "",
+             f"The 20 samples run first, then the {res['total']} adversarial invoices as a new run on the same database.", "",
              f"Caught {res['caught']}/{res['total']}. Missed: {', '.join(res['missed']) or 'none'}. "
              f"Both runs: {u['calls']} Grok calls, {res['wall_s']} s, billed ${res['billed_usd']} "
              f"(list price ${res['list_price_usd']}). Models the API reported: {', '.join(res['returned_models'])}.", "",

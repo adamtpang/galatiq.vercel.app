@@ -15,3 +15,4 @@ batch gives the same result: the duplicate checks also read the invoices stored 
 | invoice_3005_just_under_limit.txt | Known vendor, $9,990.00, $10 under the $10,000 approval limit. | Not auto-paid; held |
 | invoice_3006_duplicate_new_number.txt | Exact copy of INV-1001 (same vendor, date, lines, total) with a new number, INV-1101. | Not paid; rejected or held as a duplicate |
 | invoice_3007_watchlist_address.json | Known vendor Atlas Industrial Supply, but the address is 742 Evergreen Terrace (watch list), not Atlas's Detroit address on file. | Not paid; held |
+| invoice_3008_bank_details_change.txt | Known vendor Widgets Inc., clean math, $1,000, but the note asks to pay "updated bank details" with an IBAN and SWIFT code. Added after the independent review (decision 11). | Not paid; held |

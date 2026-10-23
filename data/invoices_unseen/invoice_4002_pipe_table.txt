@@ -1,0 +1,12 @@
+TAX INVOICE   No. INV-4002
+From: Reliable Components Inc.   |   Date: 2026-10-06   |   Due: 2026-11-05
+
+| Item    | Qty | Unit price | Line total |
+|---------|-----|------------|------------|
+| GadgetX | 2   | 750.00     | 1,500.00   |
+| WidgetA | 3   | 250.00     | 750.00     |
+
+Net: 2,250.00
+Tax: 0.00
+Invoice total: 2,250.00
+Terms: Net 30

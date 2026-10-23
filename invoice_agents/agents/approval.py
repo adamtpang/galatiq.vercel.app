@@ -20,6 +20,7 @@ the offline suite and golden tests are deterministic.
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field
@@ -206,7 +207,9 @@ def hard_rules(state: InvoiceState) -> Decision | None:
                     risk_score=(state.risk or {}).get("score"), decided_by="hard_rules")
 
 
-HOLD_FLAGS = {"vendor_renamed": "VENDOR_RENAMED", "vendor_lookalike": "VENDOR_LOOKALIKE"}
+HOLD_FLAGS = {"vendor_renamed": "VENDOR_RENAMED", "vendor_lookalike": "VENDOR_LOOKALIKE",
+              "bank_details_changed": "BANK_DETAILS_CHANGED",   # decision 11
+              "extraction_disagreement": "EXTRACTION_DISAGREEMENT"}   # decision 12
 
 
 def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
@@ -223,11 +226,17 @@ def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
         elif llm.get("prompt_injection"):   # structured field of Grok's risk review, not its prose
             quote = f' ("{llm["injection_quote"]}")' if llm.get("injection_quote") else ""
             reasons.append(f"Prompt injection found by the Grok risk review{quote}; a human must review it")
-    if cfg.get("llm_repaired") and state.extraction_mode == "llm_repair":   # decision 10
-        reasons.append("LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw "
-                       "text; a person compares the original with Grok's reading before anything is paid "
-                       "(python main.py review " + (state.invoice.number if state.invoice and state.invoice.number
-                                                    else "<invoice number>") + ")")
+    if cfg.get("llm_repaired") and state.extraction_mode == "llm_repair":   # decisions 10 and 14
+        why = repair_unreconciled(state)
+        if why:
+            reasons.append("LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw "
+                           f"text, and its reading is not confirmed ({'; '.join(why)}); a person compares the original "
+                           "with Grok's reading before anything is paid (python main.py review "
+                           + (state.invoice.number if state.invoice and state.invoice.number else "<invoice number>") + ")")
+        elif not any(f.code == "LLM_EXTRACTED" for f in state.flags):
+            state.flags.append(Flag(code="LLM_EXTRACTED", severity=Severity.INFO, evidence=state.repair_check or {},
+                                    message="The parser could not read this layout; Grok read it, every number Grok "
+                                            "reported is printed in the file, and the checks reconcile"))
     for key, code in HOLD_FLAGS.items():
         if cfg.get(key):
             reasons += [f"{code}: {f.message}; hold for human verification of the vendor and bank details"
@@ -238,11 +247,54 @@ def hard_holds(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
                     decided_by="hard_hold")
 
 
+def repair_unreconciled(state: InvoiceState) -> list[str]:
+    """Decision 14: why Grok's reading of an unreadable layout cannot go on to normal review (empty = it can)."""
+    rc = state.repair_check or {}
+    why = []
+    if not rc.get("intact", False):
+        why.append("the file itself is damaged" + (f" ({rc['parse_error'].split(':')[0]})" if rc.get("parse_error") else ""))
+    if rc.get("ungrounded"):
+        why.append("numbers not printed in the file: " + ", ".join(rc["ungrounded"][:4]))
+    codes = {f.code for f in state.flags}
+    if codes & {"UNKNOWN_VENDOR", "VENDOR_LOOKALIKE"}:
+        why.append("the vendor is not on file")
+    return why
+
+
+# Blocking codes that mean "the parser could not read this file", not "the invoice is wrong".
+UNREADABLE_CODES = {"EXTRACTION_FAILED", "MISSING_ITEMS", "MISSING_TOTAL", "MISSING_VENDOR",
+                    "SUBTOTAL_MISMATCH", "TOTAL_MISMATCH", "LINE_AMOUNT_MISMATCH"}
+_INVOICE_WORD = re.compile(r"invoice|\bbill\b|\binv[-#\s]*\d|\b(amount|balance|total)\s+due\b", re.I)
+_MONEY_AMOUNT = re.compile(r"\$\s?\d|\d[\d,]*\.\d{2}\b")
+
+
+def unreadable_hold(state: InvoiceState, policy: dict[str, Any]) -> Decision | None:
+    """Decision 14: a file that looks like an invoice (invoice, bill or amount due, and a dollar amount) but that the
+    parser could not read (no line items or no total) is held for a person, not rejected. Without Grok nothing
+    else can read it, and rejecting a real invoice for its layout is the wrong error. Any other blocking flag
+    (unsupported currency, NaN, negative quantity, ...) still rejects."""
+    if not (policy.get("approval", {}).get("hard_holds", {}) or {}).get("unreadable_layout"):
+        return None
+    inv, raw = state.invoice, state.raw_text or ""
+    if inv is not None and inv.items and inv.total is not None:
+        return None
+    blocks = {f.code for f in state.flags if f.severity == Severity.BLOCK}
+    if not blocks or blocks - UNREADABLE_CODES or not (_INVOICE_WORD.search(raw) and _MONEY_AMOUNT.search(raw)):
+        return None
+    msg = ("The file looks like an invoice but its layout could not be read (" + ", ".join(sorted(blocks))
+           + "); a person enters or checks it")
+    state.flags.append(Flag(code="UNREADABLE_LAYOUT", severity=Severity.WARN, message=msg,
+                            evidence={"blocking": sorted(blocks)}))
+    return Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="hard_hold",
+                    risk_score=(state.risk or {}).get("score"), reasons=[f"UNREADABLE_LAYOUT: {msg}"],
+                    arguments={"blocking_flags_not_applied": sorted(blocks)})
+
+
 STATUS = {"approve": DecisionStatus.APPROVED, "reject": DecisionStatus.REJECTED, "hold": DecisionStatus.PENDING_HUMAN}
 
 
 def decide(state: InvoiceState, vp: VP, critic: Critic, policy: dict[str, Any]) -> Decision:
-    hard = hard_rules(state) or hard_holds(state, policy)
+    hard = unreadable_hold(state, policy) or hard_rules(state) or hard_holds(state, policy)
     if hard:
         return hard
     f = facts(state, policy)

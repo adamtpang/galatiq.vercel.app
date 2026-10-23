@@ -183,3 +183,17 @@ data/invoices_extra/invoice_2003_truncated.json:
   total: 2000.00
   due_date: 2026-11-17
   line_items: [[WidgetA, 4], [WidgetB, 2]]   # the file is truncated (no closing brace); all fields are present
+
+data/invoices_extra/invoice_2004_over_limit_clean.txt:   # added after the independent review (critic loop on a payable invoice)
+  vendor: Widgets Inc.
+  invoice_number: INV-2004
+  total: 12500.00
+  due_date: 2026-11-11
+  line_items: [[WidgetA, 15], [WidgetB, 10], [GadgetX, 5]]
+
+data/invoices_extra/invoice_2005_over_limit_price.txt:   # added after the independent review (critic objects to the price)
+  vendor: Gadgets Co.
+  invoice_number: INV-2005
+  total: 12500.00
+  due_date: 2026-11-12
+  line_items: [[GadgetX, 5], [WidgetB, 10], [WidgetA, 10]]

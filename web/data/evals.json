@@ -1,118 +1,118 @@
 {
  "source": "evals/results (python -m evals)",
- "offline_generated_at": "2026-10-22 15:14 CDT",
- "live_generated_at": "2026-10-22 15:13 CDT",
+ "offline_generated_at": "2026-10-22 18:57 CDT",
+ "live_generated_at": "2026-10-22 18:34 CDT",
  "model": "grok-4.7",
  "extraction": {
   "offline": {
    "vendor": {
-    "correct": 21,
-    "scored": 23,
+    "correct": 23,
+    "scored": 25,
     "ambiguous": 0,
-    "accuracy": 0.913
+    "accuracy": 0.92
    },
    "invoice_number": {
-    "correct": 21,
-    "scored": 22,
+    "correct": 23,
+    "scored": 24,
     "ambiguous": 1,
-    "accuracy": 0.9545
+    "accuracy": 0.9583
    },
    "total": {
-    "correct": 21,
-    "scored": 23,
+    "correct": 23,
+    "scored": 25,
     "ambiguous": 0,
-    "accuracy": 0.913
+    "accuracy": 0.92
    },
    "line_items": {
-    "correct": 21,
-    "scored": 23,
+    "correct": 23,
+    "scored": 25,
     "ambiguous": 0,
-    "accuracy": 0.913
+    "accuracy": 0.92
    },
    "due_date": {
-    "correct": 20,
-    "scored": 21,
+    "correct": 22,
+    "scored": 23,
     "ambiguous": 2,
-    "accuracy": 0.9524
+    "accuracy": 0.9565
    },
    "overall": {
-    "correct": 104,
-    "scored": 112,
-    "accuracy": 0.9286
+    "correct": 114,
+    "scored": 122,
+    "accuracy": 0.9344
    }
   },
   "live_pipeline": {
    "vendor": {
-    "correct": 23,
-    "scored": 23,
+    "correct": 25,
+    "scored": 25,
     "ambiguous": 0,
     "accuracy": 1.0
    },
    "invoice_number": {
-    "correct": 22,
-    "scored": 22,
+    "correct": 24,
+    "scored": 24,
     "ambiguous": 1,
     "accuracy": 1.0
    },
    "total": {
-    "correct": 23,
-    "scored": 23,
+    "correct": 25,
+    "scored": 25,
     "ambiguous": 0,
     "accuracy": 1.0
    },
    "line_items": {
-    "correct": 23,
-    "scored": 23,
+    "correct": 25,
+    "scored": 25,
     "ambiguous": 0,
     "accuracy": 1.0
    },
    "due_date": {
-    "correct": 21,
-    "scored": 21,
+    "correct": 23,
+    "scored": 23,
     "ambiguous": 2,
     "accuracy": 1.0
    },
    "overall": {
-    "correct": 112,
-    "scored": 112,
+    "correct": 122,
+    "scored": 122,
     "accuracy": 1.0
    }
   },
   "live_grok_only": {
    "vendor": {
-    "correct": 23,
-    "scored": 23,
+    "correct": 24,
+    "scored": 25,
     "ambiguous": 0,
-    "accuracy": 1.0
+    "accuracy": 0.96
    },
    "invoice_number": {
-    "correct": 22,
-    "scored": 22,
+    "correct": 24,
+    "scored": 24,
     "ambiguous": 1,
     "accuracy": 1.0
    },
    "total": {
-    "correct": 23,
-    "scored": 23,
+    "correct": 25,
+    "scored": 25,
     "ambiguous": 0,
     "accuracy": 1.0
    },
    "line_items": {
-    "correct": 23,
-    "scored": 23,
+    "correct": 25,
+    "scored": 25,
     "ambiguous": 0,
     "accuracy": 1.0
    },
    "due_date": {
-    "correct": 21,
-    "scored": 21,
+    "correct": 23,
+    "scored": 23,
     "ambiguous": 2,
     "accuracy": 1.0
    },
    "overall": {
-    "correct": 112,
-    "scored": 112,
-    "accuracy": 1.0
+    "correct": 121,
+    "scored": 122,
+    "accuracy": 0.9918
    }
   },
   "ambiguous": {
@@ -129,15 +129,20 @@
   {
    "label": "committed demo runs (runs/demo/offline vs runs/demo/live), 20 samples",
    "invoices": 20,
-   "agree": 17,
-   "rate": 0.85,
+   "agree": 16,
+   "rate": 0.8,
    "disagreement_routing": {
-    "to_human": 3,
+    "to_human": 4,
     "paid_on_one_side": [
      {
-      "file": "invoice_1001.txt",
+      "file": "invoice_1004_revised.json",
       "paid_by": "offline",
-      "amount": 5000.0
+      "amount": 5940.0
+     },
+     {
+      "file": "invoice_1006.csv",
+      "paid_by": "offline",
+      "amount": 2750.0
      },
      {
       "file": "invoice_1010.txt",
@@ -150,60 +155,88 @@
       "amount": 4455.0
      }
     ],
-    "paid_on_one_side_usd": 16640.0,
+    "paid_on_one_side_usd": 20330.0,
     "paid_by_both": 3
    },
    "disagreements": [
     {
-     "file": "invoice_1001.txt",
+     "file": "invoice_1004_revised.json",
      "offline": "APPROVED",
      "live": "PENDING_HUMAN",
-     "live_reason": "Vendor Widgets Inc. is on file and the $5000 total matches the line items."
+     "live_reason": "Known vendor and line math match the $5,940.00 total, under the approval threshold."
+    },
+    {
+     "file": "invoice_1006.csv",
+     "offline": "APPROVED",
+     "live": "PENDING_HUMAN",
+     "live_reason": "Vendor is on file and line math matches the $2750 total, under the approval threshold."
     },
     {
      "file": "invoice_1010.txt",
      "offline": "APPROVED",
      "live": "PENDING_HUMAN",
-     "live_reason": "Vendor Consolidated Materials Group is on file and the $7,185.00 total matches the invoice."
+     "live_reason": "Vendor is on file, but history has no earlier invoices."
     },
     {
      "file": "invoice_1014.xml",
      "offline": "APPROVED",
      "live": "PENDING_HUMAN",
-     "live_reason": "Vendor is on file, but this is the first invoice with no prior history."
+     "live_reason": "Vendor is on file, but this is the first payment and invoice history is empty."
     }
    ]
   },
   {
    "label": "this eval run, samples (20)",
    "invoices": 20,
-   "agree": 19,
-   "rate": 0.95,
+   "agree": 17,
+   "rate": 0.85,
    "disagreement_routing": {
-    "to_human": 1,
+    "to_human": 3,
     "paid_on_one_side": [
+     {
+      "file": "invoice_1004_revised.json",
+      "paid_by": "offline",
+      "amount": 5940.0
+     },
      {
       "file": "invoice_1010.txt",
       "paid_by": "offline",
       "amount": 7185.0
+     },
+     {
+      "file": "invoice_1014.xml",
+      "paid_by": "offline",
+      "amount": 4455.0
      }
     ],
-    "paid_on_one_side_usd": 7185.0,
-    "paid_by_both": 5
+    "paid_on_one_side_usd": 17580.0,
+    "paid_by_both": 4
    },
    "disagreements": [
+    {
+     "file": "invoice_1004_revised.json",
+     "offline": "APPROVED",
+     "live": "PENDING_HUMAN",
+     "live_reason": "Known vendor and catalog prices match, but prior INV-1004 was rejected and R1 raises the total from $1,890.00 to $5,940.00."
+    },
     {
      "file": "invoice_1010.txt",
      "offline": "APPROVED",
      "live": "PENDING_HUMAN",
-     "live_reason": "Vendor is on file and the $7,185.00 total is under the approval threshold, but WidgetA is billed at two rates."
+     "live_reason": "Vendor is on file and the invoice total is under the approval threshold."
+    },
+    {
+     "file": "invoice_1014.xml",
+     "offline": "APPROVED",
+     "live": "PENDING_HUMAN",
+     "live_reason": "Vendor TechParts International is on file and the billed total matches the invoice."
     }
    ]
   },
   {
-   "label": "this eval run, adversarial (7)",
-   "invoices": 7,
-   "agree": 7,
+   "label": "this eval run, adversarial (8)",
+   "invoices": 8,
+   "agree": 8,
    "rate": 1.0,
    "disagreement_routing": {
     "to_human": 0,
@@ -214,35 +247,70 @@
    "disagreements": []
   },
   {
-   "label": "this eval run, extra (3)",
-   "invoices": 3,
-   "agree": 1,
-   "rate": 0.3333,
+   "label": "this eval run, extra (5)",
+   "invoices": 5,
+   "agree": 5,
+   "rate": 1.0,
    "disagreement_routing": {
-    "to_human": 2,
+    "to_human": 0,
     "paid_on_one_side": [],
     "paid_on_one_side_usd": 0,
+    "paid_by_both": 1
+   },
+   "disagreements": []
+  },
+  {
+   "label": "this eval run, unseen (4)",
+   "invoices": 4,
+   "agree": 1,
+   "rate": 0.25,
+   "disagreement_routing": {
+    "to_human": 3,
+    "paid_on_one_side": [
+     {
+      "file": "invoice_4001_supplier_at.txt",
+      "paid_by": "live",
+      "amount": 1000.0
+     },
+     {
+      "file": "invoice_4002_pipe_table.txt",
+      "paid_by": "live",
+      "amount": 2250.0
+     },
+     {
+      "file": "invoice_4003_prose_email.txt",
+      "paid_by": "live",
+      "amount": 2000.0
+     }
+    ],
+    "paid_on_one_side_usd": 5250.0,
     "paid_by_both": 0
    },
    "disagreements": [
     {
-     "file": "invoice_2001_email.txt",
-     "offline": "REJECTED",
-     "live": "PENDING_HUMAN",
-     "live_reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text; a person compares the original with Grok's reading before anything is paid (python main.py review INV-2001)"
+     "file": "invoice_4001_supplier_at.txt",
+     "offline": "PENDING_HUMAN",
+     "live": "APPROVED",
+     "live_reason": "Vendor Widgets Inc. is on file"
     },
     {
-     "file": "invoice_2003_truncated.json",
-     "offline": "REJECTED",
-     "live": "PENDING_HUMAN",
-     "live_reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text; a person compares the original with Grok's reading before anything is paid (python main.py review INV-2003)"
+     "file": "invoice_4002_pipe_table.txt",
+     "offline": "PENDING_HUMAN",
+     "live": "APPROVED",
+     "live_reason": "Vendor Reliable Components Inc. is on file."
+    },
+    {
+     "file": "invoice_4003_prose_email.txt",
+     "offline": "PENDING_HUMAN",
+     "live": "APPROVED",
+     "live_reason": "Vendor Atlas Industrial Supply is on file"
     }
    ]
   }
  ],
  "separate_run": {
-  "caught": 7,
-  "total": 7,
+  "caught": 8,
+  "total": 8,
   "catch_rate": 1.0,
   "missed": [],
   "duplicate_3006": {
@@ -257,15 +325,15 @@
   }
  },
  "separate_run_live": {
-  "caught": 7,
-  "total": 7,
+  "caught": 8,
+  "total": 8,
   "missed": [],
-  "generated_at": "2026-10-22 16:10 CDT",
+  "generated_at": "2026-10-22 18:12 CDT",
   "model": "grok-4.7",
-  "commit": "951b708",
-  "wall_s": 650.7,
-  "billed_usd": 0.4182,
-  "calls": 51,
+  "commit": "4719dbe",
+  "wall_s": 980.4,
+  "billed_usd": 0.7336,
+  "calls": 110,
   "cases": [
    {
     "file": "invoice_3001_injection_note.json",
@@ -305,8 +373,14 @@
    },
    {
     "file": "invoice_3007_watchlist_address.json",
-    "decision": "REJECTED",
+    "decision": "PENDING_HUMAN",
     "decided_by": "vp",
+    "caught": true
+   },
+   {
+    "file": "invoice_3008_bank_details_change.txt",
+    "decision": "PENDING_HUMAN",
+    "decided_by": "hard_hold",
     "caught": true
    }
   ]
@@ -329,11 +403,11 @@
    "conditions"
   ],
   "first": {
-   "api_calls": 31,
-   "billed_usd": 0.2433,
-   "span_s": 362.2,
+   "api_calls": 71,
+   "billed_usd": 0.4612,
+   "span_s": 655.7,
    "cache_hits": 0,
-   "cache_misses": 23,
+   "cache_misses": 43,
    "models": [
     "grok-4.7"
    ],
@@ -343,7 +417,7 @@
    "api_calls": 0,
    "billed_usd": 0.0,
    "span_s": 0.2,
-   "cache_hits": 23,
+   "cache_hits": 43,
    "cache_misses": 0,
    "models": [
     "grok-4.7"
@@ -355,25 +429,127 @@
     4
    ],
    "REJECTED": [
-    13,
-    13
+    12,
+    12
    ],
    "PENDING_HUMAN": [
-    3,
-    3
+    4,
+    4
    ]
   },
   "recorded_at": "2026-10-22"
  },
+ "unseen": {
+  "offline": {
+   "cases": [
+    {
+     "file": "invoice_4001_supplier_at.txt",
+     "decision": "PENDING_HUMAN",
+     "decided_by": "hard_hold",
+     "extraction_mode": "deterministic",
+     "read_correctly": false,
+     "paid": false,
+     "meets_expectation": true,
+     "reason": "UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (MISSING_ITEMS, TOTAL_MISMATCH); a person enters or checks it"
+    },
+    {
+     "file": "invoice_4002_pipe_table.txt",
+     "decision": "PENDING_HUMAN",
+     "decided_by": "hard_hold",
+     "extraction_mode": "deterministic",
+     "read_correctly": false,
+     "paid": false,
+     "meets_expectation": true,
+     "reason": "UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (MISSING_ITEMS, TOTAL_MISMATCH); a person enters or checks it"
+    },
+    {
+     "file": "invoice_4003_prose_email.txt",
+     "decision": "PENDING_HUMAN",
+     "decided_by": "hard_hold",
+     "extraction_mode": "deterministic",
+     "read_correctly": false,
+     "paid": false,
+     "meets_expectation": true,
+     "reason": "UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (MISSING_ITEMS, MISSING_TOTAL, MISSING_VENDOR); a person enters or checks it"
+    },
+    {
+     "file": "invoice_4004_odd_headers.csv",
+     "decision": "PENDING_HUMAN",
+     "decided_by": "hard_hold",
+     "extraction_mode": "deterministic",
+     "read_correctly": false,
+     "paid": false,
+     "meets_expectation": true,
+     "reason": "UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (MISSING_ITEMS, MISSING_TOTAL, MISSING_VENDOR); a person enters or checks it"
+    }
+   ],
+   "total": 4,
+   "rejected": 0,
+   "held": 4,
+   "paid": 0,
+   "read_correctly": 0,
+   "met": 4
+  },
+  "live": {
+   "cases": [
+    {
+     "file": "invoice_4001_supplier_at.txt",
+     "decision": "APPROVED",
+     "decided_by": "vp",
+     "extraction_mode": "llm_repair",
+     "read_correctly": true,
+     "paid": true,
+     "meets_expectation": true,
+     "reason": "Vendor Widgets Inc. is on file"
+    },
+    {
+     "file": "invoice_4002_pipe_table.txt",
+     "decision": "APPROVED",
+     "decided_by": "vp",
+     "extraction_mode": "llm_repair",
+     "read_correctly": true,
+     "paid": true,
+     "meets_expectation": true,
+     "reason": "Vendor Reliable Components Inc. is on file."
+    },
+    {
+     "file": "invoice_4003_prose_email.txt",
+     "decision": "APPROVED",
+     "decided_by": "vp",
+     "extraction_mode": "llm_repair",
+     "read_correctly": true,
+     "paid": true,
+     "meets_expectation": true,
+     "reason": "Vendor Atlas Industrial Supply is on file"
+    },
+    {
+     "file": "invoice_4004_odd_headers.csv",
+     "decision": "PENDING_HUMAN",
+     "decided_by": "hard_hold",
+     "extraction_mode": "llm_repair",
+     "read_correctly": true,
+     "paid": false,
+     "meets_expectation": false,
+     "reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text, and its reading is not confirmed (numbers not printed in the file: line 1 qty 1, line 2 qty 2, line 2 unit_price 500); a person compares the original with Grok's reading before anything is paid (python main.py review INV-4004)"
+    }
+   ],
+   "total": 4,
+   "rejected": 0,
+   "held": 1,
+   "paid": 3,
+   "read_correctly": 4,
+   "met": 3
+  }
+ },
  "adversarial": {
   "offline": {
-   "caught": 7,
-   "total": 7,
+   "caught": 8,
+   "total": 8,
    "catch_rate": 1.0
   },
   "live": {
-   "caught": 7,
-   "total": 7,
+   "caught": 8,
+   "total": 8,
    "catch_rate": 1.0
   },
   "cases": [
@@ -432,6 +608,14 @@
     "offline_caught": true,
     "live": "PENDING_HUMAN",
     "live_caught": true
+   },
+   {
+    "file": "invoice_3008_bank_details_change.txt",
+    "trap": "known vendor, clean math, small total, but asks to pay a changed bank account (IBAN and SWIFT)",
+    "offline": "PENDING_HUMAN",
+    "offline_caught": true,
+    "live": "PENDING_HUMAN",
+    "live_caught": true
    }
   ]
  },
@@ -439,76 +623,95 @@
   "batches": {
    "samples": {
     "invoices": 20,
-    "calls": 31,
-    "prompt_tokens": 63587,
-    "cached_prompt_tokens": 52352,
-    "completion_tokens": 4473,
-    "reasoning_tokens": 29816,
-    "latency_sum_s": 550.57,
-    "wall_s": 550.74,
-    "latency_mean_s": 27.53,
-    "latency_mean_ms": 27528.7,
-    "billed_usd": 0.2544,
-    "billed_usd_per_invoice": 0.0127,
-    "list_price_usd": 0.2544
+    "calls": 71,
+    "prompt_tokens": 144140,
+    "cached_prompt_tokens": 115584,
+    "completion_tokens": 11110,
+    "reasoning_tokens": 51091,
+    "latency_sum_s": 641.61,
+    "wall_s": 641.81,
+    "latency_mean_s": 32.08,
+    "latency_mean_ms": 32080.2,
+    "billed_usd": 0.4881,
+    "billed_usd_per_invoice": 0.0244,
+    "list_price_usd": 0.4881
    },
    "adversarial": {
-    "invoices": 7,
-    "calls": 20,
-    "prompt_tokens": 40766,
-    "cached_prompt_tokens": 28416,
-    "completion_tokens": 2399,
-    "reasoning_tokens": 18769,
-    "latency_sum_s": 231.69,
-    "wall_s": 231.73,
-    "latency_mean_s": 33.1,
-    "latency_mean_ms": 33098.4,
-    "billed_usd": 0.1659,
-    "billed_usd_per_invoice": 0.0237,
-    "list_price_usd": 0.1659
+    "invoices": 8,
+    "calls": 39,
+    "prompt_tokens": 77913,
+    "cached_prompt_tokens": 59520,
+    "completion_tokens": 6099,
+    "reasoning_tokens": 26615,
+    "latency_sum_s": 338.43,
+    "wall_s": 338.48,
+    "latency_mean_s": 42.3,
+    "latency_mean_ms": 42303.3,
+    "billed_usd": 0.2628,
+    "billed_usd_per_invoice": 0.0329,
+    "list_price_usd": 0.2628
    },
    "extra": {
-    "invoices": 3,
-    "calls": 11,
-    "prompt_tokens": 21299,
-    "cached_prompt_tokens": 16768,
-    "completion_tokens": 1500,
-    "reasoning_tokens": 7850,
-    "latency_sum_s": 124.81,
-    "wall_s": 124.89,
-    "latency_mean_s": 41.6,
-    "latency_mean_ms": 41603.3,
-    "billed_usd": 0.0735,
-    "billed_usd_per_invoice": 0.0245,
-    "list_price_usd": 0.0735
+    "invoices": 5,
+    "calls": 28,
+    "prompt_tokens": 54485,
+    "cached_prompt_tokens": 42752,
+    "completion_tokens": 3527,
+    "reasoning_tokens": 18866,
+    "latency_sum_s": 235.62,
+    "wall_s": 235.66,
+    "latency_mean_s": 47.12,
+    "latency_mean_ms": 47124.0,
+    "billed_usd": 0.1792,
+    "billed_usd_per_invoice": 0.0358,
+    "list_price_usd": 0.1792
+   },
+   "unseen": {
+    "invoices": 4,
+    "calls": 23,
+    "prompt_tokens": 43412,
+    "cached_prompt_tokens": 32256,
+    "completion_tokens": 2417,
+    "reasoning_tokens": 12464,
+    "latency_sum_s": 161.52,
+    "wall_s": 161.55,
+    "latency_mean_s": 40.38,
+    "latency_mean_ms": 40379.6,
+    "billed_usd": 0.1277,
+    "billed_usd_per_invoice": 0.0319,
+    "list_price_usd": 0.1277
    }
   },
   "grok_only_extraction": {
-   "calls": 23,
-   "prompt_tokens": 48893,
-   "cached_prompt_tokens": 34944,
-   "completion_tokens": 4193,
-   "reasoning_tokens": 16738,
-   "max_prompt_tokens": 2389,
-   "billed_usd": 0.171,
-   "list_price_usd": 0.171,
-   "files": 23,
-   "wall_s_per_file_mean": 8.25
+   "calls": 25,
+   "prompt_tokens": 52540,
+   "cached_prompt_tokens": 36096,
+   "completion_tokens": 4556,
+   "reasoning_tokens": 19975,
+   "max_prompt_tokens": 2370,
+   "billed_usd": 0.1981,
+   "list_price_usd": 0.1981,
+   "files": 25,
+   "wall_s_per_file_mean": 9.07
   },
   "pricing_source": "docs.x.ai/docs/models (grok-4.7: $2.00 input, $0.50 cached input, $6.00 output per 1M tokens; reasoning billed as output), fetched 2026-10-22"
  },
  "offline_latency": {
   "samples": {
-   "latency_mean_ms": 5.4,
-   "wall_s": 0.23
+   "latency_mean_ms": 6.7,
+   "wall_s": 0.26
   },
   "adversarial": {
-   "latency_mean_ms": 1.6,
-   "wall_s": 0.03
+   "latency_mean_ms": 2.6,
+   "wall_s": 0.05
   },
   "extra": {
-   "latency_mean_ms": 1.2,
-   "wall_s": 0.02
+   "latency_mean_ms": 1.7,
+   "wall_s": 0.03
+  },
+  "unseen": {
+   "latency_mean_ms": 2.1,
+   "wall_s": 0.03
   }
  }
 }

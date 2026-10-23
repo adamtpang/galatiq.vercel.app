@@ -4,11 +4,13 @@
   python main.py --batch data/invoices [--offline] [--chaos 0.3] [--json] [--no-cache]
   python main.py review                       # list the human review queue
   python main.py review INV-1012 --approve    # or --reject, optional --note
-  python main.py eval [--live]                # the four evals (same as python -m evals)
+  python main.py ui [--port 8765]             # the review queue in the browser, with Approve and Reject
+  python main.py eval [--live]                # the five evals (same as python -m evals)
 """
 from __future__ import annotations
 
 import json
+import re
 from difflib import get_close_matches
 from pathlib import Path
 from typing import Optional
@@ -18,12 +20,10 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from invoice_agents import hitl
-from invoice_agents.agents.payment import PaymentAgent, log_rejection
 from invoice_agents.db import connect, db_path
 from invoice_agents.graph import make_context, run_batch
 from invoice_agents.llm import LLMUnavailable, get_client
-from invoice_agents.models import DecisionStatus
-from invoice_agents.pipeline import collect
+from invoice_agents.pipeline import collect, skipped
 from invoice_agents.reporter import print_review, print_summary, write_artifacts
 
 app = typer.Typer(add_completion=False, invoke_without_command=True, no_args_is_help=False)
@@ -53,7 +53,7 @@ def run(
         console.print(ctx.get_help())
         raise typer.Exit(1)
     if not target.exists():
-        missing_path(target)
+        target = brief_alias(target) or missing_path(target)
     try:
         llm = get_client("offline" if offline else mode)
     except LLMUnavailable as e:
@@ -64,6 +64,10 @@ def run(
     if not as_json:
         console.print(f"[bold]Acme invoice agents[/]  mode=[cyan]{llm.name}[/]{' ' + model if model else ''}  "
                       f"chaos={chaos}  db={db_path()}  run={rc.run_id}")
+    skip = skipped(target)
+    if skip and not as_json:
+        console.print(f"[yellow]Skipped {len(skip)} file(s) with an unsupported extension[/] (supported: .txt .eml .csv "
+                      f".json .xml .pdf): {', '.join(f.name for f in skip[:6])}{', ...' if len(skip) > 6 else ''}")
     states = run_batch(collect(target), rc)
     write_artifacts(states, rc.run_dir, llm.name, model)
     if as_json:
@@ -86,6 +90,23 @@ def run(
             if pinned:
                 console.print(f"[yellow]Model pin: {len(pinned)} invoice(s) got answers from a model other than "
                               f"{model}; held for a human (MODEL_MISMATCH).[/]")
+
+
+def brief_alias(target: Path) -> Path | None:
+    """The brief's example, data/invoices/invoice1.txt, names a file the case data does not have; the samples
+    are invoice_1001.txt and up. Map invoiceN.txt (N below 1000 means 1000 + N) to that sample and say so."""
+    m = re.fullmatch(r"invoice_?(\d+)\.txt", target.name, re.I)
+    if not m or not target.parent.is_dir():
+        return None
+    n = int(m.group(1))
+    num = 1000 + n if n < 1000 else n
+    exact = target.parent / f"invoice_{num}.txt"
+    cands = [exact] if exact.exists() else sorted(target.parent.glob(f"invoice_{num}.*"))
+    if not cands:
+        return None
+    console.print(f"[yellow]Note:[/] {target.name} is not in the case data (the samples are named invoice_1001.txt "
+                  f"and up); using {cands[0]}.")
+    return cands[0]
 
 
 def missing_path(target: Path) -> None:
@@ -137,11 +158,11 @@ def review(
     if not (approve or reject):
         print_review(hitl.queued_state(row), row["reason"], console)
         return
-    state = hitl.resolve(conn, row, approve, note)
-    if state.decision.status == DecisionStatus.APPROVED:
-        state = PaymentAgent(conn, chaos=chaos).pay(state)
-    else:
-        state = log_rejection(conn, state)
+    try:
+        state = hitl.decide(conn, row, approve, note, chaos=chaos)
+    except ValueError as e:
+        console.print(f"[red]{e}[/]")
+        raise typer.Exit(1)
     p = state.payment or {}
     num, vendor = state.invoice.number, state.invoice.vendor
     if p.get("status") == "paid":
@@ -156,6 +177,21 @@ def review(
     console.print(f"{num}: {state.decision.status.value.lower()} by a human ({note or 'no note'}). {outcome}")
     if p.get("status") == "failed":
         raise typer.Exit(1)
+
+
+@app.command()
+def ui(port: int = typer.Option(8765, "--port", help="Port on 127.0.0.1"),
+       chaos: float = typer.Option(0.0, "--chaos", min=0.0, max=1.0, help="Probability each bank call fails")):
+    """Local review UI in the browser: the review queue with Approve and Reject buttons (localhost only)."""
+    from invoice_agents.ui import make_server
+    srv = make_server(port=port, chaos=chaos)
+    console.print(f"Review UI on http://127.0.0.1:{srv.server_address[1]}/  (db={db_path()}). Ctrl+C stops it.")
+    try:
+        srv.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        srv.server_close()
 
 
 @app.command("eval")

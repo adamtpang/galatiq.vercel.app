@@ -1,6 +1,7 @@
 {
   "mode": "offline",
   "model": null,
+  "grok": null,
   "rows": [
     {
       "file": "invoice_2001_email.txt",
@@ -15,15 +16,19 @@
       ],
       "warn_flags": [
         "MISSING_INVOICE_NUMBER",
-        "MISSING_DUE_DATE"
+        "MISSING_DUE_DATE",
+        "UNREADABLE_LAYOUT"
       ],
-      "decision": "REJECTED",
-      "decided_by": "hard_rules",
+      "decision": "PENDING_HUMAN",
+      "decided_by": "hard_hold",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "MISSING_VENDOR: Vendor name is missing",
+      "reason": "UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (MISSING_ITEMS, MISSING_TOTAL, MISSING_VENDOR); a person enters or checks it",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "invoice_2001_email.txt was held for a person by a hard hold. Main reason: UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (MISSING_ITEMS, MISSING_TOTAL, MISSING_VENDOR); a person enters or checks it.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_2002_injection.txt",
@@ -33,7 +38,8 @@
       "risk": 80,
       "block_flags": [],
       "warn_flags": [
-        "UNKNOWN_VENDOR"
+        "UNKNOWN_VENDOR",
+        "BANK_DETAILS_CHANGED"
       ],
       "decision": "PENDING_HUMAN",
       "decided_by": "hard_hold",
@@ -41,7 +47,10 @@
       "payment": "not_paid",
       "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score); a human must review it",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "INV-2002 from Northwind Supply Partners for $2,000.00 was held for a person by a hard hold. Main reason: Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score); a human must review it.",
+      "memo_by": "template",
+      "grok_calls": 0
     },
     {
       "file": "invoice_2003_truncated.json",
@@ -52,16 +61,65 @@
       "block_flags": [
         "EXTRACTION_FAILED"
       ],
-      "warn_flags": [],
-      "decision": "REJECTED",
-      "decided_by": "hard_rules",
+      "warn_flags": [
+        "UNREADABLE_LAYOUT"
+      ],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "hard_hold",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "EXTRACTION_FAILED: Could not extract invoice data",
+      "reason": "UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (EXTRACTION_FAILED); a person enters or checks it",
       "conditions": [],
       "errors": [
         "parse failed: JSONDecodeError: Expecting ',' delimiter: line 11 column 1 (char 301)"
-      ]
+      ],
+      "memo": "invoice_2003_truncated.json was held for a person by a hard hold. Main reason: UNREADABLE_LAYOUT: The file looks like an invoice but its layout could not be read (EXTRACTION_FAILED); a person enters or checks it.",
+      "memo_by": "template",
+      "grok_calls": 0
+    },
+    {
+      "file": "invoice_2004_over_limit_clean.txt",
+      "invoice": "INV-2004",
+      "vendor": "Widgets Inc.",
+      "total_usd": 12500.0,
+      "risk": 0,
+      "block_flags": [],
+      "warn_flags": [],
+      "decision": "APPROVED",
+      "decided_by": "vp+critic",
+      "critique_rounds": 1,
+      "payment": "paid $12,500.00",
+      "reason": "Vendor is on file",
+      "conditions": [],
+      "errors": [],
+      "memo": "INV-2004 from Widgets Inc. for $12,500.00 was approved for payment by the VP agent after the critic's review. Main reason: Vendor is on file.",
+      "memo_by": "template",
+      "grok_calls": 0
+    },
+    {
+      "file": "invoice_2005_over_limit_price.txt",
+      "invoice": "INV-2005",
+      "vendor": "Gadgets Co.",
+      "total_usd": 12500.0,
+      "risk": 10,
+      "block_flags": [],
+      "warn_flags": [
+        "PRICE_VARIANCE"
+      ],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "deadlock",
+      "critique_rounds": 2,
+      "payment": "not_paid",
+      "reason": "VP and critic still disagree after 2 rounds",
+      "conditions": [
+        "Confirm the price against the PO: GadgetX at $1,000.00 is 33% above catalog $750.00.",
+        "Resolve auditor concern before paying: Price far off catalog: GadgetX at $1,000.00 is 33% above catalog $750.00.",
+        "Resolve auditor concern before paying: Price far off catalog: GadgetX at $1,000.00 is 33% above catalog $750.00."
+      ],
+      "errors": [],
+      "memo": "INV-2005 from Gadgets Co. for $12,500.00 was held for a person because the VP and the critic still disagreed. Main reason: VP and critic still disagree after 2 rounds. Condition: Confirm the price against the PO: GadgetX at $1,000.00 is 33% above catalog $750.00.",
+      "memo_by": "template",
+      "grok_calls": 0
     }
   ]
 }

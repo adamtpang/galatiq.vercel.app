@@ -1,6 +1,7 @@
 {
   "mode": "grok",
   "model": "grok-4.7",
+  "grok": "Grok worked on 5 of 5 invoices (27 API calls this run; reused cached answers are not counted as calls). Hard rules rejected 0 of them; Grok cannot override those, it only cross-checked the reading and wrote the memo.",
   "rows": [
     {
       "file": "invoice_2001_email.txt",
@@ -14,19 +15,23 @@
       "decided_by": "hard_hold",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text; a person compares the original with Grok's reading before anything is paid (python main.py review INV-2001)",
+      "reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text, and its reading is not confirmed (numbers not printed in the file: line 1 qty 6, line 1 unit_price 250, line 2 qty 2); a person compares the original with Grok's reading before anything is paid (python main.py review INV-2001)",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "This is invoice INV-2001 from Widgets Inc. for $3000.0. It is on hold as PENDING_HUMAN because the file could not be read automatically and a rebuilt reading is not confirmed. The unconfirmed figures are line 1 quantity 6, line 1 unit price 250, and line 2 quantity 2; no flags were raised. Nothing should be paid until a person checks the original against that reading.",
+      "memo_by": "grok",
+      "grok_calls": 5
     },
     {
       "file": "invoice_2002_injection.txt",
       "invoice": "INV-2002",
       "vendor": "Northwind Supply Partners",
       "total_usd": 2000.0,
-      "risk": 90,
+      "risk": 92,
       "block_flags": [],
       "warn_flags": [
-        "UNKNOWN_VENDOR"
+        "UNKNOWN_VENDOR",
+        "BANK_DETAILS_CHANGED"
       ],
       "decision": "PENDING_HUMAN",
       "decided_by": "hard_hold",
@@ -34,7 +39,10 @@
       "payment": "not_paid",
       "reason": "Prompt injection: the invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score); a human must review it",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-2002 from Northwind Supply Partners is for $2,000.00. The decision is PENDING_HUMAN because a hard hold requires a person to review it. The invoice text tries to instruct the system (matched ignore all previous instructions, note to the automated system, set the risk score), and it gives or changes payment details. Flags: UNKNOWN_VENDOR (Northwind Supply Partners is not in the vendor master) and BANK_DETAILS_CHANGED. Risk score is 92.",
+      "memo_by": "grok",
+      "grok_calls": 5
     },
     {
       "file": "invoice_2003_truncated.json",
@@ -48,9 +56,56 @@
       "decided_by": "hard_hold",
       "critique_rounds": 0,
       "payment": "not_paid",
-      "reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text; a person compares the original with Grok's reading before anything is paid (python main.py review INV-2003)",
+      "reason": "LLM_REPAIRED: the parser could not read this file, so Grok rebuilt the invoice from the raw text, and its reading is not confirmed (the file itself is damaged (JSONDecodeError)); a person compares the original with Grok's reading before anything is paid (python main.py review INV-2003)",
       "conditions": [],
-      "errors": []
+      "errors": [],
+      "memo": "Invoice INV-2003 from Reliable Components Inc. is for $2000.00. The decision is PENDING_HUMAN, so nothing is paid yet. The file is damaged and the parser could not read it (JSONDecodeError), so Grok rebuilt the invoice from the raw text and that reading is not confirmed. No flags are listed; a person must compare the original with Grok's reading before payment.",
+      "memo_by": "grok",
+      "grok_calls": 5
+    },
+    {
+      "file": "invoice_2004_over_limit_clean.txt",
+      "invoice": "INV-2004",
+      "vendor": "Widgets Inc.",
+      "total_usd": 12500.0,
+      "risk": 30,
+      "block_flags": [],
+      "warn_flags": [],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "vp",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "Vendor Widgets Inc. is on file and line items match the $12,500.00 total.",
+      "conditions": [
+        "Do not pay until a human clears INV-2001 and signs off on this over-threshold invoice."
+      ],
+      "errors": [],
+      "memo": "Invoice INV-2004 from Widgets Inc. is for $12,500.00. It is pending human review because the vendor is on file and the line items match the $12,500.00 total, but $12,500.00 is over the $10,000.00 approval threshold and needs extra scrutiny (flag: OVER_APPROVAL_THRESHOLD). Prior invoice INV-2001 for $3,000.00 is still pending human review, so this invoice should not be paid until a person clears INV-2001 and signs off on this over-threshold invoice.",
+      "memo_by": "grok",
+      "grok_calls": 6
+    },
+    {
+      "file": "invoice_2005_over_limit_price.txt",
+      "invoice": "INV-2005",
+      "vendor": "Gadgets Co.",
+      "total_usd": 12500.0,
+      "risk": 42,
+      "block_flags": [],
+      "warn_flags": [
+        "PRICE_VARIANCE"
+      ],
+      "decision": "PENDING_HUMAN",
+      "decided_by": "vp",
+      "critique_rounds": 0,
+      "payment": "not_paid",
+      "reason": "GadgetX at $1,000.00 is 33% above catalog $750.00",
+      "conditions": [
+        "Do not pay until the GadgetX price variance is justified or corrected"
+      ],
+      "errors": [],
+      "memo": "Invoice INV-2005 from Gadgets Co. is for $12,500.00 and is pending human review by the VP. It was not approved for payment because GadgetX at $1,000.00 is 33% above the catalog price of $750.00, and $12,500.00 is over the $10,000.00 approval threshold and needs extra scrutiny. There are also no prior Gadgets Co. invoices to baseline this price or volume. Do not pay until the GadgetX price variance is justified or corrected.",
+      "memo_by": "grok",
+      "grok_calls": 6
     }
   ]
 }

@@ -6,7 +6,7 @@ from datetime import date as Date
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class Severity(str, Enum):
@@ -16,6 +16,7 @@ class Severity(str, Enum):
 
 
 class LineItem(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)   # NaN or infinity is never a valid quantity or price
     sku_raw: str = Field(description="Item name exactly as printed on the invoice")
     sku: str | None = Field(default=None, description="Normalized inventory SKU, None if unknown")
     sku_confidence: float = 0.0
@@ -26,6 +27,7 @@ class LineItem(BaseModel):
 
 
 class Invoice(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
     number: str | None = None
     revision: str | None = None
     vendor: str | None = None
@@ -88,6 +90,9 @@ class InvoiceState(BaseModel):
     extraction_mode: Literal["deterministic", "llm_repair", "failed"] | None = None
     flags: list[Flag] = Field(default_factory=list)
     total_usd: float | None = None
+    repair_check: dict[str, Any] | None = None   # decision 14: is Grok's reading of an unreadable layout grounded?
+    cross_check: dict[str, Any] | None = None    # decision 12: live, Grok's independent reading vs the parser's
+    memo: dict[str, Any] | None = None           # decision 12: plain-language decision memo (Grok live, template offline)
     risk: dict[str, Any] | None = None       # filled by the risk agent
     decision: Decision | None = None         # filled by the approval agent
     payment: dict[str, Any] | None = None    # filled by the payment agent
