@@ -17,7 +17,7 @@ invoice_1006.csv:          {decision: APPROVED, paid: 2750.00}
 invoice_1007.csv:          {decision: REJECTED, must_flag: [STOCK_EXCEEDED, TOTAL_MISMATCH]}
 invoice_1008.txt:          {decision: REJECTED, must_flag: [UNKNOWN_ITEM]}
 invoice_1009.json:         {decision: REJECTED, must_flag: [NEGATIVE_QTY, MISSING_VENDOR, TOTAL_MISMATCH]}
-invoice_1010.txt:          {decision: APPROVED, paid: 7185.00}
+invoice_1010.txt:          {decision: PENDING_HUMAN, by: price_check, must_flag: [PRICE_VARIANCE]}   # 20% over catalog: confirm against the PO first (decision 23)
 invoice_1011.pdf:          {decision: APPROVED, paid: 3000.00}
 invoice_1011.txt:          {decision: REJECTED, must_flag: [DUPLICATE_INVOICE]}
 invoice_1012.pdf:          {decision: PENDING_HUMAN, by: hard_hold, must_flag: [VENDOR_RENAMED]}

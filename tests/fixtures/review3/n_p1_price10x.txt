@@ -1,0 +1,14 @@
+INVOICE
+
+Invoice Number: INV-9530
+Vendor: Summit Manufacturing Co.
+Date: 2026-01-20
+Due Date: 2026-02-20
+
+Item                Qty     Unit Price      Amount
+--------------------------------------------------
+WidgetA              2       $2,500.00       $5,000.00
+--------------------------------------------------
+                              Total:       $5,000.00
+
+Payment Terms: Net 30

@@ -143,6 +143,7 @@ class LLMCritic:
 # Offline: the same prompts written as fixed rules.
 CONDITIONS = {
     "PRICE_VARIANCE": lambda fl: f"Confirm the price against the PO: {fl.message}.",
+    "OVERBILLING": lambda fl: f"Check the charge against the PO: {fl.message}.",   # enforced as a hold (decision 23)
     "CURRENCY_CONVERTED": lambda fl: f"Pay the USD amount from the mock FX conversion; treasury confirms the rate ({fl.message}).",
     "VENDOR_RENAMED": lambda fl: "Verify the rename and bank details with the contact on file for the former name.",
     "SAMPLE_CHARGED": lambda fl: "Ask the vendor to credit the sample line.",
@@ -440,12 +441,34 @@ def decide(state: InvoiceState, vp: VP, critic: Critic, policy: dict[str, Any], 
                     critique_rounds=rounds, risk_score=risk_score, decided_by=by, arguments=args, engine=engine)
 
 
+def price_hold(state: InvoiceState, d: Decision, policy: dict[str, Any]) -> Decision:
+    """Decision 23: an approval is never paid while a price, shipping or tax charge needs checking against the PO.
+    Applied after the VP and critic (so their loop still runs and a rejection stays a rejection): an APPROVED
+    decision with an OVERBILLING flag, or a unit price over catalog by more than price_variance.warn_above_pct
+    (the "confirm the price against the PO" condition), becomes PENDING_HUMAN."""
+    if d.status != DecisionStatus.APPROVED:
+        return d
+    codes = []
+    if (policy.get("overbilling") or {}).get("hold", True):
+        codes.append("OVERBILLING")
+    if (policy.get("price_variance") or {}).get("hold_above_warn", True):
+        codes.append("PRICE_VARIANCE")
+    found = [f for f in state.flags if f.code in codes and f.severity == Severity.WARN]
+    if not found:
+        return d
+    return Decision(status=DecisionStatus.PENDING_HUMAN, decided_by="price_check", risk_score=d.risk_score,
+                    critique_rounds=d.critique_rounds, engine=d.engine, conditions=d.conditions,
+                    reasons=[f"{f.code}: {f.message}; check it against the PO before paying (decision 23)" for f in found]
+                    + [f"Approved before this check by {d.decided_by}: " + "; ".join(d.reasons)],
+                    arguments={"decision_before_price_check": d.model_dump(mode="json")})
+
+
 def approve(state: InvoiceState, llm: LLMClient, policy: dict[str, Any]) -> InvoiceState:
     if llm is not None and llm.available:
         vp, critic, reviewer = LLMVP(llm), LLMCritic(llm), LLMRejectionReviewer(llm)
     else:
         vp, critic, reviewer = OfflineVP(), OfflineCritic(), OfflineRejectionReviewer()
-    d = decide(state, vp, critic, policy, reviewer)
+    d = price_hold(state, decide(state, vp, critic, policy, reviewer), policy)
     state.decision = d
     state.trace.append(TraceEvent(agent=AGENT, step="decide", detail=d.model_dump(mode="json")))
     return pin_check(state, llm, policy)

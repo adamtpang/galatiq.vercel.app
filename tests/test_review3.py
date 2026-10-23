@@ -225,3 +225,76 @@ def test_word_quantity_is_a_type_error_not_zero(tmp_path):
     assert "INVALID_FIELD_TYPE" in {f.code for f in st.flags} and st.decision.status == DecisionStatus.REJECTED
     assert "quantity" in st.decision.reasons[0] and "'two'" in st.decision.reasons[0]
     assert _paid_rows(ctx) == 0
+
+
+# --- re-check A: a typed amount must match the line sum or printed total unless overridden -------------
+def test_typed_amount_off_the_invoice_needs_override(queued_9121):
+    ctx, row = queued_9121
+    with pytest.raises(ValueError, match="neither the line sum nor the printed total"):
+        hitl.decide(ctx.conn, row, True, "typo", amount=5000.0)
+    assert _paid_rows(ctx) == 0 and hitl.find(ctx.conn, "INV-9121") is not None
+    st = hitl.decide(ctx.conn, row, True, "agreed with vendor", amount=5000.0, override_amount=True)
+    assert st.payment["status"] == "paid" and st.payment["amount"] == 5000.0
+    audit = [json.loads(r[0]) for r in ctx.conn.execute("SELECT detail FROM audit_log WHERE event='amount_override'")]
+    assert audit and audit[0]["amount"] == 5000.0 and audit[0]["override_amount"] is True
+
+
+def test_override_still_needs_the_second_confirmation_over_10000(queued_9121):
+    ctx, row = queued_9121
+    with pytest.raises(ValueError, match="second, explicit confirmation"):
+        hitl.decide(ctx.conn, row, True, None, amount=20000.0, override_amount=True)
+    assert _paid_rows(ctx) == 0
+
+
+def test_non_usd_typed_amount_always_needs_override(tmp_path):
+    (st,), ctx = _run(tmp_path, [INVOICES / "invoice_1014.xml"])
+    row = hitl.find(ctx.conn, "INV-1014")
+    for amt in (9999.0, 4455.0, 4125.0):
+        with pytest.raises(ValueError, match="override"):
+            hitl.decide(ctx.conn, row, True, None, amount=amt)
+    assert _paid_rows(ctx) == 0
+    st = hitl.decide(ctx.conn, row, True, "treasury rate", amount=4460.0, override_amount=True)
+    assert st.payment["status"] == "paid" and st.payment["amount"] == 4460.0
+
+
+def test_review_ui_server_refuses_an_off_invoice_amount(queued_9121, tmp_path):
+    from invoice_agents import ui
+    ctx, row = queued_9121
+    assert 'name="override_amount"' in ui.page_item(ctx.conn, row["id"], "tok")
+    srv = ui.make_server(db=str(tmp_path / "i.db"), port=0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        class NoRedirect(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, *a, **k):
+                return None
+        data = urllib.parse.urlencode({"token": srv.token, "id": row["id"], "action": "approve",
+                                       "amount": "5000"}).encode()
+        try:
+            urllib.request.build_opener(NoRedirect).open(f"http://127.0.0.1:{srv.server_address[1]}/decide", data)
+        except urllib.error.HTTPError as e:
+            assert "neither the line sum nor the printed total" in urllib.parse.unquote(e.headers["Location"])
+        assert _paid_rows(ctx) == 0
+    finally:
+        srv.shutdown()
+
+
+# --- re-check B: overbilling is held (decision 23) --------------------------------------------------------
+@pytest.mark.parametrize("name,kind", [("n_p1_price10x.txt", "unit_price"), ("n_p2_shipping.txt", "shipping"),
+                                       ("n_j1_shipping.json", "shipping"), ("n_p3_tax.txt", "tax")])
+def test_reviewer_overbilling_is_held(tmp_path, name, kind):
+    (st,), ctx = _run(tmp_path, [FIX / name])
+    ob = [f for f in st.flags if f.code == "OVERBILLING"]
+    assert ob and ob[0].evidence["kind"] == kind
+    assert st.decision.status == DecisionStatus.PENDING_HUMAN and st.decision.decided_by == "price_check"
+    assert _paid_rows(ctx) == 0
+
+
+def test_price_over_catalog_is_a_hold_not_a_condition(tmp_path):
+    (st,), ctx = _run(tmp_path, [INVOICES / "invoice_1010.txt"])   # rush price 20% over catalog
+    assert st.decision.status == DecisionStatus.PENDING_HUMAN and _paid_rows(ctx) == 0
+    assert st.decision.reasons[0].startswith("PRICE_VARIANCE")
+
+
+def test_no_overbilling_flag_on_the_20_samples(tmp_path):
+    states, _ = _run(tmp_path, sorted(INVOICES.iterdir()))
+    assert [Path(s.source).name for s in states if any(f.code == "OVERBILLING" for f in s.flags)] == []

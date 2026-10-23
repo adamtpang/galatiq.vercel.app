@@ -80,6 +80,15 @@ arithmetic:
 price_variance:
   warn_above_pct: 10                 # unit price more than 10% above catalog -> warn
   info_below_pct: 10                 # more than 10% below catalog -> info
+  hold_above_warn: true              # decision 23: an approval with such a price is held, not paid with a "confirm the price against the PO" condition
+
+# Decision 23: overbilling from a vendor on file is held for a person (OVERBILLING), never paid automatically.
+# Applied after the VP and critic: an approval becomes PENDING_HUMAN; a rejection stays a rejection.
+overbilling:
+  hold: true
+  price_over_catalog_pct: 25         # any unit price more than this % over the catalog price
+  shipping_over_subtotal_pct: 15     # shipping or freight more than this % of the goods subtotal
+  tax_over_subtotal_pct: 15          # tax more than this % of the goods subtotal
 
 # Past due dates: a non-blocking PAST_DUE warning for people (CLI table, report, site). It is display only:
 # the risk, VP and critic agents do not see it, so it never changes a decision.

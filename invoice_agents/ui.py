@@ -62,7 +62,10 @@ def _buttons(row: sqlite3.Row, st: dict, token: str) -> str:
         amt = st.get("total_usd") if st.get("total_usd") is not None else (st.get("invoice") or {}).get("total")
         if need:   # decision 21: the reviewer types the amount; prefilled with the computed line sum
             extra += (f'<br><span class="r">{e(need)}; amount to pay (USD):</span> <input name="amount" required '
-                      f'size="10" value="{"" if calc is None else f"{calc:.2f}"}"> ')
+                      f'size="10" value="{"" if calc is None else f"{calc:.2f}"}"> '
+                      '<br><label class="r"><input type="checkbox" name="override_amount" value="1"> Override amount '
+                      '(pay an amount other than the line sum or printed total; always needed for a non-USD invoice; '
+                      'recorded in the audit log)</label>')
         if need or (isinstance(amt, (int, float)) and amt > hitl.CONFIRM_OVER):
             extra += (f'<br><label class="r"><input type="checkbox" name="confirm_large" value="1"> I confirm paying '
                       f'over ${hitl.CONFIRM_OVER:,.0f} (needed above that amount)</label><br>')
@@ -188,7 +191,8 @@ def make_server(db: str | Path | None = None, host: str = "127.0.0.1", port: int
                         except ValueError:
                             raise ValueError(f"Not paid: {raw_amt!r} is not an amount")
                         s = hitl.decide(conn, row, action == "approve", note, chaos=chaos, amount=amount,
-                                        confirm_large=form.get("confirm_large") == "1")
+                                        confirm_large=form.get("confirm_large") == "1",
+                                        override_amount=form.get("override_amount") == "1")
                         p = s.payment or {}
                         num = s.invoice.number if s.invoice else "invoice"
                         msg = (f"{num}: approved by a person and paid ${p['amount']:,.2f}." if p.get("status") == "paid"

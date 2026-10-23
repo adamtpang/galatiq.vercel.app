@@ -3,7 +3,7 @@
   python main.py --invoice_path=data/invoices/invoice_1001.txt
   python main.py --batch data/invoices [--offline] [--chaos 0.3] [--json] [--no-cache]
   python main.py review                       # list the human review queue
-  python main.py review INV-1012 --approve    # or --reject; optional --note, --amount, --confirm-large
+  python main.py review INV-1012 --approve    # or --reject; optional --note, --amount, --confirm-large, --override-amount
   python main.py ui [--port 8765]             # the review queue in the browser, with Approve and Reject
   python main.py eval [--live]                # the five evals (same as python -m evals)
 """
@@ -185,6 +185,8 @@ def review(
     amount: Optional[float] = typer.Option(None, "--amount", help="Amount to pay in USD; required when the "
                                            "numbers do not add up or the currency is not USD"),
     confirm_large: bool = typer.Option(False, "--confirm-large", help="Second confirmation to pay over $10,000"),
+    override_amount: bool = typer.Option(False, "--override-amount", help="Pay a typed --amount that is not the line "
+                                         "sum or printed total (always needed for non-USD); recorded in the audit log"),
     chaos: float = typer.Option(0.0, "--chaos", min=0.0, max=1.0, help="Probability each bank call fails"),
 ):
     """List the human review queue, show one queued invoice (with the original text next to Grok's
@@ -209,7 +211,8 @@ def review(
         print_review(hitl.queued_state(row), row["reason"], console)
         return
     try:
-        state = hitl.decide(conn, row, approve, note, chaos=chaos, amount=amount, confirm_large=confirm_large)
+        state = hitl.decide(conn, row, approve, note, chaos=chaos, amount=amount, confirm_large=confirm_large,
+                             override_amount=override_amount)
     except ValueError as e:
         console.print(f"[red]{e}[/]")
         raise typer.Exit(1)

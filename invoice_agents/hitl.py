@@ -145,12 +145,14 @@ def resolve(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str
 
 def decide(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str | None,
            chaos: float = 0.0, payments: PaymentAgent | None = None, amount: float | None = None,
-           confirm_large: bool = False) -> InvoiceState:
+           confirm_large: bool = False, override_amount: bool = False) -> InvoiceState:
     """A person's decision, end to end: record it, then pay (approve) or log the rejection. Used by the
     `review` command and the local review UI (`python main.py ui`), so both write the same tables.
 
     Decision 21, enforced here and not only in the UI: when the numbers do not add up (or the currency is not
-    USD) the person must type the amount to pay; any approval paying over $10,000 needs confirm_large too."""
+    USD) the person must type the amount to pay. It must equal the computed line sum or the printed total, to the
+    cent, unless override_amount is set (recorded in the audit log); a non-USD amount always needs override_amount.
+    Any approval paying over $10,000 needs confirm_large too."""
     pay_amount = None
     if approve:
         st = InvoiceState.model_validate_json(row["state_json"])
@@ -169,6 +171,16 @@ def decide(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str 
             calc = computed_amount(st)
             raise ValueError(f"Not paid: {need}. Type the amount to pay"
                              + (f" (the lines add up to ${calc:,.2f})" if calc else "") + " and approve again")
+        if need and amount is not None and not override_amount:
+            inv = st.invoice
+            if (inv.currency or "USD") != "USD":
+                raise ValueError(f"Not paid: the invoice is in {inv.currency}; a typed USD amount needs the override "
+                                 "amount flag (tick 'override amount', or pass --override-amount)")
+            allowed = [x for x in (computed_amount(st), inv.total) if x is not None]
+            if not any(abs(amount - x) < 0.005 for x in allowed):
+                raise ValueError(f"Not paid: the amount typed (${amount:,.2f}) is neither the line sum nor the printed "
+                                 "total (" + " or ".join(f"${x:,.2f}" for x in allowed) + "); to pay a different "
+                                 "amount, tick 'override amount' (or pass --override-amount)")
         if not need and amount is not None and abs(amount - amt) > 0.005:
             raise ValueError(f"Not paid: the amount typed (${amount:,.2f}) is not the invoice total (${amt:,.2f})")
         pay_amount = round(amount if amount is not None else amt, 2)
@@ -180,8 +192,10 @@ def decide(conn: sqlite3.Connection, row: sqlite3.Row, approve: bool, note: str 
         if pay_amount is not None and amount is not None:
             state.total_usd = pay_amount
             state.decision.reasons.append(f"Amount to pay typed by the reviewer: ${pay_amount:,.2f}")
-            log_audit(conn, state.invoice.number if state.invoice else None, "hitl", "amount_entered",
+            log_audit(conn, state.invoice.number if state.invoice else None, "hitl",
+                      "amount_override" if override_amount else "amount_entered",
                       {"amount": pay_amount, "printed_total": state.invoice.total if state.invoice else None,
-                       "computed": computed_amount(state)})
+                       "currency": state.invoice.currency if state.invoice else None,
+                       "computed": computed_amount(state), "override_amount": override_amount})
         return (payments or PaymentAgent(conn, chaos=chaos)).pay(state)
     return log_rejection(conn, state)

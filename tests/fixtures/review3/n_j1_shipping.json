@@ -1,0 +1,1 @@
+{"invoice_number": "INV-9540", "vendor": {"name": "Summit Manufacturing Co."}, "date": "2026-01-20", "due_date": "2026-02-20", "line_items": [{"item": "WidgetA", "quantity": 2, "unit_price": 250.0}], "subtotal": 500.0, "tax_amount": 0, "total": 5000.0, "currency": "USD", "shipping": 4500.0}

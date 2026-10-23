@@ -283,6 +283,32 @@ def check_prices(inv: Invoice, inventory: Inventory, policy: dict) -> list[Flag]
     return out
 
 
+def check_overbilling(inv: Invoice, inventory: Inventory, policy: dict) -> list[Flag]:
+    """Decision 23: a unit price far over catalog, or shipping or tax out of proportion to the goods, is held."""
+    ob = policy.get("overbilling") or {}
+    out = []
+    rate = fx_rate(inv.currency, policy) or 1.0
+    lim = ob.get("price_over_catalog_pct")
+    for n, li in enumerate(inv.items, 1):
+        row = inventory.query_inventory(li.sku) if li.sku else None
+        if lim is None or not row or not row.unit_price or li.unit_price is None:
+            continue
+        pct = (li.unit_price * rate - row.unit_price) / row.unit_price * 100
+        if pct > lim:
+            out.append(_f("OVERBILLING", W, f"Line {n}: {li.sku} at {_money(li.unit_price * rate)} is {pct:.0f}% over "
+                          f"catalog {_money(row.unit_price)} (limit {lim}%)", kind="unit_price", line=n, pct=round(pct, 1)))
+    goods = inv.subtotal if inv.subtotal is not None else sum(
+        (li.amount if li.amount is not None else li.qty * (li.unit_price or 0)) for li in inv.items)
+    if goods and goods > 0:
+        for kind, value, key in (("shipping", inv.shipping, "shipping_over_subtotal_pct"),
+                                 ("tax", inv.tax, "tax_over_subtotal_pct")):
+            lim = ob.get(key)
+            if lim is not None and value is not None and value > goods * lim / 100:
+                out.append(_f("OVERBILLING", W, f"{kind.capitalize()} {_money(value)} is {value / goods * 100:.0f}% of "
+                              f"the goods subtotal {_money(goods)} (limit {lim}%)", kind=kind, amount=value, goods=goods))
+    return out
+
+
 def check_line_notes(inv: Invoice) -> list[Flag]:
     out = []
     for n, li in enumerate(inv.items, 1):
@@ -587,6 +613,7 @@ def validate(state: InvoiceState, inventory: Inventory, policy: dict,
         total_usd = None
     flags += cur_flags
     flags += check_prices(inv, inventory, policy)
+    flags += check_overbilling(inv, inventory, policy)
     flags += check_line_notes(inv)
     flags += check_vendor(inv, inventory, policy)
     flags += check_bank_details(state.raw_text, inv, policy)
