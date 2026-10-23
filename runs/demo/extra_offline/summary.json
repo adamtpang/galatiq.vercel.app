@@ -1,7 +1,7 @@
 {
   "mode": "offline",
   "model": null,
-  "commit": "76881f7",
+  "commit": "7e5180c",
   "grok": null,
   "rows": [
     {
@@ -113,7 +113,8 @@
       "risk": 10,
       "block_flags": [],
       "warn_flags": [
-        "PRICE_VARIANCE"
+        "PRICE_VARIANCE",
+        "OVERBILLING"
       ],
       "decision": "PENDING_HUMAN",
       "decided_by": "deadlock",
@@ -124,6 +125,7 @@
       "reason": "VP and critic still disagree after 2 rounds",
       "conditions": [
         "Confirm the price against the PO: GadgetX at $1,000.00 is 33% above catalog $750.00.",
+        "Check the charge against the PO: Line 1: GadgetX at $1,000.00 is 33% over catalog $750.00 (limit 25%).",
         "Resolve auditor concern before paying: Price far off catalog: GadgetX at $1,000.00 is 33% above catalog $750.00.",
         "Resolve auditor concern before paying: Price far off catalog: GadgetX at $1,000.00 is 33% above catalog $750.00."
       ],

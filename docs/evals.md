@@ -12,7 +12,9 @@ spot check at commit 7d320a2 (Oct 22, 9:19 PM CT, `python main.py --invoice_path
 on a fresh database): no repair call, REJECTED by hard rules with INVALID_FIELD_TYPE, Grok's rejection review agreed,
 not paid; 2 Grok calls, $0.0204 billed.
 
-**Review 3 fixes (commit 76881f7) and the live numbers.** The offline results below were regenerated at 76881f7. The
+**Review 3 fixes (commits 76881f7 and 7e5180c) and the live numbers.** The offline results below were regenerated at
+7e5180c. 7e5180c (decision 23) also holds 1010 offline (20% over catalog), as both live runs did; the typed-amount
+rule (decision 21) only affects the review queue. The
 live numbers were not re-run in full and predate these fixes. Among the 20 samples the fixes change only 1014 (EUR),
 which is now held for a person instead of paid at the mock rate; the new payment-instruction hold matches only 1003
 ("Wire transfer preferred."), which hard rules reject anyway. Live spot checks at 76881f7 on Oct 22, 2026 between
@@ -31,7 +33,7 @@ result now committed on main was re-run at 05a4ef5 and replaces them.
 
 | Run | Paid | Rejected | Held for a person |
 |---|---|---|---|
-| Offline rules stand-ins (`runs/demo/offline`, 76881f7) | 6 invoices, $30,375.00 | 12 | 2 |
+| Offline rules stand-ins (`runs/demo/offline`, 7e5180c) | 5 invoices, $23,190.00 | 12 | 3 |
 | Live demo run, grok-4.7 (`runs/demo/live`, 8:29 PM CT) | 4 invoices, $16,705.00 | 12 | 4 |
 | Live eval run, grok-4.7 (`evals/results/runs/live/main`, 7:46 PM CT) | 4 invoices, $17,250.00 | 12 | 4 |
 
@@ -45,7 +47,7 @@ other invoices are the ones the VP decides:
 | 1001 | Paid | Held (confirm Net 15 against the due date) | Paid |
 | 1004_revised | Paid $5,940.00 | Held (earlier INV-1004 rejected, PO amendment) | Held (same) |
 | 1006 | Paid | Paid | Paid |
-| 1010 | Paid | Held (rush price 20% over catalog) | Held (same) |
+| 1010 | Held (20% over catalog: check against the PO, decision 23) | Held (rush price 20% over catalog) | Held (same) |
 | 1011.pdf, 1015 | Paid | Paid | Paid |
 | 1014 (EUR) | Held (non-USD, decision 22) | Paid (before decision 22) | Held (first payment, EUR prices off the USD catalog) |
 
@@ -76,7 +78,7 @@ committed copy (`evals/results/`, `web/data/evals.json`). `tests/test_evals.py` 
 | Eval | Offline | Live (grok-4.7, 05a4ef5) |
 |---|---|---|
 | (a) Extraction, all fields, 26 files | 119/127 (93.7%) | 127/127 pipeline; 126/127 Grok-only |
-| (b) Agreement with offline, 20 samples | - | 17/20 in the eval run (against the offline run at 05a4ef5); 16/20 in the committed demo runs (offline at 76881f7) |
+| (b) Agreement with offline, 20 samples | - | 17/20 in the eval run (against the offline run at 05a4ef5); 17/20 in the committed demo runs (offline at 7e5180c) |
 | (c) Adversarial set caught (15) | 15/15; 15/15 as a separate later run | 15/15; 15/15 as a separate later run |
 | (d) Cost, 20 samples | $0, 0 calls | $0.6575 billed, 85 calls |
 | (d) Latency, 20 samples | 4.7 ms mean per invoice | 38.9 s mean per invoice, 778.9 s batch |

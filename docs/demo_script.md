@@ -25,7 +25,7 @@ Point at: one JSON line per agent step (ingest, validate, risk, approval, memo, 
 python main.py --batch data/invoices --offline
 ```
 
-Expected: 6 paid ($30,375.00), 12 rejected, 2 held for a human (1012.pdf and 1014.xml). Same result every run.
+Expected: 5 paid ($23,190.00), 12 rejected, 3 held for a human (1010.txt, 1012.pdf and 1014.xml). Same result every run.
 
 ## 3. Edge cases worth showing
 
@@ -35,7 +35,7 @@ Expected: 6 paid ($30,375.00), 12 rejected, 2 held for a human (1012.pdf and 101
 | 1004 + 1004_revised | Revision R1 supersedes the original, so the original is rejected as superseded and never paid. R1 is paid offline ($5,940.00): its address, 742 Evergreen Terrace, is the one on file for Precision Parts, so the watch list does not fire (decision 13). Live, the Grok VP held R1 in the committed run. | `SUPERSEDED_BY_REVISION`, `REVISION_SUPERSEDES`, `ADDRESS_ON_FILE` |
 | 1008 | $9,900 from an unknown vendor for items not in inventory. | `UNKNOWN_ITEM` x2 |
 | 1009 | Missing vendor, negative quantity, negative total, subtotal that does not add up. | five blocking flags |
-| 1010 | WidgetA on two lines (8 + 4 = 12, within stock of 15); the rush line is 20% over catalog. | `LINES_AGGREGATED`, `PRICE_VARIANCE` |
+| 1010 | WidgetA on two lines (8 + 4 = 12, within stock of 15); the rush line is 20% over catalog, so it is held to check against the PO (decision 23). | `LINES_AGGREGATED`, `PRICE_VARIANCE` |
 | 1011, 1012, 1013 | Same invoice in two formats. The second copy is rejected as a duplicate. | `DUPLICATE_INVOICE` |
 | 1012.pdf | OCR noise fixed (`2O26`, `$3,500.O0`), vendor renamed ("formerly FastShip Ltd."), $25 under the limit. The rename hard hold sends it to a human before the VP (decision 9). | `VENDOR_RENAMED`, decided_by `hard_hold` |
 | 1013 | WidgetA, WidgetB and GadgetX each over stock only after summing repeated lines; a "Sample" line is charged; total off by $50. | `STOCK_EXCEEDED` evidence lists the lines |

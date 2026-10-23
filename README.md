@@ -33,7 +33,7 @@ python main.py review                                          # the human revie
 python main.py ui                                              # the review queue in the browser (127.0.0.1:8765)
 python main.py --batch data/invoices --mode live               # Grok agents (needs XAI_API_KEY)
 python -m evals                                                # five evals offline, about a second (--live adds Grok)
-pytest                                                         # 427 offline tests, about 20 seconds
+pytest                                                         # 437 offline tests, about 20 seconds
 ```
 
 Each run writes `runs/<run_id>/trace.jsonl` (every step), `summary.json` and `report.md`. Times are local with the
@@ -45,14 +45,15 @@ zone shown (for example `2026-10-22 7:36 PM CDT`). At 80 columns the table wraps
 
 | Run | Paid | Rejected | Held for a person |
 |---|---|---|---|
-| Offline, rules stand-ins | 6 invoices, $30,375.00 | 12 | 2 |
+| Offline, rules stand-ins | 5 invoices, $23,190.00 | 12 | 3 |
 | Live demo run, grok-4.7 | 4 invoices, $16,705.00 | 12 | 4 |
 | Live eval run, grok-4.7 | 4 invoices, $17,250.00 | 12 | 4 |
 
 - The same 12 are rejected in every run (over stock, unknown items, missing vendor, duplicates, a superseded
   revision). Every other live and offline difference is an invoice the rules would pay and the Grok VP held, except
   1014 (EUR): offline it is now held because every non-USD invoice goes to a person (decision 22), and the live demo
-  run, made before that change, paid it at the mock rate.
+  run, made before that change, paid it at the mock rate. Offline 1010 is now held too (a unit price 20% over
+  catalog must be checked against the PO, decision 23), as the Grok VP held it live.
 - Adversarial set (15 added traps: injections, lookalike and renamed vendors, bank changes, duplicates, wrong types,
   a closing prompt-fence tag): 15 of 15 caught offline and live, and again as a separate later run.
 - Unseen layouts (4 added, never tuned on): offline all 4 held for a person; live Grok read all 4 correctly and
@@ -82,6 +83,10 @@ A LangGraph `StateGraph` passes one typed Pydantic state through the nodes; ever
   `payment_details_changed` field), a non-USD invoice, Grok and the parser disagreeing, an ungrounded Grok reading,
   an unreadable layout, an internal error, and (live) a Grok check that failed to run. Each sends the invoice to a
   person.
+- **Overbilling is held, not paid with a condition** (decision 23): a unit price more than 10% over catalog (the
+  "confirm the price against the PO" condition), a unit price more than 25% over catalog, or shipping or tax over 15%
+  of the goods subtotal. This check runs after the VP and critic, so it turns an approval into a hold and never
+  changes a rejection. Thresholds are in `config/policy.yaml`.
 - **Fail closed.** An exception while reading the file holds the invoice for a person (INTERNAL_ERROR) before any
   other rule. An exception in validation or risk adds an INTERNAL_ERROR flag: a blocking flag found before the crash
   still rejects, otherwise the invoice is held. An exception in the approval step holds it. A guard after the memo turns
@@ -94,7 +99,9 @@ A LangGraph `StateGraph` passes one typed Pydantic state through the nodes; ever
   PAYMENT_FAILED. Wrong value types (including a quantity like "two") are a blocking INVALID_FIELD_TYPE.
 - **A person approving is not one click.** In the review queue (CLI or `python main.py ui`), when the numbers do not
   add up or the currency is not USD the reviewer must type the amount to pay (prefilled with what the lines add up
-  to), and any approval paying over $10,000 needs a second confirmation. The server enforces both (decision 21).
+  to). It must equal the line sum or the printed total to the cent unless the reviewer sets "override amount"
+  (`--override-amount`), which is recorded in the audit log; a USD amount for a non-USD invoice always needs the
+  override. Any approval paying over $10,000 needs a second confirmation. The server enforces all of it (decision 21).
 - **Prompt hygiene.** Invoice text goes inside `<invoice_document>` tags as data; fence and role tags in the text are
   neutralized first. **Offline, injection detection is pattern-based**: regular expressions run on the text after
   Unicode normalization, lower-casing and joining spaced-out letters. They catch the wordings they were written for
@@ -109,7 +116,7 @@ A LangGraph `StateGraph` passes one typed Pydantic state through the nodes; ever
 
 So, by construction, **Grok cannot pay anything the rules block**: blocking flags reject before the VP, the rejection
 review can only escalate, and the guard and the payment step both refuse an invoice with a blocking flag unless a
-person approved it in the review queue. Policy decisions 1 to 22 are in [docs/DECISIONS.md](docs/DECISIONS.md);
+person approved it in the review queue. Policy decisions 1 to 23 are in [docs/DECISIONS.md](docs/DECISIONS.md);
 architecture, assumptions, testing and the production plan are in [docs/design.md](docs/design.md).
 
 ## Honest limits

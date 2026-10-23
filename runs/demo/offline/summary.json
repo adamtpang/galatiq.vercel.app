@@ -1,7 +1,7 @@
 {
   "mode": "offline",
   "model": null,
-  "commit": "76881f7",
+  "commit": "7e5180c",
   "grok": null,
   "rows": [
     {
@@ -270,18 +270,18 @@
         "PAST_DUE",
         "PRICE_VARIANCE"
       ],
-      "decision": "APPROVED",
-      "decided_by": "vp",
+      "decision": "PENDING_HUMAN",
+      "decided_by": "price_check",
       "engine": "rules",
-      "decided_by_label": "the VP rules stand-in",
+      "decided_by_label": "price_check",
       "critique_rounds": 0,
-      "payment": "paid $7,185.00",
-      "reason": "Vendor is on file",
+      "payment": "not_paid",
+      "reason": "PRICE_VARIANCE: WidgetA at $300.00 is 20% above catalog $250.00; check it against the PO before paying (decision 23)",
       "conditions": [
         "Confirm the price against the PO: WidgetA at $300.00 is 20% above catalog $250.00."
       ],
       "errors": [],
-      "memo": "INV-1010 from Consolidated Materials Group for $7,185.00 was approved for payment by the VP rules stand-in (offline: no model was called). Main reason: Vendor is on file. Condition: Confirm the price against the PO: WidgetA at $300.00 is 20% above catalog $250.00.",
+      "memo": "INV-1010 from Consolidated Materials Group for $7,185.00 was held for a person by price_check (offline: no model was called). Main reason: PRICE_VARIANCE: WidgetA at $300.00 is 20% above catalog $250.00; check it against the PO before paying (decision 23). Condition: Confirm the price against the PO: WidgetA at $300.00 is 20% above catalog $250.00.",
       "memo_by": "template",
       "grok_calls": 0
     },

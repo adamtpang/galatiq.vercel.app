@@ -1,8 +1,8 @@
 {
  "mode": "offline",
  "model": null,
- "generated_at": "2026-10-22 21:49 CDT",
- "commit": "76881f7",
+ "generated_at": "2026-10-22 22:06 CDT",
+ "commit": "7e5180c",
  "traces": [
   "(temporary, not kept)/main/trace.jsonl",
   "(temporary, not kept)/extra/trace.jsonl",
@@ -1981,7 +1981,7 @@
     ],
     "grok_reasons": [],
     "reasons": [
-     "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-22 9:49 PM CDT) under a different number (INV-1101)"
+     "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-22 10:06 PM CDT) under a different number (INV-1101)"
     ]
    },
    {
@@ -2202,7 +2202,7 @@
     "PAST_DUE",
     "DUPLICATE_INVOICE"
    ],
-   "reason": "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-22 9:49 PM CDT) under a different number (INV-1101)"
+   "reason": "DUPLICATE_INVOICE: Same vendor, line items, quantities and total as INV-1001 (invoice_1001.txt, seen in an earlier run and approved, paid $5,000.00 on 2026-10-22 10:06 PM CDT) under a different number (INV-1101)"
   }
  },
  "cost_latency": {
@@ -2211,7 +2211,7 @@
     "file": "invoice_1001.txt",
     "group": "samples",
     "decision": "APPROVED",
-    "latency_s": 0.008,
+    "latency_s": 0.007,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2239,7 +2239,7 @@
     "file": "invoice_1003.txt",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2253,7 +2253,7 @@
     "file": "invoice_1004.json",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.003,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2267,7 +2267,7 @@
     "file": "invoice_1004_revised.json",
     "group": "samples",
     "decision": "APPROVED",
-    "latency_s": 0.002,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2281,7 +2281,7 @@
     "file": "invoice_1005.json",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2295,7 +2295,7 @@
     "file": "invoice_1006.csv",
     "group": "samples",
     "decision": "APPROVED",
-    "latency_s": 0.004,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2309,7 +2309,7 @@
     "file": "invoice_1007.csv",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.001,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2323,7 +2323,7 @@
     "file": "invoice_1008.txt",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.002,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2337,7 +2337,7 @@
     "file": "invoice_1009.json",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.001,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2350,8 +2350,8 @@
    {
     "file": "invoice_1010.txt",
     "group": "samples",
-    "decision": "APPROVED",
-    "latency_s": 0.003,
+    "decision": "PENDING_HUMAN",
+    "latency_s": 0.007,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2379,7 +2379,7 @@
     "file": "invoice_1011.txt",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.004,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2393,7 +2393,7 @@
     "file": "invoice_1012.pdf",
     "group": "samples",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.02,
+    "latency_s": 0.019,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2421,7 +2421,7 @@
     "file": "invoice_1013.json",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2435,7 +2435,7 @@
     "file": "invoice_1013.pdf",
     "group": "samples",
     "decision": "REJECTED",
-    "latency_s": 0.019,
+    "latency_s": 0.02,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2449,7 +2449,7 @@
     "file": "invoice_1014.xml",
     "group": "samples",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2463,7 +2463,7 @@
     "file": "invoice_1015.csv",
     "group": "samples",
     "decision": "APPROVED",
-    "latency_s": 0.003,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2505,7 +2505,7 @@
     "file": "invoice_3002_injection_reworded.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2519,7 +2519,7 @@
     "file": "invoice_3003_lookalike_vendor.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.003,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2533,7 +2533,7 @@
     "file": "invoice_3004_renamed_vendor.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.001,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2575,7 +2575,7 @@
     "file": "invoice_3007_watchlist_address.json",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.003,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2589,7 +2589,7 @@
     "file": "invoice_3008_bank_details_change.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.003,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2645,7 +2645,7 @@
     "file": "invoice_3012_fence_close.txt",
     "group": "adversarial",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2673,7 +2673,7 @@
     "file": "invoice_3014_wrong_types.json",
     "group": "adversarial",
     "decision": "REJECTED",
-    "latency_s": 0.003,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2701,7 +2701,7 @@
     "file": "invoice_2001_email.txt",
     "group": "extra",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.003,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2743,7 +2743,7 @@
     "file": "invoice_2004_over_limit_clean.txt",
     "group": "extra",
     "decision": "APPROVED",
-    "latency_s": 0.003,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2785,7 +2785,7 @@
     "file": "invoice_4001_supplier_at.txt",
     "group": "unseen",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.004,
+    "latency_s": 0.003,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2799,7 +2799,7 @@
     "file": "invoice_4002_pipe_table.txt",
     "group": "unseen",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.002,
+    "latency_s": 0.004,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2813,7 +2813,7 @@
     "file": "invoice_4003_prose_email.txt",
     "group": "unseen",
     "decision": "PENDING_HUMAN",
-    "latency_s": 0.004,
+    "latency_s": 0.002,
     "calls": 0,
     "prompt_tokens": 0,
     "cached_prompt_tokens": 0,
@@ -2846,10 +2846,10 @@
     "cached_prompt_tokens": 0,
     "completion_tokens": 0,
     "reasoning_tokens": 0,
-    "latency_sum_s": 0.1,
+    "latency_sum_s": 0.11,
     "wall_s": 0.25,
     "latency_mean_s": 0.01,
-    "latency_mean_ms": 5.0,
+    "latency_mean_ms": 5.4,
     "billed_usd": 0.0,
     "billed_usd_per_invoice": 0.0,
     "list_price_usd": 0.0
@@ -2861,10 +2861,10 @@
     "cached_prompt_tokens": 0,
     "completion_tokens": 0,
     "reasoning_tokens": 0,
-    "latency_sum_s": 0.03,
-    "wall_s": 0.09,
+    "latency_sum_s": 0.04,
+    "wall_s": 0.1,
     "latency_mean_s": 0.0,
-    "latency_mean_ms": 2.2,
+    "latency_mean_ms": 2.4,
     "billed_usd": 0.0,
     "billed_usd_per_invoice": 0.0,
     "list_price_usd": 0.0
@@ -2879,7 +2879,7 @@
     "latency_sum_s": 0.01,
     "wall_s": 0.04,
     "latency_mean_s": 0.0,
-    "latency_mean_ms": 2.4,
+    "latency_mean_ms": 2.3,
     "billed_usd": 0.0,
     "billed_usd_per_invoice": 0.0,
     "list_price_usd": 0.0
@@ -2894,7 +2894,7 @@
     "latency_sum_s": 0.01,
     "wall_s": 0.04,
     "latency_mean_s": 0.0,
-    "latency_mean_ms": 3.3,
+    "latency_mean_ms": 3.1,
     "billed_usd": 0.0,
     "billed_usd_per_invoice": 0.0,
     "list_price_usd": 0.0
@@ -2907,7 +2907,7 @@
    "file": "invoice_1001.txt",
    "invoice": "INV-1001",
    "decision": "APPROVED",
-   "ms": 8.4,
+   "ms": 6.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -2948,7 +2948,7 @@
    "file": "invoice_1002.txt",
    "invoice": "INV-1002",
    "decision": "REJECTED",
-   "ms": 1.9,
+   "ms": 2.1,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -2979,7 +2979,7 @@
    "file": "invoice_1003.txt",
    "invoice": "INV-1003",
    "decision": "REJECTED",
-   "ms": 1.8,
+   "ms": 2.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3011,7 +3011,7 @@
    "file": "invoice_1004.json",
    "invoice": "INV-1004",
    "decision": "REJECTED",
-   "ms": 3.1,
+   "ms": 1.7,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3042,7 +3042,7 @@
    "file": "invoice_1004_revised.json",
    "invoice": "INV-1004",
    "decision": "APPROVED",
-   "ms": 2.2,
+   "ms": 4.2,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3083,7 +3083,7 @@
    "file": "invoice_1005.json",
    "invoice": "INV-1005",
    "decision": "REJECTED",
-   "ms": 1.8,
+   "ms": 2.8,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3114,7 +3114,7 @@
    "file": "invoice_1006.csv",
    "invoice": "INV-1006",
    "decision": "APPROVED",
-   "ms": 3.9,
+   "ms": 1.7,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3155,7 +3155,7 @@
    "file": "invoice_1007.csv",
    "invoice": "INV-1007",
    "decision": "REJECTED",
-   "ms": 1.4,
+   "ms": 2.1,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3188,7 +3188,7 @@
    "file": "invoice_1008.txt",
    "invoice": "INV-1008",
    "decision": "REJECTED",
-   "ms": 2.1,
+   "ms": 3.8,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3220,7 +3220,7 @@
    "file": "invoice_1009.json",
    "invoice": "INV-1009",
    "decision": "REJECTED",
-   "ms": 1.4,
+   "ms": 1.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3254,8 +3254,8 @@
   "invoice_1010.txt": {
    "file": "invoice_1010.txt",
    "invoice": "INV-1010",
-   "decision": "APPROVED",
-   "ms": 3.4,
+   "decision": "PENDING_HUMAN",
+   "ms": 6.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3278,18 +3278,17 @@
      ]
     }
    ],
-   "paid": 7185.0,
+   "paid": null,
    "risk": {
     "score": 10,
     "deterministic": 10,
     "grok_reasons": [],
     "grok_error": null
    },
-   "decided_by": "vp",
+   "decided_by": "price_check",
    "reasons": [
-    "Vendor is on file",
-    "Math and stock checks are clean",
-    "Open points are covered by payment conditions"
+    "PRICE_VARIANCE: WidgetA at $300.00 is 20% above catalog $250.00; check it against the PO before paying (decision 23)",
+    "Approved before this check by vp: Vendor is on file; Math and stock checks are clean; Open points are covered by payment conditions"
    ],
    "conditions": [
     "Confirm the price against the PO: WidgetA at $300.00 is 20% above catalog $250.00."
@@ -3300,7 +3299,7 @@
    "file": "invoice_1011.pdf",
    "invoice": "INV-1011",
    "decision": "APPROVED",
-   "ms": 16.2,
+   "ms": 16.3,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3341,7 +3340,7 @@
    "file": "invoice_1011.txt",
    "invoice": "INV-1011",
    "decision": "REJECTED",
-   "ms": 3.6,
+   "ms": 2.3,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3372,7 +3371,7 @@
    "file": "invoice_1012.pdf",
    "invoice": "INV-1012",
    "decision": "PENDING_HUMAN",
-   "ms": 19.8,
+   "ms": 19.4,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3403,7 +3402,7 @@
    "file": "invoice_1012.txt",
    "invoice": "INV-1012",
    "decision": "REJECTED",
-   "ms": 2.2,
+   "ms": 1.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3434,7 +3433,7 @@
    "file": "invoice_1013.json",
    "invoice": "INV-1013",
    "decision": "REJECTED",
-   "ms": 2.0,
+   "ms": 2.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3468,7 +3467,7 @@
    "file": "invoice_1013.pdf",
    "invoice": "INV-1013",
    "decision": "REJECTED",
-   "ms": 19.3,
+   "ms": 20.0,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3503,7 +3502,7 @@
    "file": "invoice_1014.xml",
    "invoice": "INV-1014",
    "decision": "PENDING_HUMAN",
-   "ms": 2.1,
+   "ms": 3.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3534,7 +3533,7 @@
    "file": "invoice_1015.csv",
    "invoice": "INV-1015",
    "decision": "APPROVED",
-   "ms": 3.0,
+   "ms": 4.3,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3606,7 +3605,7 @@
    "file": "invoice_3001_injection_note.json",
    "invoice": "INV-3001",
    "decision": "PENDING_HUMAN",
-   "ms": 2.4,
+   "ms": 2.2,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3637,7 +3636,7 @@
    "file": "invoice_3002_injection_reworded.txt",
    "invoice": "INV-3002",
    "decision": "PENDING_HUMAN",
-   "ms": 1.7,
+   "ms": 4.2,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3668,7 +3667,7 @@
    "file": "invoice_3003_lookalike_vendor.txt",
    "invoice": "INV-3003",
    "decision": "PENDING_HUMAN",
-   "ms": 2.7,
+   "ms": 3.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3699,7 +3698,7 @@
    "file": "invoice_3004_renamed_vendor.txt",
    "invoice": "INV-3004",
    "decision": "PENDING_HUMAN",
-   "ms": 1.4,
+   "ms": 2.7,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3805,7 +3804,7 @@
    "file": "invoice_3006_duplicate_new_number.txt",
    "invoice": "INV-1101",
    "decision": "REJECTED",
-   "ms": 1.5,
+   "ms": 1.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3836,7 +3835,7 @@
    "file": "invoice_3007_watchlist_address.json",
    "invoice": "INV-3007",
    "decision": "PENDING_HUMAN",
-   "ms": 2.6,
+   "ms": 2.1,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3875,7 +3874,7 @@
    "file": "invoice_3008_bank_details_change.txt",
    "invoice": "INV-3008",
    "decision": "PENDING_HUMAN",
-   "ms": 2.6,
+   "ms": 1.5,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3906,7 +3905,7 @@
    "file": "invoice_3009_moved_banks.txt",
    "invoice": "INV-3009",
    "decision": "PENDING_HUMAN",
-   "ms": 2.6,
+   "ms": 2.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3937,7 +3936,7 @@
    "file": "invoice_3010_system_precleared.txt",
    "invoice": "INV-3010",
    "decision": "PENDING_HUMAN",
-   "ms": 1.8,
+   "ms": 1.7,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3968,7 +3967,7 @@
    "file": "invoice_3011_assistant_final_answer.json",
    "invoice": "INV-3011",
    "decision": "PENDING_HUMAN",
-   "ms": 2.0,
+   "ms": 2.2,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -3999,7 +3998,7 @@
    "file": "invoice_3012_fence_close.txt",
    "invoice": "INV-3012",
    "decision": "PENDING_HUMAN",
-   "ms": 1.7,
+   "ms": 2.8,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4030,7 +4029,7 @@
    "file": "invoice_3013_notes_list.json",
    "invoice": "INV-3013",
    "decision": "REJECTED",
-   "ms": 3.0,
+   "ms": 2.5,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4062,7 +4061,7 @@
    "file": "invoice_3014_wrong_types.json",
    "invoice": "INV-3014",
    "decision": "REJECTED",
-   "ms": 2.6,
+   "ms": 1.5,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4095,7 +4094,7 @@
    "file": "invoice_3015_wire_change.txt",
    "invoice": "INV-3015",
    "decision": "PENDING_HUMAN",
-   "ms": 1.6,
+   "ms": 1.5,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4126,7 +4125,7 @@
    "file": "invoice_2001_email.txt",
    "invoice": null,
    "decision": "PENDING_HUMAN",
-   "ms": 2.6,
+   "ms": 2.3,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4157,7 +4156,7 @@
    "file": "invoice_2002_injection.txt",
    "invoice": "INV-2002",
    "decision": "PENDING_HUMAN",
-   "ms": 3.5,
+   "ms": 3.6,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4189,7 +4188,7 @@
    "file": "invoice_2003_truncated.json",
    "invoice": null,
    "decision": "PENDING_HUMAN",
-   "ms": 1.2,
+   "ms": 0.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4220,7 +4219,7 @@
    "file": "invoice_2004_over_limit_clean.txt",
    "invoice": "INV-2004",
    "decision": "APPROVED",
-   "ms": 2.9,
+   "ms": 1.9,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4267,7 +4266,7 @@
    "file": "invoice_2005_over_limit_price.txt",
    "invoice": "INV-2005",
    "decision": "PENDING_HUMAN",
-   "ms": 2.6,
+   "ms": 2.8,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4337,6 +4336,7 @@
    ],
    "conditions": [
     "Confirm the price against the PO: GadgetX at $1,000.00 is 33% above catalog $750.00.",
+    "Check the charge against the PO: Line 1: GadgetX at $1,000.00 is 33% over catalog $750.00 (limit 25%).",
     "Resolve auditor concern before paying: Price far off catalog: GadgetX at $1,000.00 is 33% above catalog $750.00.",
     "Resolve auditor concern before paying: Price far off catalog: GadgetX at $1,000.00 is 33% above catalog $750.00."
    ],
@@ -4346,7 +4346,7 @@
    "file": "invoice_2006_critic_objects.txt",
    "invoice": "INV-2006",
    "decision": "REJECTED",
-   "ms": 1.8,
+   "ms": 2.4,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4401,7 +4401,7 @@
    "file": "invoice_4001_supplier_at.txt",
    "invoice": null,
    "decision": "PENDING_HUMAN",
-   "ms": 4.0,
+   "ms": 3.4,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4432,7 +4432,7 @@
    "file": "invoice_4002_pipe_table.txt",
    "invoice": "INV-4002",
    "decision": "PENDING_HUMAN",
-   "ms": 2.0,
+   "ms": 4.0,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4463,7 +4463,7 @@
    "file": "invoice_4003_prose_email.txt",
    "invoice": "INV-4003",
    "decision": "PENDING_HUMAN",
-   "ms": 3.8,
+   "ms": 1.8,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4494,7 +4494,7 @@
    "file": "invoice_4004_odd_headers.csv",
    "invoice": null,
    "decision": "PENDING_HUMAN",
-   "ms": 3.4,
+   "ms": 3.3,
    "llm": {
     "calls": 0,
     "prompt_tokens": 0,
@@ -4581,8 +4581,8 @@
   {
    "label": "committed demo runs (runs/demo/offline vs runs/demo/live), 20 samples",
    "invoices": 20,
-   "agree": 16,
-   "rate": 0.8,
+   "agree": 17,
+   "rate": 0.85,
    "disagreements": [
     {
      "file": "invoice_1001.txt",
@@ -4632,29 +4632,6 @@
      ]
     },
     {
-     "file": "invoice_1010.txt",
-     "offline": "APPROVED",
-     "offline_by": "vp",
-     "offline_reasons": [
-      "Vendor is on file",
-      "Math and stock checks are clean",
-      "Open points are covered by payment conditions"
-     ],
-     "live": "PENDING_HUMAN",
-     "live_by": "vp",
-     "live_reasons": [
-      "Vendor Consolidated Materials Group is on file.",
-      "Invoice math is clean and total is 7185.00 USD, under the approval threshold.",
-      "WidgetA rush line is 20% above catalog ($300.00 vs $250.00); risk score 30."
-     ],
-     "live_conditions": [
-      "Confirm the rush-order premium is authorized before payment."
-     ],
-     "live_risk": 30,
-     "offline_risk": 10,
-     "grok_risk_reasons": []
-    },
-    {
      "file": "invoice_1014.xml",
      "offline": "PENDING_HUMAN",
      "offline_by": "hard_hold",
@@ -4681,7 +4658,7 @@
     }
    ],
    "disagreement_routing": {
-    "to_human": 4,
+    "to_human": 3,
     "paid_on_one_side": [
      {
       "file": "invoice_1001.txt",
@@ -4694,25 +4671,20 @@
       "amount": 5940.0
      },
      {
-      "file": "invoice_1010.txt",
-      "paid_by": "offline",
-      "amount": 7185.0
-     },
-     {
       "file": "invoice_1014.xml",
       "paid_by": "live",
       "amount": 4455.0
      }
     ],
-    "paid_on_one_side_usd": 22580.0,
+    "paid_on_one_side_usd": 15395.0,
     "paid_by_both": 3
    }
   },
   {
    "label": "eval live run (2026-10-22 20:28 CDT) vs this offline run, samples (20)",
    "invoices": 20,
-   "agree": 18,
-   "rate": 0.9,
+   "agree": 19,
+   "rate": 0.95,
    "disagreements": [
     {
      "file": "invoice_1004_revised.json",
@@ -4738,49 +4710,18 @@
       "Vendor history shows prior INV-1004 (revision null) status REJECTED at $1,890.00; this document resubmits the same invoice number as revision R1 at $5,940.00.",
       "Notes claim \"Revised invoice - additional items added per PO amendment\" but the invoice cites no PO number or amendment identifier to support that claim."
      ]
-    },
-    {
-     "file": "invoice_1010.txt",
-     "offline": "APPROVED",
-     "offline_by": "vp",
-     "offline_reasons": [
-      "Vendor is on file",
-      "Math and stock checks are clean",
-      "Open points are covered by payment conditions"
-     ],
-     "live": "PENDING_HUMAN",
-     "live_by": "vp",
-     "live_reasons": [
-      "Vendor is on file and the invoice total matches the authoritative amount.",
-      "WidgetA is billed at two rates, with the rush line 20% above catalog and no rush authorization or PO referenced.",
-      "Risk score is below the high-risk cutoff, so this is a documentation issue for a human rather than a hard reject."
-     ],
-     "live_conditions": [
-      "Confirm a PO or written rush authorization before paying the premium line.",
-      "Release payment only after that authorization is on file."
-     ],
-     "live_risk": 28,
-     "offline_risk": 10,
-     "grok_risk_reasons": [
-      "Same SKU billed at two rates on one invoice: WidgetA 8 @ $250.00 and 'WidgetA (rush order)' 4 @ $300.00; the premium is only labeled in the line description, with no rush authorization or PO referenced in the invoice text."
-     ]
     }
    ],
    "disagreement_routing": {
-    "to_human": 2,
+    "to_human": 1,
     "paid_on_one_side": [
      {
       "file": "invoice_1004_revised.json",
       "paid_by": "offline",
       "amount": 5940.0
-     },
-     {
-      "file": "invoice_1010.txt",
-      "paid_by": "offline",
-      "amount": 7185.0
      }
     ],
-    "paid_on_one_side_usd": 13125.0,
+    "paid_on_one_side_usd": 5940.0,
     "paid_by_both": 4
    }
   },

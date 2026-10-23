@@ -10,7 +10,7 @@ stand-ins take their place and no model is called. Every decision has reasons an
 
 ```bash
 python main.py --batch data/invoices     # the 20 case invoices: table, reasons, trace path
-pytest                                   # 427 offline tests, about 20 seconds
+pytest                                   # 437 offline tests, about 20 seconds
 ```
 
 The brief's own command also works: `python main.py --invoice_path=data/invoices/invoice1.txt`.
@@ -19,7 +19,7 @@ The brief's own command also works: `python main.py --invoice_path=data/invoices
 
 | Run | Paid | Rejected | Held |
 |---|---|---|---|
-| Offline, commit 76881f7 | 6, $30,375.00 | 12 | 2 (1012.pdf renamed vendor, 1014 EUR) |
+| Offline, commit 7e5180c | 5, $23,190.00 | 12 | 3 (1010 price 20% over catalog, 1012.pdf renamed vendor, 1014 EUR) |
 | Live demo run, grok-4.7, commit 05a4ef5 | 4, $16,705.00 | 12 | 4 |
 
 The same 12 are rejected in every run. Adversarial set: 15 of 15 caught offline and live. The third reviewer's 9
@@ -27,7 +27,7 @@ bank-change sentences and 10 invented injections are all held offline (tests in 
 
 **Honest limits**
 
-- The full live runs predate the review 3 fixes (76881f7). Only three live spot checks were run after them (1014 and
+- The full live runs predate the review 3 fixes (76881f7 and 7e5180c). Only three live spot checks were run after them (1014 and
   two bank sentences, all held, $0.10). The live demo run paid 1014 at the mock rate; it is now held.
 - Offline injection and bank-change detection is pattern-based. It catches the wordings it was written for, not every
   wording. Live, Grok is the real reader (its `prompt_injection` and `payment_details_changed` fields hold).
