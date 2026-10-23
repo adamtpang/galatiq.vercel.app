@@ -7,8 +7,10 @@ The README has the short version. Every number here comes from a committed file:
 (evals). All live results were made on Oct 22, 2026 between 7:46 PM and 9:16 PM CT at commit 05a4ef5, which only
 added data and docs on top of 4d539d3. One later code change is not in the live numbers: after the live eval showed
 that Grok's repair could rebuild adversarial 3014 and drop its wrong-type errors, a file with wrong value types is no
-longer sent to Grok repair (`tests/test_review_fixes.py::test_wrong_types_are_never_repaired_by_grok_live`). See
-the README for the spot check of that fix.
+longer sent to Grok repair (`tests/test_review_fixes.py::test_wrong_types_are_never_repaired_by_grok_live`). Live
+spot check at commit 7d320a2 (Oct 22, 9:19 PM CT, `python main.py --invoice_path=data/invoices_adversarial/invoice_3014_wrong_types.json --mode live`
+on a fresh database): no repair call, REJECTED by hard rules with INVALID_FIELD_TYPE, Grok's rejection review agreed,
+not paid; 2 Grok calls, $0.0204 billed.
 
 Earlier live results (before review 2) came from local checkpoint commits 4719dbe, 982b14f and 849b0af that were
 never pushed to main. They are now on the branch
