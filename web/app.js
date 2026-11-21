@@ -14,7 +14,7 @@
   var SEV = { block: "Blocking: rules out payment", warn: "Warning: does not block on its own", info: "Info: noted for the record" };
   var AGENT = { ingestion: "Ingest", validation: "Validate", risk: "Risk", approval: "Approval", memo: "Memo", payment: "Payment", hitl: "Review", guard: "Guard" };
   var STAGES = [["ingestion", "Ingest", "Read the file"], ["validation", "Validate", "Stock, math, dates, duplicates"], ["risk", "Risk", "Fraud score; Grok checks claims with read-only tools"], ["vp", "VP", "Proposes approve, hold or reject"], ["critic", "Critic", "Challenges VP approvals (a rules stand-in offline)"], ["outcome", "Outcome", "Pay, reject, or hold for a person"]];
-  var README = "https://github.com/adamtpang/galatiq.vercel.app#quickstart-offline-about-a-minute";
+  var README = "https://github.com/adamtpang/invoiceclerk#run-it";
   var SCALE = 25, MIN_STEP = 130, INTRO = 280, OUTRO = 170;
   var $ = function (id) { return document.getElementById(id); };
   var REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -631,7 +631,7 @@
       cl.calls + " calls, " + cl.latency_mean_s + " s per invoice on average over all 20. Offline costs $0."));
     $("ev-cards").innerHTML = cards.join("");
     $("ev-note").textContent = "From evals/results, exported to /data/evals.json. Offline " + (E.offline_generated_at || "") + (E.live_generated_at ? "; live " + E.live_generated_at : "") + ".";
-    $("ev-foot").innerHTML = 'Details, traces and the live/offline disagreements: <a href="https://github.com/adamtpang/galatiq.vercel.app/tree/main/evals/results">evals/results on GitHub</a>.';
+    $("ev-foot").innerHTML = 'Details, traces and the live/offline disagreements: <a href="https://github.com/adamtpang/invoiceclerk/tree/main/evals/results">evals/results on GitHub</a>.';
   }
   fetch("/data/evals.json").then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
     .then(renderEvals).catch(function () { $("ev-note").textContent = "Could not load eval results."; });

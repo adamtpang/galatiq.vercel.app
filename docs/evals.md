@@ -65,4 +65,4 @@ Grok's risk review spotted each problem, so the VP held before any critic call. 
 4. `--offline --chaos 0.3 --seed 7`, then the same batch again: retries with backoff, then `idempotency_skip`.
 5. `python main.py review INV-1012` and `python main.py ui`: the queue; approve pays through the same idempotent step.
 6. `--mode live` (needs `XAI_API_KEY`): `grok_cross_check`, `tool_call`, `memo`, `llm_repair` on 2001 and 2003.
-7. https://galatiq.vercel.app replays the committed runs.
+7. https://invoiceclerk.vercel.app replays the committed runs.
