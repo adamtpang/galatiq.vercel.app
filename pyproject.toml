@@ -1,7 +1,7 @@
 [project]
 name = "invoice-agents"
 version = "0.1.0"
-description = "Multi-agent invoice processing for the Galatiq case"
+description = "Multi-agent invoice processing for Acme Corp accounts payable"
 requires-python = ">=3.11"
 
 [tool.setuptools]
