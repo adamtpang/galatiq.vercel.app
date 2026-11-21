@@ -1,6 +1,6 @@
 # Acme invoice agents
 
-[![CI](https://github.com/adamtpang/galatiq.vercel.app/actions/workflows/ci.yml/badge.svg)](https://github.com/adamtpang/galatiq.vercel.app/actions/workflows/ci.yml)
+[![CI](https://github.com/adamtpang/invoiceclerk/actions/workflows/ci.yml/badge.svg)](https://github.com/adamtpang/invoiceclerk/actions/workflows/ci.yml)
 
 **Start here: [READ_THIS_FIRST.md](READ_THIS_FIRST.md)** (one page).
 
@@ -17,7 +17,7 @@ agents' prompts take their place and no model is called. Every decision has reas
 Python 3.11 or newer, no API key, about a minute:
 
 ```bash
-git clone https://github.com/adamtpang/galatiq.vercel.app galatiq && cd galatiq
+git clone https://github.com/adamtpang/invoiceclerk && cd invoiceclerk
 python3 -m venv .venv && source .venv/bin/activate
 python -m pip install -r requirements.txt && python main.py --batch data/invoices --offline
 ```
