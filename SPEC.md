@@ -1,10 +1,10 @@
-# SPEC.md: checkinvoice build spec
+# SPEC.md: invoiceclerk build spec
 
 Written Nov 20, 2026 (Central Time) from `REDESIGN_HANDOFF.md` (branch `thrive-redesign-handoff`, PR #1), the repo
 tree on that branch, and https://evals.thriveholdings.com (fetched Nov 20, 2026). This is a spec only. It changes
 no code. Each step below is one pull request for Claude to build, in order, with checkable acceptance criteria.
 
-Target: rename this project to **checkinvoice** (target URL `checkinvoice.vercel.app`) and make it a gift project for
+Target: rename this project to **invoiceclerk** (target URL `invoiceclerk.vercel.app`) and make it a gift project for
 Thrive Holdings: an accounts payable checker where the agent does the rote work, a person signs off, and every
 correction becomes an eval case (handoff section 5 goal).
 
@@ -19,7 +19,7 @@ Where this spec says "open question", the handoff and the repo do not answer it.
   (`.github/workflows/ci.yml`: pytest plus `python main.py --batch data/invoices --offline`) green on the PR.
 - Offline first. No step may require an API key to pass its tests. Live model runs cost money and need Adam's OK.
 
-## Step 1. Rebrand to checkinvoice and replace all Galatiq data
+## Step 1. Rebrand to invoiceclerk and replace all Galatiq data
 
 ### 1a. Remove the Galatiq sample files (list by path)
 
@@ -137,7 +137,7 @@ Claude does not do these. List them in the PR body as a checklist for Adam:
 1. **GitHub repo rename (Adam does this himself):** Settings, General, Repository name, from `galatiq.vercel.app`
    to the new name (open question Q2). GitHub redirects the old URL, but update links anyway.
 2. **Vercel project rename (Adam does this himself):** Project Settings, General, Project Name. Add
-   `checkinvoice.vercel.app` under Domains if it is free (open question Q3). Decide what happens to
+   `invoiceclerk.vercel.app` under Domains if it is free (open question Q3). Decide what happens to
    `galatiq.vercel.app` (open question Q4).
 3. After the renames, Claude opens a small follow-up PR that updates hard-coded URLs (`web/app.js` lines 17 and
    634, the CI badge in `README.md` line 3, the clone command in `README.md` line 20, `docs/`).
@@ -157,7 +157,7 @@ Claude does not do these. List them in the PR body as a checklist for Adam:
 - `python main.py --batch data/invoices --offline` runs and its decisions match `tests/golden.yaml`.
 - `python -m evals` runs offline and writes fresh `evals/results/offline.*` built only from the new files.
 - `make check` passes. CI is green.
-- The site served from `web/` (for example `python -m http.server -d web`) shows checkinvoice branding, no
+- The site served from `web/` (for example `python -m http.server -d web`) shows invoiceclerk branding, no
   Galatiq or Acme text, and every asset it references loads (no 404 in the browser console).
 - Handoff 5.4 fixes are in: `#run` and `#report` nav links work before pressing Run (handoff problem 6), `og:` and
   `twitter:` meta tags plus an `og.png` exist (problem 9), and each cost figure on the site has a one-line label
@@ -369,8 +369,8 @@ One JSON object per correction (handoff 5.2 fields, plus what is needed to repla
 ## Open questions for Adam
 
 - **Q1.** Names for the fictional firm, its clients and vendors in the synthetic set.
-- **Q2.** New GitHub repo name (for example `checkinvoice`), and whether to rename this repo or start a fresh one.
-- **Q3.** Is `checkinvoice.vercel.app` free on Vercel? Not checked.
+- **Q2.** New GitHub repo name (for example `invoiceclerk`), and whether to rename this repo or start a fresh one.
+- **Q3.** Is `invoiceclerk.vercel.app` free on Vercel? On Nov 20, 2026 it returned HTTP 404, which suggests it is unclaimed, but that is not proof; confirm when adding the domain.
 - **Q4.** What happens to `galatiq.vercel.app` after the rename: keep it as a redirect, take it down, or leave it.
 - **Q5.** Git history still contains the Galatiq files. Rename this repo and accept that, or start a fresh repo
   and link back (handoff 5.5 and section 9)? Also: when to delete `REDESIGN_HANDOFF.md` and reword `SPEC.md`,
