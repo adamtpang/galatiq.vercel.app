@@ -10,7 +10,7 @@ review risk with read-only tools, argue the approval as VP and critic, review ev
 escalate it) and write a memo for every decision. Offline, with no API key, fixed **rules stand-ins** written from the
 agents' prompts take their place and no model is called. Every decision has reasons and a full trace.
 
-**Site:** https://galatiq.vercel.app replays the committed runs step by step (the system itself runs locally).
+**Site:** https://invoiceclerk.vercel.app replays the committed runs step by step (the system itself runs locally).
 
 ## Run it
 
