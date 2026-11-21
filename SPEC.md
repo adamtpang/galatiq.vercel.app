@@ -19,11 +19,11 @@ Where this spec says "open question", the handoff and the repo do not answer it.
   (`.github/workflows/ci.yml`: pytest plus `python main.py --batch data/invoices --offline`) green on the PR.
 - Offline first. No step may require an API key to pass its tests. Live model runs cost money and need Adam's OK.
 
-## Step 1. Rebrand to invoiceclerk and replace all Galatiq data
+## Step 1. Rebrand to invoiceclerk and replace all case data
 
-### 1a. Remove the Galatiq sample files (list by path)
+### 1a. Remove the case sample files (list by path)
 
-These come from `github.com/galatiq-ai/galatiq-case-invoices`, which has no license file (handoff section 3, item 2;
+These come from the case's public sample-invoice repo, which has no license file (handoff section 3, item 2;
 `README.md` lines 119 to 121). Delete all of them:
 
 - `data/generate_pdfs.py`
@@ -56,14 +56,14 @@ then delete the originals:
   `web/data/sources.json`. Regenerate the offline ones from the new data. Live results are regenerated only in
   Step 2, with Adam's OK for the spend.
 
-### 1c. Remove every Galatiq and Acme reference in code and copy
+### 1c. Remove every case-company and Acme reference in code and copy
 
-Found by `grep -rIin -e galatiq -e acme` on this branch (excluding the files deleted above):
+Found by a case-insensitive grep for the case company's name and `acme` on this branch (excluding the files deleted above):
 
 - `web/index.html` lines 6, 7, 19, 24, 33, 34, 185, 186 (title, meta description, brand, eyebrow, hero, footer)
-- `web/app.js` lines 17 and 634 (GitHub links to `adamtpang/galatiq.vercel.app`)
-- `web/styles.css` line 1 (comment says the tokens follow galatiq.ai). Replace the comment and pick a palette that
-  is not taken from galatiq.ai. Open question Q6 covers the look.
+- `web/app.js` lines 17 and 634 (GitHub links to the old repo name)
+- `web/styles.css` line 1 (comment says the tokens follow the case company's site). Replace the comment and pick a palette that
+  is not taken from the case company's site. Open question Q6 covers the look.
 - `README.md` (title, lines 7, 13, 20, 120), `READ_THIS_FIRST.md` line 3
 - `invoice_agents/__init__.py` line 1, `pyproject.toml` line 4, `main.py` lines 1 and 65, `Dockerfile` lines 2 to 6
 - `invoice_agents/db.py` line 1, `invoice_agents/ui.py` line 132
@@ -79,7 +79,7 @@ Found by `grep -rIin -e galatiq -e acme` on this branch (excluding the files del
   $1.1M to $1.2M estimate built on it). Delete both. `docs/design.md` lines 51 to 57 carry the same story and
   estimate; delete them. Do not replace them with any new dollar figure unless it is sourced or labeled as an
   estimate with its assumptions.
-- `docs/evals.md` line 68 (the galatiq.vercel.app link) and the case-specific narrative across `docs/`.
+- `docs/evals.md` line 68 (the old site link) and the case-specific narrative across `docs/`.
 
 Also from handoff 5.4: rewrite `README.md` for a buyer (who it helps, what it does, run it, results table, honest
 limits) and move decision numbers and review history into `docs/DECISIONS.md` only.
@@ -134,18 +134,18 @@ Create a new, clearly synthetic dataset. Requirements:
 
 Claude does not do these. List them in the PR body as a checklist for Adam:
 
-1. **GitHub repo rename (Adam does this himself):** Settings, General, Repository name, from `galatiq.vercel.app`
+1. **GitHub repo rename (Adam does this himself):** Settings, General, Repository name, from the old name
    to the new name (open question Q2). GitHub redirects the old URL, but update links anyway.
 2. **Vercel project rename (Adam does this himself):** Project Settings, General, Project Name. Add
    `invoiceclerk.vercel.app` under Domains if it is free (open question Q3). Decide what happens to
-   `galatiq.vercel.app` (open question Q4).
+   the old address (open question Q4).
 3. After the renames, Claude opens a small follow-up PR that updates hard-coded URLs (`web/app.js` lines 17 and
    634, the CI badge in `README.md` line 3, the clone command in `README.md` line 20, `docs/`).
 
 ### Step 1 acceptance criteria
 
-- `git grep -i -n -e galatiq -e acme -- . ':!SPEC.md' ':!REDESIGN_HANDOFF.md'` prints nothing. After Adam has read
-  both planning files and they are removed or reworded (open question Q5), `git grep -i -n -e galatiq -e acme`
+- A case-insensitive `git grep` for the case company's name and `acme`, excluding `SPEC.md` and `REDESIGN_HANDOFF.md`, prints nothing. After Adam has read
+  both planning files and they are removed or reworded (open question Q5), the same grep
   with no exclusions prints nothing. Matches in git history are allowed (see Q5 on a fresh repo).
 - `git ls-files data/invoices web/invoices | grep -E 'invoice_10(0[1-9]|1[0-6])'` prints nothing, and
   `git ls-files data/generate_pdfs.py` prints nothing.
@@ -158,7 +158,7 @@ Claude does not do these. List them in the PR body as a checklist for Adam:
 - `python -m evals` runs offline and writes fresh `evals/results/offline.*` built only from the new files.
 - `make check` passes. CI is green.
 - The site served from `web/` (for example `python -m http.server -d web`) shows invoiceclerk branding, no
-  Galatiq or Acme text, and every asset it references loads (no 404 in the browser console).
+  case-company or Acme text, and every asset it references loads (no 404 in the browser console).
 - Handoff 5.4 fixes are in: `#run` and `#report` nav links work before pressing Run (handoff problem 6), `og:` and
   `twitter:` meta tags plus an `og.png` exist (problem 9), and each cost figure on the site has a one-line label
   saying which run it is from (problem 8).
@@ -360,7 +360,7 @@ One JSON object per correction (handoff 5.2 fields, plus what is needed to repla
 
 - Pull requests only. One PR per step. Never merge, and never deploy to production, without Adam's own words.
 - No secrets in git, logs, test fixtures or PR text. API keys are read from env vars named in config.
-- Never contact or email Galatiq, for any reason, including to ask about reuse terms.
+- Never contact or email the case company, for any reason, including to ask about reuse terms.
 - No invented facts or numbers. Every figure is computed from committed results, cited with a source and date, or
   labeled as an estimate with its assumptions. If something is unknown, write it as an open question.
 - No live model runs, paid tools, signups or new paid services without Adam's OK.
@@ -371,11 +371,11 @@ One JSON object per correction (handoff 5.2 fields, plus what is needed to repla
 - **Q1.** Names for the fictional firm, its clients and vendors in the synthetic set.
 - **Q2.** New GitHub repo name (for example `invoiceclerk`), and whether to rename this repo or start a fresh one.
 - **Q3.** Is `invoiceclerk.vercel.app` free on Vercel? On Nov 20, 2026 it returned HTTP 404, which suggests it is unclaimed, but that is not proof; confirm when adding the domain.
-- **Q4.** What happens to `galatiq.vercel.app` after the rename: keep it as a redirect, take it down, or leave it.
-- **Q5.** Git history still contains the Galatiq files. Rename this repo and accept that, or start a fresh repo
+- **Q4.** What happens to the old site address after the rename: keep it as a redirect, take it down, or leave it.
+- **Q5.** Git history still contains the case files. Rename this repo and accept that, or start a fresh repo
   and link back (handoff 5.5 and section 9)? Also: when to delete `REDESIGN_HANDOFF.md` and reword `SPEC.md`,
-  which both name Galatiq by necessity.
-- **Q6.** Site look: new palette and type to replace the galatiq.ai-derived tokens in `web/styles.css`.
+  which both describe the case.
+- **Q6.** Site look: new palette and type to replace the case-site-derived tokens in `web/styles.css`.
 - **Q7.** In the stop-and-ask eval, does an automatic REJECTED on a case that should be handed off count as a pass
   or a fail?
 - **Q8.** Which 3 to 5 models to run, at which effort levels, and the spend cap for the live run.

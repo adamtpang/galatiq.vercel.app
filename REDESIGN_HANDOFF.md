@@ -1,4 +1,4 @@
-# Redesign handoff: from a Galatiq take-home to a Thrive-shaped AP gift project
+# Redesign handoff: from a take-home case to a Thrive-shaped AP gift project
 
 Written Nov 20, 2026 (Central Time) after a review of the live site, this repo at commit `74f02ca`, and the
 public Thrive Holdings, Current and Shield pages listed in Sources. Nothing here has been sent to anyone.
@@ -11,7 +11,7 @@ against a seeded SQLite inventory (`config/seed.sql`), applies hard rules from `
 agents (extractor, risk reviewer, VP, critic, rejection reviewer, memo writer) in live mode, and pays, rejects or
 holds each invoice. It ships 518 offline tests, five evals (`evals/`), committed traces (`runs/`, `evals/results/`),
 a local human review UI (`invoice_agents/ui.py`, `python main.py ui`) and a static replay site (`web/`, deployed at
-https://galatiq.vercel.app). The engineering is strong. The framing, the data and the public site are what hold it
+https://invoiceclerk.vercel.app). The engineering is strong. The framing, the data and the public site are what hold it
 back as a Thrive gift.
 
 ## 2. What works (keep it)
@@ -26,8 +26,8 @@ back as a Thrive gift.
 
 ## 3. What is wrong today (ranked, with file paths)
 
-1. **It is branded as someone else's interview.** The page title is "Acme AP Agents · Galatiq FDE case by Adam Pang", the hero eyebrow says "Galatiq FDE case", and the footer says "Built by Adam Pang for the Galatiq FDE case" and "Not an official Galatiq product" (`web/index.html` lines 6, 33, 185, 186). The domain is `galatiq.vercel.app`, the repo is `adamtpang/galatiq.vercel.app`, `invoice_agents/__init__.py` line 1 says "for the Galatiq case", and `README.md` line 7 says "the Galatiq FDE case". A Thrive reader sees a take-home for another company, not a product.
-2. **The data and the problem statement are not ours.** The 20 invoices in `data/invoices/` (and copies in `web/invoices/`) and `data/generate_pdfs.py` come from `github.com/galatiq-ai/galatiq-case-invoices`, which has no license file (GitHub API reported `license: null` on Nov 20, 2026). `README.md` lines 119 to 121 already say they are not covered by this repo's MIT license. The "$2M a year, 30% error rate, 5-day delay" story in `docs/presentation.md` section 1 is the case brief's, not a real client's.
+1. **It is branded as someone else's interview.** The page title, hero eyebrow and footer named the case company (`web/index.html` lines 6, 33, 185, 186), and so did the domain, the repo name, `invoice_agents/__init__.py` line 1 and `README.md` line 7. A Thrive reader sees a take-home for another company, not a product.
+2. **The data and the problem statement are not ours.** The 20 invoices in `data/invoices/` (and copies in `web/invoices/`) and `data/generate_pdfs.py` come from the case's public sample-invoice repo, which has no license file (GitHub API reported `license: null` on Nov 20, 2026). `README.md` lines 119 to 121 already say they are not covered by this repo's MIT license. The "$2M a year, 30% error rate, 5-day delay" story in `docs/presentation.md` section 1 is the case brief's, not a real client's.
 3. **The workflow is a manufacturing inventory check, not accounting work.** Validation checks stock in an `inventory` table (`config/seed.sql`, `invoice_agents/validation.py`) because the case brief required it. A Current firm doing Client Accounting Services (bookkeeping, payroll, outsourced accounting, per current.co/services/client-accounting-services) cares about PO and receipt matching, GL coding against a client's chart of accounts, approval routing per client, vendor master hygiene, 1099 tracking and an export into the accounting system. None of that exists yet. `docs/presentation.md` section 5 lists PO matching as "next".
 4. **The human review step is invisible on the live site.** The site is a replay only (`web/index.html` hero note "Replay, not a live call"). The real review UI is localhost only (`invoice_agents/ui.py`, bound to 127.0.0.1). Thrive's whole thesis is practitioners in the loop ("Long Humans", Jun 6, 2026; the OpenAI and Thrive Tax AI post, May 27, 2026). The most on-thesis feature is the one a visitor cannot touch.
 5. **Corrections do not become evals.** A reviewer's Approve or Reject is logged (`hitl.py`, `audit_log`), but there is no field-level "predicted vs corrected" record, no grouping of repeated corrections, and no path from a correction to a new eval case. That loop is exactly what Thrive and OpenAI published as their method (Sources 4).
@@ -80,14 +80,14 @@ Goal: "An AP desk for a client accounting team, where the agent does the rote wo
 
 ### 5.4 Site and copy
 
-- New name, new domain, no Galatiq or Acme anywhere (`web/index.html`, `web/app.js` line 17, `README.md`, `invoice_agents/__init__.py`, `docs/`).
+- New name, new domain, no case-company or Acme text anywhere (`web/index.html`, `web/app.js` line 17, `README.md`, `invoice_agents/__init__.py`, `docs/`).
 - Hero: one sentence on who it helps (a bookkeeper closing AP for several clients), one live button "Review a bill", one line of honest scope.
 - Fix the dead nav anchors (problem 6), add an OG image and meta tags (problem 9), reconcile the two cost numbers with a one-line label each (problem 8).
 - README rewrite: who, what, run it, results table, honest limits. Move decision numbers and review history into `docs/DECISIONS.md` only.
 
 ### 5.5 Data
 
-- Replace every Galatiq sample with an original synthetic set (fictional firm, fictional clients, fictional vendors). Keep the same traps (duplicate, revision, renamed vendor, under-limit split, fraud, injection) rewritten from scratch. Delete `data/generate_pdfs.py` and write a new generator.
+- Replace every case sample with an original synthetic set (fictional firm, fictional clients, fictional vendors). Keep the same traps (duplicate, revision, renamed vendor, under-limit split, fraud, injection) rewritten from scratch. Delete `data/generate_pdfs.py` and write a new generator.
 - Note: git history still contains the original files. If that matters, start the redesign in a fresh repo and link back for history rather than rewriting history.
 
 ## 6. Rename options (proposals only, availability not checked)
@@ -118,7 +118,7 @@ Impact = how directly it speaks to what Thrive has published. Effort: A = an aft
 | 5 | **Audit evidence packet** per invoice from the audit trail (for their "financial audits coming soon" theme) | Medium high | A to W | `audit_log`, `reporter.py` |
 | 6 | **Shield / Forge procurement angle**: reconcile an MSP's vendor and license bills against expected seats and contract prices, flag overspend | Medium high: Forge's Procurement pillar | W | parsers, validation rules |
 | 7 | **1099 and W-9 tracker** from AP history, tied to tax season | Medium | W | vendor table |
-| 8 | **Rebrand and copy pass** (name, hero, README, OG image, nav fix, no Galatiq data) | Low alone, but required before anything is shown | A | `web/`, `README.md` |
+| 8 | **Rebrand and copy pass** (name, hero, README, OG image, nav fix, no case data) | Low alone, but required before anything is shown | A | `web/`, `README.md` |
 | 9 | **Write-up post** "What an AP agent should not do," with the restraint numbers | Medium, cheap | A | results from 2 |
 
 Suggested order for one weekend: 8 (Friday night), then 2 (Saturday), then 1 (Sunday). Ship 3 and 4 the next weekend.
@@ -134,10 +134,10 @@ Suggested order for one weekend: 8 (Friday night), then 2 (Saturday), then 1 (Su
 
 ## 9. Risk: reusing a take-home publicly
 
-- **What the case says:** the Galatiq case README asks for submission "as a link to a public GitHub repository", so a public repo was expected. It states no other terms on reuse, ownership or confidentiality.
+- **What the case says:** the case README asks for submission "as a link to a public GitHub repository", so a public repo was expected. It states no other terms on reuse, ownership or confidentiality.
 - **What it does not say:** the case repo has no license file, so its sample invoices, PDF generator and brief text are not licensed for reuse. This repo's `README.md` lines 119 to 121 already flag that.
-- **Unknown:** whether Galatiq has separate candidate terms (an email, NDA or portal terms). None were found in this repo or the public case repo. Adam should check his own records. Per Adam's standing rule, do not contact Galatiq about it.
-- **Lower-risk path:** remove the Galatiq name, the Acme story and every Galatiq sample file; use an original synthetic dataset; describe the project on its own terms. Optionally start a fresh repo so git history does not carry the original files.
+- **Unknown:** whether the case company has separate candidate terms (an email, NDA or portal terms). None were found in this repo or the public case repo. Adam should check his own records. Per Adam's standing rule, do not contact the case company about it.
+- **Lower-risk path:** remove the case company's name, the Acme story and every case sample file; use an original synthetic dataset; describe the project on its own terms. Optionally start a fresh repo so git history does not carry the original files.
 
 ## Sources (all fetched Nov 20, 2026)
 
@@ -146,6 +146,6 @@ Suggested order for one weekend: 8 (Friday night), then 2 (Saturday), then 1 (Su
 3. https://shieldtp.com and https://shieldtp.com/forge
 4. https://openai.com/index/building-self-improving-tax-agents-with-codex/
 5. https://www.current.co and https://www.current.co/services/client-accounting-services
-6. https://github.com/galatiq-ai/galatiq-case-invoices (README, license field via the GitHub API)
-7. https://galatiq.vercel.app (live site, screenshots at 1440 px and 390 px)
+6. The case's public sample-invoice repo (README, license field via the GitHub API)
+7. The live site at its original address (live site, screenshots at 1440 px and 390 px)
 8. This repo at commit `74f02ca`

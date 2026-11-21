@@ -4,7 +4,7 @@
 
 **Start here: [READ_THIS_FIRST.md](READ_THIS_FIRST.md)** (one page).
 
-A prototype that reads, checks, approves and pays Acme Corp's invoices (the Galatiq FDE case). Deterministic code
+A prototype that reads, checks, approves and pays Acme Corp's invoices (a take-home case). Deterministic code
 reads the files, does all the math and applies the hard rules. Live, Grok agents read every invoice next to the parser,
 review risk with read-only tools, argue the approval as VP and critic, review every hard-rule rejection (they can only
 escalate it) and write a memo for every decision. Offline, with no API key, fixed **rules stand-ins** written from the
