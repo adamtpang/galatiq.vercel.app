@@ -1,6 +1,6 @@
 # Acme invoice agents
 
-[![CI](https://github.com/adamtpang/galatiq.vercel.app/actions/workflows/ci.yml/badge.svg)](https://github.com/adamtpang/galatiq.vercel.app/actions/workflows/ci.yml)
+[![CI](https://github.com/adamtpang/invoiceclerk/actions/workflows/ci.yml/badge.svg)](https://github.com/adamtpang/invoiceclerk/actions/workflows/ci.yml)
 
 **Start here: [READ_THIS_FIRST.md](READ_THIS_FIRST.md)** (one page).
 
@@ -10,14 +10,14 @@ review risk with read-only tools, argue the approval as VP and critic, review ev
 escalate it) and write a memo for every decision. Offline, with no API key, fixed **rules stand-ins** written from the
 agents' prompts take their place and no model is called. Every decision has reasons and a full trace.
 
-**Site:** https://galatiq.vercel.app replays the committed runs step by step (the system itself runs locally).
+**Site:** https://invoiceclerk.vercel.app replays the committed runs step by step (the system itself runs locally).
 
 ## Run it
 
 Python 3.11 or newer, no API key, about a minute:
 
 ```bash
-git clone https://github.com/adamtpang/galatiq.vercel.app galatiq && cd galatiq
+git clone https://github.com/adamtpang/invoiceclerk && cd invoiceclerk
 python3 -m venv .venv && source .venv/bin/activate
 python -m pip install -r requirements.txt && python main.py --batch data/invoices --offline
 ```
