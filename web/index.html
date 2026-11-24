@@ -3,39 +3,91 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Acme AP Agents · invoiceclerk by Adam Pang</title>
-<meta name="description" content="A replay of a real grok-4.7 run that reads, checks, approves and pays Acme Corp's 20 sample invoices, with the original files and a handoff report.">
-<meta name="theme-color" content="#000000">
+<title>invoiceclerk: the AP desk that knows when to ask a person</title>
+<meta name="description" content="invoiceclerk reads messy vendor bills, checks them against hard rules, and pays, rejects or holds each one for a person, with reasons and evidence. A replay of a recorded run on 20 sample bills.">
+<link rel="canonical" href="https://invoiceclerk.vercel.app/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://invoiceclerk.vercel.app/">
+<meta property="og:title" content="invoiceclerk: the AP desk that knows when to ask a person">
+<meta property="og:description" content="invoiceclerk reads messy vendor bills, checks them against hard rules, and pays, rejects or holds each one for a person, with reasons and evidence. A replay of a recorded run on 20 sample bills.">
+<meta property="og:image" content="https://invoiceclerk.vercel.app/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="invoiceclerk: the AP desk that knows when to ask a person">
+<meta name="twitter:description" content="invoiceclerk reads messy vendor bills, checks them against hard rules, and pays, rejects or holds each one for a person, with reasons and evidence. A replay of a recorded run on 20 sample bills.">
+<meta name="twitter:image" content="https://invoiceclerk.vercel.app/og.png">
+<meta name="theme-color" content="#ffffff">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
 <a class="skip" href="#overview">Skip to content</a>
 <header class="nav">
   <div class="wrap nav-inner">
-    <a class="brand" href="#top">Acme AP Agents</a>
+    <a class="brand" href="#top">invoiceclerk</a>
     <nav aria-label="Sections">
-      <a href="#run">Run</a>
-      <a href="#report">Report</a>
-      <a href="#demo">Explore</a>
+      <a href="#demo">Review</a>
+      <a href="#inbox-h">Run</a>
+      <a href="#evals">Evals</a>
       <a href="https://github.com/adamtpang/invoiceclerk">Code</a>
     </nav>
-    <span class="badge" title="Played back from committed traces of a real run">Replay</span>
   </div>
 </header>
 
 <main id="top">
   <section id="overview" class="wrap section first" aria-labelledby="ov-h">
     <div class="hero">
-      <p class="eyebrow">invoiceclerk</p>
-      <h1 id="ov-h">Grok works Acme's invoice inbox.</h1>
-      <p class="lede">20 invoices in five formats. Live, Grok agents (extractor, risk reviewer, VP, critic, rejection reviewer, memo writer) work around deterministic checks to pay them, reject them or hold them for a person. Offline, rules stand-ins take their place.</p>
-      <p class="replay" id="honesty" role="note">Loading run data...</p>
+      <div>
+        <h1 id="ov-h">The AP desk that knows when to ask a person</h1>
+        <p class="lede">invoiceclerk reads messy vendor bills, checks them against hard rules, and pays, rejects or holds each one. Every decision comes with its reasons and its evidence.</p>
+        <div class="actions">
+          <a class="btn primary" href="#demo">Review a bill</a>
+          <a class="btn ghost" href="#inbox-h">Replay the run</a>
+        </div>
+        <dl class="tally">
+          <div><dd id="tally-paid">&nbsp;</dd><dt>paid</dt></div>
+          <div><dd id="tally-rejected">&nbsp;</dd><dt>rejected</dt></div>
+          <div><dd id="tally-held">&nbsp;</dd><dt>held for a person</dt></div>
+        </dl>
+        <p class="replay" id="honesty" role="note">Loading run data...</p>
+      </div>
+      <!-- A real bill from the recorded live run (web/data/demo.json, INV-1001) and its recorded decision. -->
+      <figure class="desk" aria-label="A real bill from the run, held for a person">
+        <div class="bill">
+          <div class="bill-head"><b>Widgets Inc.</b><span>invoice_1001.txt</span></div>
+          <dl class="bill-meta">
+            <div><dt>Invoice</dt><dd>INV-1001</dd></div>
+            <div><dt>Issued</dt><dd>15 Jan 2026</dd></div>
+            <div><dt>Due</dt><dd><span class="flag">1 Feb 2026</span></dd></div>
+          </dl>
+          <table>
+            <thead><tr><th>Item</th><th>Qty</th><th>Unit price</th><th>Amount</th></tr></thead>
+            <tbody>
+              <tr><td>WidgetA</td><td>10</td><td>$250.00</td><td>$2,500.00</td></tr>
+              <tr><td>WidgetB</td><td>5</td><td>$500.00</td><td>$2,500.00</td></tr>
+              <tr><td>Terms</td><td colspan="3"><span class="flag">Net 15</span></td></tr>
+            </tbody>
+            <tfoot><tr><td>Total</td><td colspan="3">$5,000.00</td></tr></tfoot>
+          </table>
+          <span class="stamp">Held for a person</span>
+        </div>
+        <figcaption class="held-why">
+          <h2><span class="dot" aria-hidden="true"></span>Why it was held</h2>
+          <ul>
+            <li>Widgets Inc. is on file and the lines add up to the total.</li>
+            <li>The terms say Net 15, but the due date is 17 days after issue.</li>
+          </ul>
+          <p>Next step: confirm whether payment is Net 15 or due 1 Feb 2026 before release.</p>
+          <p class="by">Risk 12 of 100 · decided by the approver agent · recorded run</p>
+        </figcaption>
+      </figure>
     </div>
 
+    <h2 id="inbox-h" style="margin-bottom:20px">The inbox and the pipeline</h2>
     <div class="ov-grid">
       <div class="card">
         <h2 class="card-h">The job</h2>
@@ -72,7 +124,7 @@
     </div>
 
     <div class="go">
-      <button class="btn primary xl" id="go" type="button" disabled>Run Grok on the inbox</button>
+      <button class="btn primary xl" id="go" type="button" disabled>Replay the run on the inbox</button>
       <p class="small muted" id="go-note"></p>
       <button class="linkish small" id="go-offline" type="button">Replay the offline rules instead</button>
     </div>
@@ -121,7 +173,6 @@
   <section id="report" class="wrap section" aria-labelledby="rep-h" hidden>
     <div class="run-head">
       <div>
-        <p class="eyebrow">Handoff</p>
         <h2 id="rep-h">Report</h2>
       </div>
       <div class="controls">
@@ -136,7 +187,6 @@
   </section>
 
   <section id="demo" class="wrap section" aria-labelledby="demo-h">
-    <p class="eyebrow">Explore</p>
     <h2 id="demo-h">Every invoice, every step</h2>
     <div class="toolbar">
       <div class="seg" role="group" aria-label="Run">
@@ -144,7 +194,7 @@
         <button class="seg-btn" data-run="offline" type="button">Offline rules</button>
       </div>
       <div class="seg" role="group" aria-label="Invoice set">
-        <button class="seg-btn on" data-set="case" type="button">Case samples</button>
+        <button class="seg-btn on" data-set="case" type="button">Sample bills</button>
         <button class="seg-btn" data-set="extra" type="button">Extra tests</button>
         <button class="seg-btn" data-set="critic" type="button">Critic loop</button>
       </div>
@@ -167,7 +217,6 @@
   </section>
 
   <section id="evals" class="wrap section" aria-labelledby="ev-h">
-    <p class="eyebrow">Evals</p>
     <h2 id="ev-h">How well it holds up</h2>
     <p class="small muted" id="ev-note">Loading eval results...</p>
     <div class="summary ev-grid" id="ev-cards"></div>

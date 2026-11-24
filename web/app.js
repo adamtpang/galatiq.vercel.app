@@ -302,7 +302,10 @@
   /* ---------- stage 1: overview ---------- */
   function renderOverview() {
     var live = DATA.runs.live, w = fmtWhen(live.recorded_at), p = DATA.policy;
-    $("honesty").innerHTML = '<span class="dot" aria-hidden="true"></span><span><b>Replay, not a live call.</b> Real ' + esc(live.model) + " run recorded " + esc(w.full) + ". Every step comes from the committed trace. The system runs locally: <a href='" + README + "'>quickstart</a>.</span>";
+    $("honesty").innerHTML = "A replay of one recorded run on " + live.invoices.length + " sample bills (" + esc(live.model) + ", " + esc(w.full) + "). Nothing on this page calls a live model. The system runs locally: <a href='" + README + "'>quickstart</a>.";
+    var tally = { APPROVED: 0, REJECTED: 0, PENDING_HUMAN: 0 };
+    live.invoices.forEach(function (i) { if (tally[i.decision.status] != null) tally[i.decision.status]++; });
+    $("tally-paid").textContent = tally.APPROVED; $("tally-rejected").textContent = tally.REJECTED; $("tally-held").textContent = tally.PENDING_HUMAN;
     $("job-limit").textContent = whole(p.approval_threshold_usd) + " limit";
     var invs = live.invoices, fm = {};
     invs.forEach(function (i) { var f = (i.format || "?").toUpperCase(); fm[f] = (fm[f] || 0) + 1; });
